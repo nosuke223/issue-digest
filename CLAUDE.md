@@ -98,9 +98,11 @@
 
 ## プロジェクト固有
 
-- 概要:
-- 言語・フレームワーク:
-- テストコマンド:
-- lint / format コマンド:
-- 読まなくてよいディレクトリ:
+- 概要: GitHub Issue の状況（`gh issue list --json` の出力）をラベル別にまとめ、Markdown のダイジェストを出力する CLI
+- 言語・フレームワーク: Python 3.12、uv（パッケージ管理）、pytest、ruff。コードは `src/issue_digest/`、テストは `tests/`
+- テストコマンド: `uv run pytest`（失敗したテストだけ再実行: `uv run pytest --lf`）
+- lint / format コマンド: `uv run ruff check .` / `uv run ruff format .`
+- 読まなくてよいディレクトリ: `.venv/`、`.pytest_cache/`、`.ruff_cache/`、`uv.lock`
 - その他の注意:
+  - テストで GitHub に接続しない。入力は JSON ファイル（`tests/` 以下に置くサンプル）で与える
+  - 依存パッケージの追加（`uv add`）は「止まって聞く」に当たる

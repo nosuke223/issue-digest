@@ -1,0 +1,29 @@
+[project]
+name = "issue-digest"
+version = "0.1.0"
+description = "GitHub Issue の状況を Markdown のダイジェストにまとめる CLI"
+readme = "README.md"
+authors = [
+    { name = "Tomonosuke Tsutsumi", email = "80640190+nosuke223@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+issue-digest = "issue_digest:main"
+
+[build-system]
+requires = ["uv_build>=0.12.19,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.0",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

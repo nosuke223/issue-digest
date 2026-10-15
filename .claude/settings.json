@@ -22,7 +22,10 @@
       "Bash(gh pr list *)",
       "Bash(gh pr create *)",
       "Bash(gh pr view *)",
-      "Bash(gh pr checks *)"
+      "Bash(gh pr checks *)",
+      "Bash(uv run pytest)",
+      "Bash(uv run pytest *)",
+      "Bash(uv run ruff *)"
     ],
     "deny": [
       "Read(./.env)",
