@@ -21,3 +21,10 @@ uv run issue-digest issues.json
 ```
 gh issue list --json number,title,labels,url | uv run issue-digest -
 ```
+
+`--hide-empty` を付けると、0件の分類の見出しと「なし」を出力しません。対応が必要な分類だけを見たいときに使います。
+付けない場合は、0件の分類も見出しと「なし」を出力します。
+
+```
+uv run issue-digest --hide-empty issues.json
+```

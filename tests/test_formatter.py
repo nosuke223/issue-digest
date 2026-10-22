@@ -59,6 +59,29 @@ def test_format_digest_total_counts_each_issue_once():
     assert out.splitlines()[0] == "# Issue ダイジェスト（全 3 件）"
 
 
+def test_format_digest_hide_empty_omits_empty_categories():
+    issues = [make_issue(5, "CLI を作る", ["agent:needs-decision"])]
+    out = format_digest(classify_issues(issues), hide_empty=True)
+    assert out == (
+        "# Issue ダイジェスト（全 1 件）\n"
+        "\n"
+        "## 判断待ち (agent:needs-decision) - 1件\n"
+        "\n"
+        "- #5 CLI を作る\n"
+    )
+
+
+def test_format_digest_hide_empty_all_empty():
+    out = format_digest(classify_issues([]), hide_empty=True)
+    assert out == "# Issue ダイジェスト（全 0 件）\n"
+
+
+def test_format_digest_default_shows_empty_categories():
+    classified = classify_issues([make_issue(1, "A", ["agent:ready"])])
+    assert format_digest(classified) == format_digest(classified, hide_empty=False)
+    assert "なし" in format_digest(classified)
+
+
 def test_format_digest_total_zero():
     out = format_digest(classify_issues([]))
     assert out.splitlines()[0] == "# Issue ダイジェスト（全 0 件）"

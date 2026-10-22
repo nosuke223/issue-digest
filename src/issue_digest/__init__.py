@@ -8,19 +8,23 @@ from issue_digest.loader import load_issues, parse_issues
 
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
-    if len(args) != 1:
+    hide_empty = "--hide-empty" in args
+    paths = [a for a in args if a != "--hide-empty"]
+    if len(paths) != 1:
         print(
-            "使い方: issue-digest <JSONファイルのパス | ->  (- で標準入力から読む)", file=sys.stderr
+            "使い方: issue-digest [--hide-empty] <JSONファイルのパス | ->\n"
+            "  - で標準入力から読む / --hide-empty で0件の分類を出力しない",
+            file=sys.stderr,
         )
         return 2
-    path = args[0]
+    path = paths[0]
     if path == "-":
         try:
             issues = parse_issues(sys.stdin.read())
         except (OSError, ValueError, KeyError, TypeError) as e:
             print(f"エラー: 標準入力を読み込めません ({type(e).__name__})", file=sys.stderr)
             return 1
-        print(format_digest(classify_issues(issues)), end="")
+        print(format_digest(classify_issues(issues), hide_empty), end="")
         return 0
     try:
         issues = load_issues(path)
@@ -30,5 +34,5 @@ def main(argv: list[str] | None = None) -> int:
     except (OSError, json.JSONDecodeError, KeyError, TypeError) as e:
         print(f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})", file=sys.stderr)
         return 1
-    print(format_digest(classify_issues(issues)), end="")
+    print(format_digest(classify_issues(issues), hide_empty), end="")
     return 0

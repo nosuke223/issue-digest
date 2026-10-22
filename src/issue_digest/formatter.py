@@ -11,12 +11,17 @@ HEADINGS = {
 }
 
 
-def format_digest(classified: dict[str, list[Issue]]) -> str:
-    """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。"""
+def format_digest(classified: dict[str, list[Issue]], hide_empty: bool = False) -> str:
+    """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
+
+    hide_empty が True のとき、0件の分類は見出しも「なし」も出力しない。
+    """
     # 複数の分類に入る Issue を二重に数えないよう、番号で重複を除く
     total = len({issue.number for issues in classified.values() for issue in issues})
     lines = [f"# Issue ダイジェスト（全 {total} 件）"]
     for category, issues in classified.items():
+        if hide_empty and not issues:
+            continue
         title = HEADINGS[category]
         if category == UNCLASSIFIED:
             heading = f"## {title} - {len(issues)}件"

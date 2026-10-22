@@ -20,6 +20,30 @@ def test_main_prints_none_for_empty_input(capsys):
     assert out.count("なし") == 6
 
 
+def test_main_hide_empty(capsys):
+    assert main(["--hide-empty", str(DATA / "issues.json")]) == 0
+    out = capsys.readouterr().out
+    assert "なし" not in out.splitlines()
+    assert "(agent:blocked)" not in out
+    assert "## 着手可能 (agent:ready) - 1件\n\n- #1 サンプルの Issue A\n" in out
+    assert "## 未分類 - 1件\n\n- #2 ラベルなしの Issue B\n" in out
+
+
+def test_main_hide_empty_after_path(capsys):
+    assert main([str(DATA / "empty.json"), "--hide-empty"]) == 0
+    assert capsys.readouterr().out == "# Issue ダイジェスト（全 0 件）\n"
+
+
+def test_main_without_hide_empty_unchanged(capsys):
+    assert main([str(DATA / "issues.json")]) == 0
+    assert "## 中断 (agent:blocked) - 0件\n\nなし\n" in capsys.readouterr().out
+
+
+def test_main_hide_empty_only_shows_usage(capsys):
+    assert main(["--hide-empty"]) == 2
+    assert "使い方" in capsys.readouterr().err
+
+
 def test_main_missing_file(capsys):
     assert main([str(DATA / "missing.json")]) == 1
     captured = capsys.readouterr()
