@@ -1,0 +1,17 @@
+[
+  {
+    "number": 1,
+    "title": "サンプルの Issue A",
+    "labels": [
+      {"name": "bug", "color": "d73a4a"},
+      {"name": "agent:ready", "color": "0e8a16"}
+    ],
+    "url": "https://github.com/example/repo/issues/1"
+  },
+  {
+    "number": 2,
+    "title": "ラベルなしの Issue B",
+    "labels": [],
+    "url": "https://github.com/example/repo/issues/2"
+  }
+]
