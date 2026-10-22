@@ -28,6 +28,7 @@
 - 1タスク = 1 Issue = 1ブランチ = 1PR
 - 作業開始前に、Issue の本文とすべてのコメントを読む
 - 対応するブランチが既にあれば、そこから続きを再開する
+- 対応する PR が既にあれば、「PR の指摘への対応」に従う（未対応の指摘がなければ、Issue に状況をコメントして `agent:blocked` にする）
 - 新しくブランチを作るときは、`git fetch origin` で最新の main を取得し、`origin/main` から作る
 - 着手したら Issue のラベルを `agent:ready` から `agent:working` に変える
 - 完了条件が書かれていない、または解釈が複数ある場合は、実装を始めずに「判断待ちの手順」に従う
@@ -57,7 +58,7 @@
 
 PR のコメントで修正を頼まれたときの手順。
 
-1. Issue のラベルを `agent:review` から `agent:working` に変える
+1. Issue のラベルを `agent:working` に変える（`agent:review` または `agent:ready` から）
 2. PR のコメントを読む
    - 全体へのコメント: `gh pr view <PR番号> --comments`
    - 行ごとのコメント: `gh api repos/<所有者>/<リポジトリ>/pulls/<PR番号>/comments`（オプションを付けない）
