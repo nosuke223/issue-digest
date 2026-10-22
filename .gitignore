@@ -12,3 +12,6 @@
 __pycache__/
 .pytest_cache/
 .ruff_cache/
+
+# エージェントの PR 本文やコメントの下書き
+.agent-tmp/
