@@ -9,7 +9,7 @@ DATA = Path(__file__).parent / "data"
 def test_main_prints_digest(capsys):
     assert main([str(DATA / "issues.json")]) == 0
     out = capsys.readouterr().out
-    assert out.startswith("# Issue ダイジェスト\n")
+    assert out.startswith("# Issue ダイジェスト（全 2 件）\n")
     assert "## 着手可能 (agent:ready) - 1件\n\n- #1 サンプルの Issue A\n" in out
     assert "## 未分類 - 1件\n\n- #2 ラベルなしの Issue B\n" in out
 

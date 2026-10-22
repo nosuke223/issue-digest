@@ -16,7 +16,7 @@ def test_format_digest_lists_issues_and_none():
     issues = [make_issue(5, "CLI を作る", ["agent:needs-decision"])]
     out = format_digest(classify_issues(issues))
     assert out.startswith(
-        "# Issue ダイジェスト\n"
+        "# Issue ダイジェスト（全 1 件）\n"
         "\n"
         "## 判断待ち (agent:needs-decision) - 1件\n"
         "\n"
@@ -46,3 +46,19 @@ def test_format_digest_issue_in_multiple_categories():
     issues = [make_issue(1, "両方", ["agent:review", "agent:working"])]
     out = format_digest(classify_issues(issues))
     assert out.count("- #1 両方") == 2
+    assert out.startswith("# Issue ダイジェスト（全 1 件）\n")
+
+
+def test_format_digest_total_counts_each_issue_once():
+    issues = [
+        make_issue(1, "両方", ["agent:review", "agent:working"]),
+        make_issue(2, "ready", ["agent:ready"]),
+        make_issue(3, "ラベルなし", []),
+    ]
+    out = format_digest(classify_issues(issues))
+    assert out.splitlines()[0] == "# Issue ダイジェスト（全 3 件）"
+
+
+def test_format_digest_total_zero():
+    out = format_digest(classify_issues([]))
+    assert out.splitlines()[0] == "# Issue ダイジェスト（全 0 件）"

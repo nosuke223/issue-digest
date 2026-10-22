@@ -13,7 +13,9 @@ HEADINGS = {
 
 def format_digest(classified: dict[str, list[Issue]]) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。"""
-    lines = ["# Issue ダイジェスト"]
+    # 複数の分類に入る Issue を二重に数えないよう、番号で重複を除く
+    total = len({issue.number for issues in classified.values() for issue in issues})
+    lines = [f"# Issue ダイジェスト（全 {total} 件）"]
     for category, issues in classified.items():
         title = HEADINGS[category]
         if category == UNCLASSIFIED:
