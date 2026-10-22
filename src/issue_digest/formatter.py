@@ -11,15 +11,22 @@ HEADINGS = {
 }
 
 
-def format_digest(classified: dict[str, list[Issue]], hide_empty: bool = False) -> str:
+def format_digest(
+    classified: dict[str, list[Issue]],
+    hide_empty: bool = False,
+    only: list[str] | None = None,
+) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
     hide_empty が True のとき、0件の分類は見出しも「なし」も出力しない。
+    only を指定すると、そこに含まれる分類だけを出力する（総件数は全件のまま）。
     """
     # 複数の分類に入る Issue を二重に数えないよう、番号で重複を除く
     total = len({issue.number for issues in classified.values() for issue in issues})
     lines = [f"# Issue ダイジェスト（全 {total} 件）"]
     for category, issues in classified.items():
+        if only is not None and category not in only:
+            continue
         if hide_empty and not issues:
             continue
         title = HEADINGS[category]
