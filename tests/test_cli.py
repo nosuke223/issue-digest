@@ -1,3 +1,4 @@
+import io
 from pathlib import Path
 
 from issue_digest import main
@@ -32,6 +33,29 @@ def test_main_invalid_json(capsys, tmp_path):
     bad.write_text("not json", encoding="utf-8")
     assert main([str(bad)]) == 1
     assert "読み込めません" in capsys.readouterr().err
+
+
+def test_main_reads_stdin(capsys, monkeypatch):
+    text = (DATA / "issues.json").read_text(encoding="utf-8")
+    monkeypatch.setattr("sys.stdin", io.StringIO(text))
+    assert main(["-"]) == 0
+    stdin_out = capsys.readouterr().out
+    assert main([str(DATA / "issues.json")]) == 0
+    assert stdin_out == capsys.readouterr().out
+
+
+def test_main_invalid_json_on_stdin(capsys, monkeypatch):
+    monkeypatch.setattr("sys.stdin", io.StringIO("not json"))
+    assert main(["-"]) == 1
+    captured = capsys.readouterr()
+    assert "標準入力を読み込めません" in captured.err
+    assert "Traceback" not in captured.err
+    assert captured.out == ""
+
+
+def test_main_usage_mentions_stdin(capsys):
+    assert main([]) == 2
+    assert "-" in capsys.readouterr().err
 
 
 def test_main_without_args_shows_usage(capsys):
