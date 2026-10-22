@@ -22,6 +22,10 @@
   - `&&` `;` `|` でつながない
   - `echo "exit=$?"` などの付け足しをしない（終了コードは結果に表示される）
   - 出力を `| tail` などで短くしない（失敗を見落とすため）
+- コマンドの引数に改行を入れない
+  - PR 本文やコメントなど複数行の文章は、Write ツールで `.agent-tmp/body.md` に書き、`--body-file .agent-tmp/body.md` で渡す
+  - 例: `gh pr create --title "..." --body-file .agent-tmp/body.md`、`gh issue comment 12 --body-file .agent-tmp/body.md`
+  - 改行を含む `gh` のコマンドは sandbox の中で動き、GitHub への接続に失敗する
 
 ## タスクの進め方
 
@@ -64,8 +68,8 @@ PR のコメントで修正を頼まれたときの手順。
    - 行ごとのコメント: `gh api repos/<所有者>/<リポジトリ>/pulls/<PR番号>/comments`（オプションを付けない）
 3. 同じブランチで修正し、指摘への対応ごとに別のコミットにする
 4. テストと lint が通ったら push する
-5. PR 本文の「自分で決めた前提」「確認方法」を修正後の内容に更新する
-6. PR に、何をどう直したかを返信する
+5. PR 本文の「自分で決めた前提」「確認方法」を修正後の内容に更新する（`gh pr edit <PR番号> --body-file .agent-tmp/body.md`）
+6. PR に、何をどう直したかを返信する（`gh pr comment <PR番号> --body-file .agent-tmp/body.md`）
 7. Issue のラベルを `agent:working` から `agent:review` に戻す
 
 ## 判断の基準
