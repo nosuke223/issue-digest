@@ -22,10 +22,14 @@
       "Bash(gh pr list *)",
       "Bash(gh pr create *)",
       "Bash(gh pr view *)",
+      "Bash(gh pr edit *)",
+      "Bash(gh pr comment *)",
       "Bash(gh pr checks *)",
+      "Bash(gh api repos/*/pulls/*/comments)",
       "Bash(uv run pytest)",
       "Bash(uv run pytest *)",
-      "Bash(uv run ruff *)"
+      "Bash(uv run ruff *)",
+      "Bash(uv run issue-digest *)"
     ],
     "deny": [
       "Read(./.env)",
