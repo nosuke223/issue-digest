@@ -18,15 +18,12 @@ def classify_issues(issues: list[Issue]) -> dict[str, list[Issue]]:
 
     キーは CATEGORIES の順で、Issue がない分類も空のリストで含まれる。
     各分類の中は Issue 番号の小さい順。複数の `agent:*` ラベルを持つ Issue は
-    該当するすべての分類に入る。CATEGORIES にない `agent:*` ラベルは無視する。
+    該当するすべての分類に入る。CATEGORIES にない `agent:*` ラベルは無視するため、
+    それしか持たない Issue は未分類に入る。
     """
     result: dict[str, list[Issue]] = {category: [] for category in CATEGORIES}
     for issue in sorted(issues, key=lambda i: i.number):
-        agent_labels = [label for label in issue.labels if label.startswith("agent:")]
-        if not agent_labels:
-            result[UNCLASSIFIED].append(issue)
-            continue
-        for category in CATEGORIES[:-1]:
-            if category in agent_labels:
-                result[category].append(issue)
+        matched = [c for c in CATEGORIES[:-1] if c in issue.labels]
+        for category in matched or [UNCLASSIFIED]:
+            result[category].append(issue)
     return result

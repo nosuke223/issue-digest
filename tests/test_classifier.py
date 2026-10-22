@@ -59,6 +59,13 @@ def test_issue_with_multiple_agent_labels_is_in_all_categories():
     assert result[UNCLASSIFIED] == []
 
 
-def test_unknown_agent_label_is_ignored():
+def test_issue_with_only_unknown_agent_label_is_unclassified():
     result = classify_issues([make_issue(1, ["agent:unknown"])])
-    assert all(result[category] == [] for category in CATEGORIES)
+    assert numbers(result[UNCLASSIFIED]) == [1]
+    assert all(result[c] == [] for c in CATEGORIES if c != UNCLASSIFIED)
+
+
+def test_unknown_agent_label_is_ignored_alongside_known_label():
+    result = classify_issues([make_issue(1, ["agent:unknown", "agent:ready"])])
+    assert numbers(result["agent:ready"]) == [1]
+    assert result[UNCLASSIFIED] == []
