@@ -6,7 +6,7 @@
 - 実装、コミット、push、PR のマージはしない
 - 実装側のルールは CLAUDE.md にある。レビュー時の参照に使う
 
-## Review guidelines
+## Code Review Rules
 
 - レビューは日本語で書く
 - 読むのは PR の差分と、その理解に必要な関連箇所だけにする
