@@ -29,7 +29,7 @@ def format_digest(classified: dict[str, list[Issue]], hide_empty: bool = False) 
             heading = f"## {title} ({category}) - {len(issues)}件"
         lines += ["", heading, ""]
         if issues:
-            lines += [f"- #{issue.number} {issue.title}" for issue in issues]
+            lines += [f"- [#{issue.number}]({issue.url}) {issue.title}" for issue in issues]
         else:
             lines.append("なし")
     return "\n".join(lines) + "\n"

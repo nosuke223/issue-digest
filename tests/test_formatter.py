@@ -20,7 +20,7 @@ def test_format_digest_lists_issues_and_none():
         "\n"
         "## 判断待ち (agent:needs-decision) - 1件\n"
         "\n"
-        "- #5 CLI を作る\n"
+        "- [#5](https://github.com/example/repo/issues/5) CLI を作る\n"
         "\n"
         "## 中断 (agent:blocked) - 0件\n"
         "\n"
@@ -45,7 +45,7 @@ def test_format_digest_heading_order_and_unclassified():
 def test_format_digest_issue_in_multiple_categories():
     issues = [make_issue(1, "両方", ["agent:review", "agent:working"])]
     out = format_digest(classify_issues(issues))
-    assert out.count("- #1 両方") == 2
+    assert out.count("- [#1](https://github.com/example/repo/issues/1) 両方") == 2
     assert out.startswith("# Issue ダイジェスト（全 1 件）\n")
 
 
@@ -67,7 +67,7 @@ def test_format_digest_hide_empty_omits_empty_categories():
         "\n"
         "## 判断待ち (agent:needs-decision) - 1件\n"
         "\n"
-        "- #5 CLI を作る\n"
+        "- [#5](https://github.com/example/repo/issues/5) CLI を作る\n"
     )
 
 
