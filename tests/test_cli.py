@@ -195,6 +195,54 @@ def test_main_invalid_updated_at(capsys, tmp_path):
     assert "読み込めません" in capsys.readouterr().err
 
 
+def issue_numbers_in_output(out: str) -> list[int]:
+    lines = [line for line in out.splitlines() if line.startswith("- [#")]
+    return [int(line.removeprefix("- [#").split("]")[0]) for line in lines]
+
+
+def test_main_sort_updated_orders_oldest_first(capsys):
+    assert main(["--sort", "updated", str(DATA / "sort.json")]) == 0
+    # レビュー待ち → 着手可能の順。各分類は古い順、同時刻は番号順、updatedAt なしは末尾
+    assert issue_numbers_in_output(capsys.readouterr().out) == [8, 7, 6, 3, 4, 1, 2, 5]
+
+
+def test_main_without_sort_orders_by_number(capsys):
+    assert main([str(DATA / "sort.json")]) == 0
+    assert issue_numbers_in_output(capsys.readouterr().out) == [7, 8, 1, 2, 3, 4, 5, 6]
+
+
+def test_main_sort_with_other_options(capsys):
+    args = ["--sort", "updated", "--hide-empty", "--only", "agent:ready", "--stale", "7"]
+    assert main([*args, str(DATA / "sort.json")], now=NOW) == 0
+    out = capsys.readouterr().out
+    assert issue_numbers_in_output(out) == [6, 3, 4, 1, 2, 5]
+    assert "(agent:review)" not in out
+    assert "先頭の古い Issue（番号6）（52日更新なし）" in out
+
+
+def test_main_sort_reads_stdin(capsys, monkeypatch):
+    text = (DATA / "sort.json").read_text(encoding="utf-8")
+    monkeypatch.setattr("sys.stdin", io.StringIO(text))
+    assert main(["--sort", "updated", "-"]) == 0
+    assert issue_numbers_in_output(capsys.readouterr().out) == [8, 7, 6, 3, 4, 1, 2, 5]
+
+
+@pytest.mark.parametrize("value", ["created", "", "Updated", "asc"])
+def test_main_sort_invalid_value(capsys, value):
+    assert main(["--sort", value, str(DATA / "sort.json")]) == 2
+    captured = capsys.readouterr()
+    assert "--sort" in captured.err
+    assert captured.out == ""
+
+
+def test_main_sort_without_value_shows_usage(capsys):
+    assert main([str(DATA / "sort.json"), "--sort"]) == 2
+    captured = capsys.readouterr()
+    assert "使い方" in captured.err
+    assert "--sort" in captured.err
+    assert captured.out == ""
+
+
 def test_main_output_writes_same_content_as_stdout(capsys, tmp_path):
     assert main([str(DATA / "issues.json")]) == 0
     expected = capsys.readouterr().out
@@ -277,6 +325,12 @@ def test_main_version_ignores_output(capsys, tmp_path):
     assert main(["--version", "--output", str(out_file)]) == 0
     assert capsys.readouterr().out == f"issue-digest {version('issue-digest')}\n"
     assert not out_file.exists()
+
+
+def test_main_output_with_sort(tmp_path):
+    out_file = tmp_path / "out.md"
+    assert main(["--sort", "updated", "--output", str(out_file), str(DATA / "sort.json")]) == 0
+    assert issue_numbers_in_output(out_file.read_text(encoding="utf-8")) == [8, 7, 6, 3, 4, 1, 2, 5]
 
 
 def test_main_version(capsys):
@@ -373,6 +427,13 @@ def test_main_json_stale_with_hide_empty_and_only(capsys):
     assert data["total"] == 4
     assert [c["label"] for c in data["categories"]] == ["agent:ready"]
     assert data["categories"][0]["issues"][0]["stale_days"] == 13
+
+
+def test_main_json_with_sort_orders_oldest_first(capsys):
+    assert main(["--json", "--sort", "updated", str(DATA / "sort.json")]) == 0
+    data = _json_out(capsys)
+    numbers = [i["number"] for c in data["categories"] for i in c["issues"]]
+    assert numbers == [8, 7, 6, 3, 4, 1, 2, 5]
 
 
 def test_main_json_without_stale_has_no_stale_days(capsys):

@@ -8,12 +8,13 @@ from issue_digest.loader import load_issues, parse_issues
 
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--stale <日数>]"
-    " [--json] [--output <パス>] <JSONファイルのパス | ->\n"
+    " [--json] [--sort updated] [--output <パス>] <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
     "  --only で指定した分類だけを出力する（複数回指定できる）\n"
     "  --summary で見出しの次に全分類の件数を1行で出力する\n"
     "  --stale で最終更新から指定日数以上たった Issue に印を付ける\n"
+    "  --sort updated で各分類の中を最終更新の古い順に並べる\n"
     "  --json で Markdown の代わりに JSON を出力する\n"
     "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
@@ -31,6 +32,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     as_json = False
     only: list[str] = []
     stale_days: int | None = None
+    sort: str | None = None
     output: str | None = None
     paths: list[str] = []
     i = 0
@@ -60,6 +62,18 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
                 )
                 return 2
             stale_days = int(args[i])
+        elif arg == "--sort":
+            i += 1
+            if i >= len(args):
+                print(USAGE, file=sys.stderr)
+                return 2
+            if args[i] != "updated":
+                print(
+                    f"エラー: --sort に指定できるのは updated だけです: {args[i]}",
+                    file=sys.stderr,
+                )
+                return 2
+            sort = args[i]
         elif arg == "--output":
             i += 1
             if i >= len(args):
@@ -100,9 +114,9 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     classified = classify_issues(issues)
     if as_json:
         # JSON には分類ごとの count があるので、--summary は Markdown のときだけ効く
-        digest = format_json(classified, hide_empty, only_filter, stale_days, now)
+        digest = format_json(classified, hide_empty, only_filter, stale_days, now, sort)
     else:
-        digest = format_digest(classified, hide_empty, only_filter, stale_days, now, summary)
+        digest = format_digest(classified, hide_empty, only_filter, stale_days, now, sort, summary)
     if output is None:
         print(digest, end="")
         return 0

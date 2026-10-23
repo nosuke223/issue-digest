@@ -38,6 +38,7 @@ def format_json(
     only: list[str] | None = None,
     stale_days: int | None = None,
     now: datetime | None = None,
+    sort: str | None = None,
 ) -> str:
     """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
 
@@ -53,6 +54,8 @@ def format_json(
             continue
         if hide_empty and not issues:
             continue
+        if sort == "updated":
+            issues = _sort_by_updated(issues)
         items = []
         for issue in issues:
             item: dict[str, object] = {
@@ -76,12 +79,22 @@ def format_json(
     return json.dumps(body, ensure_ascii=False, indent=2) + "\n"
 
 
+def _sort_by_updated(issues: list[Issue]) -> list[Issue]:
+    """updatedAt の古い順（同じなら番号順）。updatedAt がない Issue は末尾に番号順。"""
+    dated = [i for i in issues if i.updated_at is not None]
+    undated = [i for i in issues if i.updated_at is None]
+    dated.sort(key=lambda i: (i.updated_at, i.number))
+    undated.sort(key=lambda i: i.number)
+    return dated + undated
+
+
 def format_digest(
     classified: dict[str, list[Issue]],
     hide_empty: bool = False,
     only: list[str] | None = None,
     stale_days: int | None = None,
     now: datetime | None = None,
+    sort: str | None = None,
     summary: bool = False,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
@@ -90,6 +103,8 @@ def format_digest(
     only を指定すると、そこに含まれる分類だけを出力する（総件数は全件のまま）。
     stale_days を指定すると、最終更新から stale_days 日以上たった Issue の行末に
     `（N日更新なし）` を付ける。経過日数は now（省略時は現在時刻）から計算する。
+    sort が "updated" のとき、各分類の中を updatedAt の古い順に並べる
+    （同じ場合は番号順。updatedAt がない Issue は末尾）。
     summary が True のとき、総件数の見出しの次に全分類の件数を1行で出力する。
     この行は only や hide_empty に関係なく、常に全分類を含む。
     """
@@ -114,6 +129,8 @@ def format_digest(
         else:
             heading = f"## {title} ({category}) - {len(issues)}件"
         lines += ["", heading, ""]
+        if sort == "updated":
+            issues = _sort_by_updated(issues)
         if issues:
             for issue in issues:
                 lines.append(
