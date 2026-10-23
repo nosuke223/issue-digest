@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from issue_digest.classifier import UNCLASSIFIED
 from issue_digest.loader import Issue
@@ -13,10 +13,15 @@ HEADINGS = {
 }
 
 
+def _elapsed_days(elapsed: timedelta) -> int:
+    """経過時間を日数に直す（1日未満は切り捨て）。"""
+    return elapsed.days
+
+
 def _stale_mark(issue: Issue, stale_days: int | None, now: datetime | None) -> str:
     if stale_days is None or now is None or issue.updated_at is None:
         return ""
-    days = (now - issue.updated_at).days
+    days = _elapsed_days(now - issue.updated_at)
     return f"（{days}日更新なし）" if days >= stale_days else ""
 
 
