@@ -52,6 +52,19 @@ N は経過日数を切り捨てた整数です。`--hide-empty`、`--only` と�
 gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --stale 7 -
 ```
 
+`--summary` を付けると、総件数の見出しの次に、空行をはさんで分類ごとの件数を1行で出力します。全体の概要をひと目で知りたいときに使います。
+分類の名前と順は見出しと同じです。この行は `--only` や `--hide-empty` に関係なく、常に6つの分類すべての件数を出します。
+`--summary` を付けない場合の出力は変わりません。
+`--json` と同時に指定した場合、`--summary` は無視します（JSON には分類ごとの `count` があるため）。
+
+```
+判断待ち 1 / 中断 0 / レビュー待ち 2 / 作業中 0 / 着手可能 3 / 未分類 1
+```
+
+```
+uv run issue-digest --summary issues.json
+```
+
 `--sort updated` を付けると、各分類の中の Issue を `updatedAt`（最終更新）の古い順に並べます。止まっている Issue を見つけやすくするために使います。
 `updatedAt` が同じ Issue は番号の小さい順、`updatedAt` がない Issue は分類の末尾に番号の小さい順で並べます。分類の順番は変わりません。
 `--hide-empty`、`--only`、`--stale`、`--json` と同時に使えます（`--json` のときは各分類の `issues` の順が変わります）。
