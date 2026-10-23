@@ -54,6 +54,50 @@ def test_main_hide_empty_only_shows_usage(capsys):
     assert "使い方" in capsys.readouterr().err
 
 
+def test_main_only_shows_single_category(capsys):
+    assert main(["--only", "agent:ready", str(DATA / "issues.json")]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("# Issue ダイジェスト（全 2 件）\n")
+    assert "## 着手可能 (agent:ready) - 1件" in out
+    assert "(agent:blocked)" not in out
+    assert "## 未分類" not in out
+
+
+def test_main_only_multiple(capsys):
+    assert main(["--only", "agent:ready", "--only", "unclassified", str(DATA / "issues.json")]) == 0
+    out = capsys.readouterr().out
+    assert "## 着手可能 (agent:ready) - 1件" in out
+    assert "## 未分類 - 1件" in out
+    assert "(agent:blocked)" not in out
+
+
+def test_main_only_empty_category_shows_none(capsys):
+    assert main(["--only", "agent:needs-decision", str(DATA / "issues.json")]) == 0
+    out = capsys.readouterr().out
+    assert "## 判断待ち (agent:needs-decision) - 0件\n\nなし\n" in out
+    assert "## 着手可能" not in out
+
+
+def test_main_only_with_hide_empty(capsys):
+    args = ["--only", "agent:needs-decision", "--only", "agent:ready", "--hide-empty"]
+    assert main([*args, str(DATA / "issues.json")]) == 0
+    out = capsys.readouterr().out
+    assert "## 着手可能 (agent:ready) - 1件" in out
+    assert "agent:needs-decision" not in out
+
+
+def test_main_only_unknown_label(capsys):
+    assert main(["--only", "agent:nope", str(DATA / "issues.json")]) == 2
+    captured = capsys.readouterr()
+    assert "agent:nope" in captured.err
+    assert captured.out == ""
+
+
+def test_main_only_without_value_shows_usage(capsys):
+    assert main([str(DATA / "issues.json"), "--only"]) == 2
+    assert "使い方" in capsys.readouterr().err
+
+
 def test_main_missing_file(capsys):
     assert main([str(DATA / "missing.json")]) == 1
     captured = capsys.readouterr()

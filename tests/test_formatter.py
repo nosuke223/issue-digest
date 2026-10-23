@@ -82,6 +82,21 @@ def test_format_digest_default_shows_empty_categories():
     assert "なし" in format_digest(classified)
 
 
+def test_format_digest_only_keeps_total_of_all_issues():
+    issues = [
+        make_issue(1, "A", ["agent:ready"]),
+        make_issue(2, "B", ["agent:review"]),
+    ]
+    out = format_digest(classify_issues(issues), only=["agent:review"])
+    assert out == (
+        "# Issue ダイジェスト（全 2 件）\n"
+        "\n"
+        "## レビュー待ち (agent:review) - 1件\n"
+        "\n"
+        "- [#2](https://github.com/example/repo/issues/2) B\n"
+    )
+
+
 def test_format_digest_total_zero():
     out = format_digest(classify_issues([]))
     assert out.splitlines()[0] == "# Issue ダイジェスト（全 0 件）"

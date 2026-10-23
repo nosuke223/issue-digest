@@ -28,3 +28,14 @@ gh issue list --json number,title,labels,url | uv run issue-digest -
 ```
 uv run issue-digest --hide-empty issues.json
 ```
+
+`--only <ラベル>` を付けると、指定したラベルの分類だけを出力します。見たい分類だけを素早く確認したいときに使います。
+複数回指定すると、指定したすべての分類を出力します。`--hide-empty` と同時に使えます。
+指定できるのは `agent:needs-decision`、`agent:blocked`、`agent:review`、`agent:working`、`agent:ready`、`unclassified`（未分類）の6つです。
+それ以外を指定すると、エラーを標準エラーに出して終了コード 2 で終わります。
+見出しの総件数は、`--only` に関係なく全件の数のままです。
+
+```
+uv run issue-digest --only agent:needs-decision issues.json
+uv run issue-digest --only agent:needs-decision --only agent:blocked --hide-empty issues.json
+```
