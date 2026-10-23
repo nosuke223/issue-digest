@@ -448,6 +448,16 @@ def test_main_json_reads_stdin(capsys, monkeypatch):
     assert _json_out(capsys)["total"] == 2
 
 
+def test_main_json_ignores_summary(capsys):
+    path = str(DATA / "issues.json")
+    assert main(["--json", path]) == 0
+    expected = capsys.readouterr().out
+    assert main(["--json", "--summary", path]) == 0
+    out = capsys.readouterr().out
+    assert out == expected
+    json.loads(out)
+
+
 def test_main_without_json_still_markdown(capsys):
     assert main([str(DATA / "issues.json")]) == 0
     assert capsys.readouterr().out.startswith("# Issue ダイジェスト")
