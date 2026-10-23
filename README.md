@@ -52,6 +52,16 @@ N は経過日数を切り捨てた整数です。`--hide-empty`、`--only` と�
 gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --stale 7 -
 ```
 
+`--sort updated` を付けると、各分類の中の Issue を `updatedAt`（最終更新）の古い順に並べます。止まっている Issue を見つけやすくするために使います。
+`updatedAt` が同じ Issue は番号の小さい順、`updatedAt` がない Issue は分類の末尾に番号の小さい順で並べます。分類の順番は変わりません。
+`--hide-empty`、`--only`、`--stale`、`--json` と同時に使えます（`--json` のときは各分類の `issues` の順が変わります）。
+`--sort` に指定できる値は `updated` だけです。それ以外の値や値がない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
+`--sort` を付けない場合の並び順（Issue 番号の小さい順）は変わりません。
+
+```
+gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --sort updated --stale 7 -
+```
+
 `--json` を付けると、Markdown の代わりに JSON を標準出力に出します。通知のスクリプトなど、ほかのツールから使いたいときに使います。
 UTF-8 で日本語はエスケープせず、インデントは2です。`--json` を付けない場合の出力は変わりません。
 
@@ -92,7 +102,7 @@ uv run issue-digest --json issues.json
 
 `--output <パス>` を付けると、ダイジェストを標準出力ではなく、指定したファイルに書き出します。シェルのリダイレクトを使わずに、定期的にファイルへ保存したいときに使います。
 文字コードは UTF-8 で、ファイルが既にあれば上書きします。書き出したときは、標準出力には何も出しません。
-`--hide-empty`、`--only`、`--stale` と同時に使えます。
+`--hide-empty`、`--only`、`--stale`、`--sort` と同時に使えます。
 フォルダは作らないので、フォルダがないなど書き出せない場合は、エラーを標準エラーに出して終了コード 1 で終わります。
 `--output` の後にパスがない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
 `--output` を付けない場合の動作は変わりません。`--version` の出力先も変わりません（標準出力に出します）。
