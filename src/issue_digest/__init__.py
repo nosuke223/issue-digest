@@ -3,17 +3,18 @@ from datetime import datetime
 from importlib.metadata import version
 
 from issue_digest.classifier import CATEGORIES, classify_issues
-from issue_digest.formatter import format_digest
+from issue_digest.formatter import format_digest, format_json
 from issue_digest.loader import load_issues, parse_issues
 
 USAGE = (
-    "使い方: issue-digest [--hide-empty] [--only <ラベル>]... [--stale <日数>]"
+    "使い方: issue-digest [--hide-empty] [--only <ラベル>]... [--stale <日数>] [--json]"
     " [--sort updated] [--output <パス>] <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
     "  --only で指定した分類だけを出力する（複数回指定できる）\n"
     "  --stale で最終更新から指定日数以上たった Issue に印を付ける\n"
     "  --sort updated で各分類の中を最終更新の古い順に並べる\n"
+    "  --json で Markdown の代わりに JSON を出力する\n"
     "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
@@ -26,6 +27,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         print(f"issue-digest {version('issue-digest')}")
         return 0
     hide_empty = False
+    as_json = False
     only: list[str] = []
     stale_days: int | None = None
     sort: str | None = None
@@ -36,6 +38,8 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         arg = args[i]
         if arg == "--hide-empty":
             hide_empty = True
+        elif arg == "--json":
+            as_json = True
         elif arg == "--only":
             i += 1
             if i >= len(args):
@@ -87,6 +91,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             )
             return 2
     only_filter = only or None
+    render = format_json if as_json else format_digest
     path = paths[0]
     if path == "-":
         try:
@@ -103,7 +108,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         except (OSError, ValueError, KeyError, TypeError) as e:
             print(f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})", file=sys.stderr)
             return 1
-    digest = format_digest(classify_issues(issues), hide_empty, only_filter, stale_days, now, sort)
+    digest = render(classify_issues(issues), hide_empty, only_filter, stale_days, now, sort)
     if output is None:
         print(digest, end="")
         return 0

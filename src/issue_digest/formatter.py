@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime, timedelta
 
 from issue_digest.classifier import UNCLASSIFIED
@@ -18,11 +19,64 @@ def _elapsed_days(elapsed: timedelta) -> int:
     return elapsed.days
 
 
-def _stale_mark(issue: Issue, stale_days: int | None, now: datetime | None) -> str:
+def _stale_days_of(issue: Issue, stale_days: int | None, now: datetime | None) -> int | None:
+    """印を付ける Issue の経過日数を返す。印を付けないときは None。"""
     if stale_days is None or now is None or issue.updated_at is None:
-        return ""
+        return None
     days = _elapsed_days(now - issue.updated_at)
-    return f"（{days}日更新なし）" if days >= stale_days else ""
+    return days if days >= stale_days else None
+
+
+def _stale_mark(issue: Issue, stale_days: int | None, now: datetime | None) -> str:
+    days = _stale_days_of(issue, stale_days, now)
+    return "" if days is None else f"（{days}日更新なし）"
+
+
+def format_json(
+    classified: dict[str, list[Issue]],
+    hide_empty: bool = False,
+    only: list[str] | None = None,
+    stale_days: int | None = None,
+    now: datetime | None = None,
+    sort: str | None = None,
+) -> str:
+    """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
+
+    引数の意味は format_digest と同じ。stale_days を指定したとき、印が付く Issue にだけ
+    `stale_days`（経過日数）を加える。
+    """
+    if stale_days is not None and now is None:
+        now = datetime.now(UTC)
+    total = len({issue.number for issues in classified.values() for issue in issues})
+    categories = []
+    for category, issues in classified.items():
+        if only is not None and category not in only:
+            continue
+        if hide_empty and not issues:
+            continue
+        if sort == "updated":
+            issues = _sort_by_updated(issues)
+        items = []
+        for issue in issues:
+            item: dict[str, object] = {
+                "number": issue.number,
+                "title": issue.title,
+                "url": issue.url,
+            }
+            days = _stale_days_of(issue, stale_days, now)
+            if days is not None:
+                item["stale_days"] = days
+            items.append(item)
+        categories.append(
+            {
+                "label": category,
+                "title": HEADINGS[category],
+                "count": len(issues),
+                "issues": items,
+            }
+        )
+    body = {"total": total, "categories": categories}
+    return json.dumps(body, ensure_ascii=False, indent=2) + "\n"
 
 
 def _sort_by_updated(issues: list[Issue]) -> list[Issue]:
