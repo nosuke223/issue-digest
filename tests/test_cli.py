@@ -578,3 +578,31 @@ def test_main_without_args_shows_usage(capsys):
 def test_main_with_too_many_args_shows_usage(capsys):
     assert main(["a.json", "b.json"]) != 0
     assert "使い方" in capsys.readouterr().err
+
+
+def test_main_unknown_option_shows_usage(capsys):
+    assert main(["--foo", str(DATA / "issues.json")]) == 2
+    captured = capsys.readouterr()
+    assert "使い方" in captured.err
+    assert captured.out == ""
+
+
+def test_main_abbreviated_option_is_rejected(capsys):
+    assert main(["--hide", str(DATA / "issues.json")]) == 2
+    assert "使い方" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("flag", ["-h", "--help"])
+def test_main_help_prints_usage_to_stdout(capsys, flag):
+    assert main([flag]) == 0
+    captured = capsys.readouterr()
+    assert "使い方" in captured.out
+    assert captured.err == ""
+
+
+def test_main_stale_accepts_equals_form(capsys):
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    assert main(["--stale=7", str(DATA / "issues.json")], now=now) == 0
+    equals_out = capsys.readouterr().out
+    assert main(["--stale", "7", str(DATA / "issues.json")], now=now) == 0
+    assert capsys.readouterr().out == equals_out
