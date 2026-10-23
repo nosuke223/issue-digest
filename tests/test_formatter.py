@@ -97,6 +97,43 @@ def test_format_digest_only_keeps_total_of_all_issues():
     )
 
 
+SUMMARY_LINE = "判断待ち 1 / 中断 0 / レビュー待ち 2 / 作業中 0 / 着手可能 3 / 未分類 1"
+
+
+def _summary_issues():
+    return [
+        make_issue(1, "A", ["agent:needs-decision"]),
+        make_issue(2, "B", ["agent:review"]),
+        make_issue(3, "C", ["agent:review"]),
+        make_issue(4, "D", ["agent:ready"]),
+        make_issue(5, "E", ["agent:ready"]),
+        make_issue(6, "F", ["agent:ready"]),
+        make_issue(7, "G", []),
+    ]
+
+
+def test_format_digest_summary_line_after_total():
+    out = format_digest(classify_issues(_summary_issues()), summary=True)
+    assert out.startswith(f"# Issue ダイジェスト（全 7 件）\n\n{SUMMARY_LINE}\n\n## 判断待ち")
+
+
+def test_format_digest_summary_ignores_only_and_hide_empty():
+    out = format_digest(
+        classify_issues(_summary_issues()),
+        hide_empty=True,
+        only=["agent:review"],
+        summary=True,
+    )
+    assert out.startswith(f"# Issue ダイジェスト（全 7 件）\n\n{SUMMARY_LINE}\n\n## レビュー待ち")
+    assert "## 判断待ち" not in out
+
+
+def test_format_digest_without_summary_unchanged():
+    classified = classify_issues(_summary_issues())
+    assert format_digest(classified) == format_digest(classified, summary=False)
+    assert SUMMARY_LINE not in format_digest(classified)
+
+
 def test_format_digest_total_zero():
     out = format_digest(classify_issues([]))
     assert out.splitlines()[0] == "# Issue ダイジェスト（全 0 件）"

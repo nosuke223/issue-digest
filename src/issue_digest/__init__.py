@@ -7,11 +7,12 @@ from issue_digest.formatter import format_digest
 from issue_digest.loader import load_issues, parse_issues
 
 USAGE = (
-    "使い方: issue-digest [--hide-empty] [--only <ラベル>]... [--stale <日数>]"
+    "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--stale <日数>]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
     "  --only で指定した分類だけを出力する（複数回指定できる）\n"
+    "  --summary で見出しの次に全分類の件数を1行で出力する\n"
     "  --stale で最終更新から指定日数以上たった Issue に印を付ける\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
@@ -24,6 +25,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         print(f"issue-digest {version('issue-digest')}")
         return 0
     hide_empty = False
+    summary = False
     only: list[str] = []
     stale_days: int | None = None
     paths: list[str] = []
@@ -32,6 +34,8 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         arg = args[i]
         if arg == "--hide-empty":
             hide_empty = True
+        elif arg == "--summary":
+            summary = True
         elif arg == "--only":
             i += 1
             if i >= len(args):
@@ -72,7 +76,9 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         except (OSError, ValueError, KeyError, TypeError) as e:
             print(f"エラー: 標準入力を読み込めません ({type(e).__name__})", file=sys.stderr)
             return 1
-        digest = format_digest(classify_issues(issues), hide_empty, only_filter, stale_days, now)
+        digest = format_digest(
+            classify_issues(issues), hide_empty, only_filter, stale_days, now, summary
+        )
         print(digest, end="")
         return 0
     try:
@@ -83,6 +89,8 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     except (OSError, ValueError, KeyError, TypeError) as e:
         print(f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})", file=sys.stderr)
         return 1
-    digest = format_digest(classify_issues(issues), hide_empty, only_filter, stale_days, now)
+    digest = format_digest(
+        classify_issues(issues), hide_empty, only_filter, stale_days, now, summary
+    )
     print(digest, end="")
     return 0

@@ -52,6 +52,18 @@ N は経過日数を切り捨てた整数です。`--hide-empty`、`--only` と�
 gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --stale 7 -
 ```
 
+`--summary` を付けると、総件数の見出しの次に、空行をはさんで分類ごとの件数を1行で出力します。全体の概要をひと目で知りたいときに使います。
+分類の名前と順は見出しと同じです。この行は `--only` や `--hide-empty` に関係なく、常に6つの分類すべての件数を出します。
+`--summary` を付けない場合の出力は変わりません。
+
+```
+判断待ち 1 / 中断 0 / レビュー待ち 2 / 作業中 0 / 着手可能 3 / 未分類 1
+```
+
+```
+uv run issue-digest --summary issues.json
+```
+
 `--version` を付けると、`issue-digest 0.1.0` のようにバージョンを1行で出力し、終了コード 0 で終わります。
 バージョンは `pyproject.toml` の値です。ほかのオプションやファイルが指定されていても、バージョンだけを出力します（ファイルは読みません）。
 `--version` を付けない場合の動作は変わりません。

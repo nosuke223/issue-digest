@@ -31,6 +31,7 @@ def format_digest(
     only: list[str] | None = None,
     stale_days: int | None = None,
     now: datetime | None = None,
+    summary: bool = False,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
@@ -38,12 +39,19 @@ def format_digest(
     only を指定すると、そこに含まれる分類だけを出力する（総件数は全件のまま）。
     stale_days を指定すると、最終更新から stale_days 日以上たった Issue の行末に
     `（N日更新なし）` を付ける。経過日数は now（省略時は現在時刻）から計算する。
+    summary が True のとき、総件数の見出しの次に全分類の件数を1行で出力する。
+    この行は only や hide_empty に関係なく、常に全分類を含む。
     """
     if stale_days is not None and now is None:
         now = datetime.now(UTC)
     # 複数の分類に入る Issue を二重に数えないよう、番号で重複を除く
     total = len({issue.number for issues in classified.values() for issue in issues})
     lines = [f"# Issue ダイジェスト（全 {total} 件）"]
+    if summary:
+        counts = " / ".join(
+            f"{HEADINGS[category]} {len(issues)}" for category, issues in classified.items()
+        )
+        lines += ["", counts]
     for category, issues in classified.items():
         if only is not None and category not in only:
             continue
