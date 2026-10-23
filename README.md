@@ -52,6 +52,42 @@ N は経過日数を切り捨てた整数です。`--hide-empty`、`--only` と�
 gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --stale 7 -
 ```
 
+`--json` を付けると、Markdown の代わりに JSON を標準出力に出します。通知のスクリプトなど、ほかのツールから使いたいときに使います。
+UTF-8 で日本語はエスケープせず、インデントは2です。`--json` を付けない場合の出力は変わりません。
+
+- `total`: Markdown の見出しと同じ総件数（重複を除いた全件数。`--only` に関係なく全件）
+- `categories`: 分類の配列。順と `label`、`title` は Markdown の見出しと同じ（未分類の `label` は `unclassified`）
+- `--hide-empty`、`--only` は Markdown と同じように効き、出力する分類が変わります
+- `--stale` と同時に指定すると、印が付く Issue にだけ `stale_days`（経過日数）を加えます
+
+```
+uv run issue-digest --json issues.json
+```
+
+出力例（`--only agent:needs-decision`）:
+
+```json
+{
+  "total": 3,
+  "categories": [
+    {
+      "label": "agent:needs-decision",
+      "title": "判断待ち",
+      "count": 1,
+      "issues": [
+        {
+          "number": 12,
+          "title": "仕様を決めたい",
+          "url": "https://github.com/example/repo/issues/12"
+        }
+      ]
+    }
+  ]
+}
+```
+
+`--stale 7` を同時に指定し、その Issue が13日更新されていない場合は、Issue に `"stale_days": 13` が加わります。
+
 `--version` を付けると、`issue-digest 0.1.0` のようにバージョンを1行で出力し、終了コード 0 で終わります。
 バージョンは `pyproject.toml` の値です。ほかのオプションやファイルが指定されていても、バージョンだけを出力します（ファイルは読みません）。
 `--version` を付けない場合の動作は変わりません。

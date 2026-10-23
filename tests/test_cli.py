@@ -1,4 +1,5 @@
 import io
+import json
 import tomllib
 from datetime import UTC, datetime
 from importlib.metadata import version
@@ -184,6 +185,104 @@ def test_main_version_ignores_other_args(capsys):
     captured = capsys.readouterr()
     assert captured.out == f"issue-digest {version('issue-digest')}\n"
     assert captured.err == ""
+
+
+def _json_out(capsys) -> dict:
+    return json.loads(capsys.readouterr().out)
+
+
+def test_main_json_shape(capsys):
+    assert main(["--json", str(DATA / "issues.json")]) == 0
+    out = capsys.readouterr().out
+    assert out.endswith("}\n")
+    assert "ラベルなしの Issue B" in out  # 日本語はエスケープしない
+    assert '\n  "total": 2,\n  "categories": [\n    {\n' in out  # インデントは2
+    data = json.loads(out)
+    assert data["total"] == 2
+    assert [c["label"] for c in data["categories"]] == [
+        "agent:needs-decision",
+        "agent:blocked",
+        "agent:review",
+        "agent:working",
+        "agent:ready",
+        "unclassified",
+    ]
+    ready = data["categories"][4]
+    assert ready == {
+        "label": "agent:ready",
+        "title": "着手可能",
+        "count": 1,
+        "issues": [
+            {
+                "number": 1,
+                "title": "サンプルの Issue A",
+                "url": "https://github.com/example/repo/issues/1",
+            }
+        ],
+    }
+    assert data["categories"][5]["title"] == "未分類"
+    assert data["categories"][0]["issues"] == []
+
+
+def test_main_json_hide_empty(capsys):
+    assert main(["--json", "--hide-empty", str(DATA / "issues.json")]) == 0
+    data = _json_out(capsys)
+    assert [c["label"] for c in data["categories"]] == ["agent:ready", "unclassified"]
+
+
+def test_main_json_only_keeps_total(capsys):
+    assert main(["--json", "--only", "agent:ready", str(DATA / "issues.json")]) == 0
+    data = _json_out(capsys)
+    assert data["total"] == 2
+    assert [c["label"] for c in data["categories"]] == ["agent:ready"]
+
+
+def test_main_json_only_with_hide_empty(capsys):
+    args = ["--json", "--only", "agent:blocked", "--only", "agent:ready", "--hide-empty"]
+    assert main([*args, str(DATA / "issues.json")]) == 0
+    data = _json_out(capsys)
+    assert [c["label"] for c in data["categories"]] == ["agent:ready"]
+
+
+def test_main_json_stale_adds_days_only_to_marked(capsys):
+    assert main(["--json", "--stale", "7", str(DATA / "stale.json")], now=NOW) == 0
+    data = _json_out(capsys)
+    issues = {i["number"]: i for c in data["categories"] for i in c["issues"]}
+    assert issues[1]["stale_days"] == 13
+    assert issues[2]["stale_days"] == 7
+    assert "stale_days" not in issues[3]
+    assert "stale_days" not in issues[4]
+
+
+def test_main_json_stale_with_hide_empty_and_only(capsys):
+    args = ["--json", "--stale", "7", "--hide-empty", "--only", "agent:ready"]
+    assert main([*args, str(DATA / "stale.json")], now=NOW) == 0
+    data = _json_out(capsys)
+    assert data["total"] == 4
+    assert [c["label"] for c in data["categories"]] == ["agent:ready"]
+    assert data["categories"][0]["issues"][0]["stale_days"] == 13
+
+
+def test_main_json_without_stale_has_no_stale_days(capsys):
+    assert main(["--json", str(DATA / "stale.json")], now=NOW) == 0
+    assert "stale_days" not in capsys.readouterr().out
+
+
+def test_main_json_reads_stdin(capsys, monkeypatch):
+    text = (DATA / "issues.json").read_text(encoding="utf-8")
+    monkeypatch.setattr("sys.stdin", io.StringIO(text))
+    assert main(["--json", "-"]) == 0
+    assert _json_out(capsys)["total"] == 2
+
+
+def test_main_without_json_still_markdown(capsys):
+    assert main([str(DATA / "issues.json")]) == 0
+    assert capsys.readouterr().out.startswith("# Issue ダイジェスト")
+
+
+def test_main_usage_mentions_json(capsys):
+    assert main([]) == 2
+    assert "--json" in capsys.readouterr().err
 
 
 def test_main_usage_mentions_version(capsys):
