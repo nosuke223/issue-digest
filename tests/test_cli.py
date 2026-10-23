@@ -55,6 +55,34 @@ def test_main_without_hide_empty_unchanged(capsys):
     assert "## 中断 (agent:blocked) - 0件\n\nなし\n" in capsys.readouterr().out
 
 
+def test_main_summary(capsys):
+    assert main(["--summary", str(DATA / "issues.json")]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith(
+        "# Issue ダイジェスト（全 2 件）\n\n"
+        "判断待ち 0 / 中断 0 / レビュー待ち 0 / 作業中 0 / 着手可能 1 / 未分類 1\n\n"
+    )
+
+
+def test_main_summary_with_only_and_hide_empty(capsys):
+    assert (
+        main(["--summary", "--hide-empty", "--only", "agent:ready", str(DATA / "issues.json")]) == 0
+    )
+    out = capsys.readouterr().out
+    assert "判断待ち 0 / 中断 0 / レビュー待ち 0 / 作業中 0 / 着手可能 1 / 未分類 1\n" in out
+    assert "## 未分類" not in out
+
+
+def test_main_without_summary_unchanged(capsys):
+    assert main([str(DATA / "issues.json")]) == 0
+    assert "判断待ち 0 /" not in capsys.readouterr().out
+
+
+def test_main_usage_mentions_summary(capsys):
+    assert main([]) == 2
+    assert "--summary" in capsys.readouterr().err
+
+
 def test_main_hide_empty_only_shows_usage(capsys):
     assert main(["--hide-empty"]) == 2
     assert "使い方" in capsys.readouterr().err
@@ -190,6 +218,21 @@ def test_main_without_show_assignees_unchanged(capsys):
 def test_main_show_assignees_without_assignees_field_does_not_fail(capsys):
     assert main(["--show-assignees", str(DATA / "issues.json")]) == 0
     assert "担当" not in capsys.readouterr().out
+
+
+def test_main_json_show_assignees(capsys):
+    assert main(["--json", "--show-assignees", str(DATA / "assignees.json")]) == 0
+    body = json.loads(capsys.readouterr().out)
+    by_title = {i["title"]: i for c in body["categories"] for i in c["issues"]}
+    assert by_title["担当者が2人の Issue"]["assignees"] == ["bob", "alice"]
+    assert by_title["担当者が空の Issue"]["assignees"] == []
+    assert by_title["assignees がない Issue"]["assignees"] == []
+    assert by_title["assignees が null の Issue"]["assignees"] == []
+
+
+def test_main_json_without_show_assignees_has_no_assignees(capsys):
+    assert main(["--json", str(DATA / "assignees.json")]) == 0
+    assert '"assignees":' not in capsys.readouterr().out
 
 
 def test_main_usage_mentions_show_assignees(capsys):
@@ -460,6 +503,16 @@ def test_main_json_reads_stdin(capsys, monkeypatch):
     monkeypatch.setattr("sys.stdin", io.StringIO(text))
     assert main(["--json", "-"]) == 0
     assert _json_out(capsys)["total"] == 2
+
+
+def test_main_json_ignores_summary(capsys):
+    path = str(DATA / "issues.json")
+    assert main(["--json", path]) == 0
+    expected = capsys.readouterr().out
+    assert main(["--json", "--summary", path]) == 0
+    out = capsys.readouterr().out
+    assert out == expected
+    json.loads(out)
 
 
 def test_main_without_json_still_markdown(capsys):

@@ -39,11 +39,13 @@ def format_json(
     stale_days: int | None = None,
     now: datetime | None = None,
     sort: str | None = None,
+    show_assignees: bool = False,
 ) -> str:
     """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
 
     引数の意味は format_digest と同じ。stale_days を指定したとき、印が付く Issue にだけ
-    `stale_days`（経過日数）を加える。
+    `stale_days`（経過日数）を加える。show_assignees が True のとき、各 Issue に
+    `assignees`（login の配列。担当者がいなければ空の配列）を加える。
     """
     if stale_days is not None and now is None:
         now = datetime.now(UTC)
@@ -66,6 +68,8 @@ def format_json(
             days = _stale_days_of(issue, stale_days, now)
             if days is not None:
                 item["stale_days"] = days
+            if show_assignees:
+                item["assignees"] = list(issue.assignees)
             items.append(item)
         categories.append(
             {
@@ -101,6 +105,7 @@ def format_digest(
     stale_days: int | None = None,
     now: datetime | None = None,
     sort: str | None = None,
+    summary: bool = False,
     show_assignees: bool = False,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
@@ -111,6 +116,8 @@ def format_digest(
     `（N日更新なし）` を付ける。経過日数は now（省略時は現在時刻）から計算する。
     sort が "updated" のとき、各分類の中を updatedAt の古い順に並べる
     （同じ場合は番号順。updatedAt がない Issue は末尾）。
+    summary が True のとき、総件数の見出しの次に全分類の件数を1行で出力する。
+    この行は only や hide_empty に関係なく、常に全分類を含む。
     show_assignees が True のとき、担当者がいる Issue の行末に `（担当: @alice, @bob）` を
     付ける（`--stale` の印があればその後ろ）。
     """
@@ -119,6 +126,11 @@ def format_digest(
     # 複数の分類に入る Issue を二重に数えないよう、番号で重複を除く
     total = len({issue.number for issues in classified.values() for issue in issues})
     lines = [f"# Issue ダイジェスト（全 {total} 件）"]
+    if summary:
+        counts = " / ".join(
+            f"{HEADINGS[category]} {len(issues)}" for category, issues in classified.items()
+        )
+        lines += ["", counts]
     for category, issues in classified.items():
         if only is not None and category not in only:
             continue

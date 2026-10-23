@@ -57,10 +57,23 @@ gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --s
 `assignees` がない入力でもエラーにはならず、担当者なしとして扱います。
 `--stale` の印と両方付くときは、`（N日更新なし）（担当: @alice）` の順です。
 `--show-assignees` を付けない場合の出力は変わりません。
-`--json` と同時に指定した場合、JSON の出力には影響しません（担当者は出力しません）。
+`--json` と同時に指定した場合は、各 Issue に `"assignees": ["alice", "bob"]`（login の配列。担当者がいなければ空の配列）を加えます。`--show-assignees` を付けない JSON には `assignees` を出しません。
 
 ```
 gh issue list --json number,title,labels,url,assignees | uv run issue-digest --show-assignees -
+```
+
+`--summary` を付けると、総件数の見出しの次に、空行をはさんで分類ごとの件数を1行で出力します。全体の概要をひと目で知りたいときに使います。
+分類の名前と順は見出しと同じです。この行は `--only` や `--hide-empty` に関係なく、常に6つの分類すべての件数を出します。
+`--summary` を付けない場合の出力は変わりません。
+`--json` と同時に指定した場合、`--summary` は無視します（JSON には分類ごとの `count` があるため）。
+
+```
+判断待ち 1 / 中断 0 / レビュー待ち 2 / 作業中 0 / 着手可能 3 / 未分類 1
+```
+
+```
+uv run issue-digest --summary issues.json
 ```
 
 `--sort updated` を付けると、各分類の中の Issue を `updatedAt`（最終更新）の古い順に並べます。止まっている Issue を見つけやすくするために使います。

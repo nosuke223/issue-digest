@@ -7,15 +7,18 @@ from issue_digest.formatter import format_digest, format_json
 from issue_digest.loader import load_issues, parse_issues
 
 USAGE = (
-    "使い方: issue-digest [--hide-empty] [--only <ラベル>]... [--stale <日数>] [--json]"
-    " [--sort updated] [--show-assignees] [--output <パス>] <JSONファイルのパス | ->\n"
+    "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--stale <日数>]"
+    " [--json] [--sort updated] [--show-assignees] [--output <パス>]"
+    " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
     "  --only で指定した分類だけを出力する（複数回指定できる）\n"
+    "  --summary で見出しの次に全分類の件数を1行で出力する\n"
     "  --stale で最終更新から指定日数以上たった Issue に印を付ける\n"
     "  --sort updated で各分類の中を最終更新の古い順に並べる\n"
     "  --json で Markdown の代わりに JSON を出力する\n"
-    "  --show-assignees で担当者がいる Issue の行末に担当者を表示する（Markdown のみ）\n"
+    "  --show-assignees で担当者を表示する（Markdown は行末に（担当: @alice）、"
+    "JSON は各 Issue に assignees の配列を加える）\n"
     "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
@@ -28,6 +31,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         print(f"issue-digest {version('issue-digest')}")
         return 0
     hide_empty = False
+    summary = False
     as_json = False
     only: list[str] = []
     stale_days: int | None = None
@@ -42,6 +46,8 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             hide_empty = True
         elif arg == "--show-assignees":
             show_assignees = True
+        elif arg == "--summary":
+            summary = True
         elif arg == "--json":
             as_json = True
         elif arg == "--only":
@@ -113,10 +119,13 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             return 1
     classified = classify_issues(issues)
     if as_json:
-        digest = format_json(classified, hide_empty, only_filter, stale_days, now, sort)
+        # JSON には分類ごとの count があるので、--summary は Markdown のときだけ効く
+        digest = format_json(
+            classified, hide_empty, only_filter, stale_days, now, sort, show_assignees
+        )
     else:
         digest = format_digest(
-            classified, hide_empty, only_filter, stale_days, now, sort, show_assignees
+            classified, hide_empty, only_filter, stale_days, now, sort, summary, show_assignees
         )
     if output is None:
         print(digest, end="")

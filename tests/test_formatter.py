@@ -1,7 +1,8 @@
+import json
 from datetime import UTC, datetime
 
 from issue_digest.classifier import classify_issues
-from issue_digest.formatter import format_digest
+from issue_digest.formatter import format_digest, format_json
 from issue_digest.loader import Issue
 
 
@@ -122,6 +123,59 @@ def test_format_digest_stale_mark_comes_before_assignees():
     issue = Issue(1, "A", ["agent:ready"], "u", updated_at=updated, assignees=["alice"])
     out = format_digest(classify_issues([issue]), stale_days=7, now=now, show_assignees=True)
     assert "- [#1](u) A（13日更新なし）（担当: @alice）\n" in out
+
+
+def test_format_json_show_assignees_adds_login_list():
+    issues = [
+        Issue(1, "A", ["agent:ready"], "u", assignees=["alice", "bob"]),
+        make_issue(2, "B", ["agent:ready"]),
+    ]
+    body = json.loads(format_json(classify_issues(issues), show_assignees=True))
+    ready = next(c for c in body["categories"] if c["label"] == "agent:ready")
+    assert [i["assignees"] for i in ready["issues"]] == [["alice", "bob"], []]
+
+
+def test_format_json_without_show_assignees_has_no_assignees():
+    issue = Issue(1, "A", ["agent:ready"], "u", assignees=["alice"])
+    out = format_json(classify_issues([issue]))
+    assert '"assignees":' not in out
+
+
+SUMMARY_LINE = "判断待ち 1 / 中断 0 / レビュー待ち 2 / 作業中 0 / 着手可能 3 / 未分類 1"
+
+
+def _summary_issues():
+    return [
+        make_issue(1, "A", ["agent:needs-decision"]),
+        make_issue(2, "B", ["agent:review"]),
+        make_issue(3, "C", ["agent:review"]),
+        make_issue(4, "D", ["agent:ready"]),
+        make_issue(5, "E", ["agent:ready"]),
+        make_issue(6, "F", ["agent:ready"]),
+        make_issue(7, "G", []),
+    ]
+
+
+def test_format_digest_summary_line_after_total():
+    out = format_digest(classify_issues(_summary_issues()), summary=True)
+    assert out.startswith(f"# Issue ダイジェスト（全 7 件）\n\n{SUMMARY_LINE}\n\n## 判断待ち")
+
+
+def test_format_digest_summary_ignores_only_and_hide_empty():
+    out = format_digest(
+        classify_issues(_summary_issues()),
+        hide_empty=True,
+        only=["agent:review"],
+        summary=True,
+    )
+    assert out.startswith(f"# Issue ダイジェスト（全 7 件）\n\n{SUMMARY_LINE}\n\n## レビュー待ち")
+    assert "## 判断待ち" not in out
+
+
+def test_format_digest_without_summary_unchanged():
+    classified = classify_issues(_summary_issues())
+    assert format_digest(classified) == format_digest(classified, summary=False)
+    assert SUMMARY_LINE not in format_digest(classified)
 
 
 def test_format_digest_total_zero():
