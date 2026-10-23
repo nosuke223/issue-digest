@@ -100,6 +100,34 @@ def test_format_digest_only_keeps_total_of_all_issues():
     )
 
 
+def test_format_digest_only_keeps_category_order_and_ignores_duplicates():
+    issues = [
+        make_issue(1, "A", ["agent:ready"]),
+        make_issue(2, "B", ["agent:blocked"]),
+    ]
+    classified = classify_issues(issues)
+    expected = format_digest(classified, only=["agent:blocked", "agent:ready"])
+    assert format_digest(classified, only=["agent:ready", "agent:blocked"]) == expected
+    assert (
+        format_digest(classified, only=["agent:ready", "agent:ready", "agent:blocked"]) == expected
+    )
+    headings = [line for line in expected.splitlines() if line.startswith("## ")]
+    assert headings == [
+        "## 中断 (agent:blocked) - 1件",
+        "## 着手可能 (agent:ready) - 1件",
+    ]
+
+
+def test_format_json_only_keeps_category_order_and_ignores_duplicates():
+    issues = [
+        make_issue(1, "A", ["agent:ready"]),
+        make_issue(2, "B", ["agent:blocked"]),
+    ]
+    out = format_json(classify_issues(issues), only=["agent:ready", "agent:ready", "agent:blocked"])
+    labels = [c["label"] for c in json.loads(out)["categories"]]
+    assert labels == ["agent:blocked", "agent:ready"]
+
+
 def test_format_digest_show_assignees_appends_in_input_order():
     issue = Issue(1, "A", ["agent:ready"], "u", assignees=["bob", "alice"])
     out = format_digest(classify_issues([issue]), show_assignees=True)
