@@ -15,7 +15,7 @@ HEADINGS = {
 
 def _elapsed_days(elapsed: timedelta) -> int:
     """経過時間を日数に直す（1日未満は切り捨て）。"""
-    return elapsed.seconds // 86400
+    return elapsed.days
 
 
 def _stale_mark(issue: Issue, stale_days: int | None, now: datetime | None) -> str:
