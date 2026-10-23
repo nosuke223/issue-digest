@@ -51,3 +51,11 @@ N は経過日数を切り捨てた整数です。`--hide-empty`、`--only` と�
 ```
 gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --stale 7 -
 ```
+
+`--version` を付けると、`issue-digest 0.1.0` のようにバージョンを1行で出力し、終了コード 0 で終わります。
+バージョンは `pyproject.toml` の値です。ほかのオプションやファイルが指定されていても、バージョンだけを出力します（ファイルは読みません）。
+`--version` を付けない場合の動作は変わりません。
+
+```
+uv run issue-digest --version
+```

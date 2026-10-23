@@ -1,5 +1,7 @@
 import io
+import tomllib
 from datetime import UTC, datetime
+from importlib.metadata import version
 from pathlib import Path
 
 import pytest
@@ -162,6 +164,31 @@ def test_main_invalid_updated_at(capsys, tmp_path):
     )
     assert main(["--stale", "7", str(bad)], now=NOW) == 1
     assert "読み込めません" in capsys.readouterr().err
+
+
+def test_main_version(capsys):
+    assert main(["--version"]) == 0
+    assert capsys.readouterr().out == f"issue-digest {version('issue-digest')}\n"
+
+
+def test_main_version_matches_pyproject(capsys):
+    text = (Path(__file__).parent.parent / "pyproject.toml").read_text(encoding="utf-8")
+    expected = tomllib.loads(text)["project"]["version"]
+    assert main(["--version"]) == 0
+    assert capsys.readouterr().out == f"issue-digest {expected}\n"
+
+
+def test_main_version_ignores_other_args(capsys):
+    args = ["--only", "agent:nope", "--stale", "x", str(DATA / "missing.json"), "--version"]
+    assert main(args) == 0
+    captured = capsys.readouterr()
+    assert captured.out == f"issue-digest {version('issue-digest')}\n"
+    assert captured.err == ""
+
+
+def test_main_usage_mentions_version(capsys):
+    assert main([]) == 2
+    assert "--version" in capsys.readouterr().err
 
 
 def test_main_missing_file(capsys):
