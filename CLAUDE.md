@@ -79,13 +79,15 @@ PR のコメントで修正を頼まれたときの手順。
 「Codex の指摘に対応して」と依頼されたときの手順。
 
 1. Issue のラベルを `agent:working` に変える
-2. Codex の指摘を読む: `gh api repos/<所有者>/<リポジトリ>/pulls/<PR番号>/comments`（オプションを付けない）のうち、作成者が `chatgpt-codex-connector[bot]` で、まだ対応していないもの
+2. Codex の指摘を読む: `gh api repos/<所有者>/<リポジトリ>/pulls/<PR番号>/comments`（オプションを付けない）のうち、作成者が `chatgpt-codex-connector[bot]` で、まだ自分の返信が付いていないもの（返信は `in_reply_to_id` が指摘の `id` のコメント）
 3. 指摘ごとに、正しいかを判断する
    - 正しい: 同じブランチで直す。指摘ごとに別のコミットにする
    - 誤っている、または Issue の範囲外: 直さない
 4. 直した場合は、テストと lint が通ったら push する
 5. PR 本文の「自分で決めた前提」「確認方法」を更新する（`gh pr edit <PR番号> --body-file .agent-tmp/body.md`）
-6. PR に、指摘ごとの対応（直した内容、または直さなかった理由）を返信する（`gh pr comment <PR番号> --body-file .agent-tmp/body.md`）
+6. 指摘ごとに、その指摘のスレッドへ対応（直した内容、または直さなかった理由）を返信する
+   - Write ツールで `.agent-tmp/body.md` に返信を書き、`gh api repos/<所有者>/<リポジトリ>/pulls/<PR番号>/comments/<指摘のコメントID>/replies -F body=@.agent-tmp/body.md` で送る
+   - 指摘のコメントID は、手順2の結果の `id`
 7. Issue のラベルを `agent:working` から `agent:review` に戻す
 
 1つも直さなかった場合は、ランナーが人間に判断を頼む。
