@@ -8,12 +8,13 @@ from issue_digest.loader import load_issues, parse_issues
 
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--only <ラベル>]... [--stale <日数>]"
-    " [--show-assignees] <JSONファイルのパス | ->\n"
+    " [--show-assignees] [--output <パス>] <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
     "  --only で指定した分類だけを出力する（複数回指定できる）\n"
     "  --stale で最終更新から指定日数以上たった Issue に印を付ける\n"
     "  --show-assignees で担当者がいる Issue の行末に担当者を表示する\n"
+    "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -28,6 +29,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     only: list[str] = []
     stale_days: int | None = None
     show_assignees = False
+    output: str | None = None
     paths: list[str] = []
     i = 0
     while i < len(args):
@@ -54,6 +56,12 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
                 )
                 return 2
             stale_days = int(args[i])
+        elif arg == "--output":
+            i += 1
+            if i >= len(args):
+                print(USAGE, file=sys.stderr)
+                return 2
+            output = args[i]
         else:
             paths.append(arg)
         i += 1
@@ -76,21 +84,25 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         except (OSError, ValueError, KeyError, TypeError) as e:
             print(f"エラー: 標準入力を読み込めません ({type(e).__name__})", file=sys.stderr)
             return 1
-        digest = format_digest(
-            classify_issues(issues), hide_empty, only_filter, stale_days, now, show_assignees
-        )
-        print(digest, end="")
-        return 0
-    try:
-        issues = load_issues(path)
-    except FileNotFoundError:
-        print(f"エラー: ファイルが見つかりません: {path}", file=sys.stderr)
-        return 1
-    except (OSError, ValueError, KeyError, TypeError) as e:
-        print(f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})", file=sys.stderr)
-        return 1
+    else:
+        try:
+            issues = load_issues(path)
+        except FileNotFoundError:
+            print(f"エラー: ファイルが見つかりません: {path}", file=sys.stderr)
+            return 1
+        except (OSError, ValueError, KeyError, TypeError) as e:
+            print(f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})", file=sys.stderr)
+            return 1
     digest = format_digest(
         classify_issues(issues), hide_empty, only_filter, stale_days, now, show_assignees
     )
-    print(digest, end="")
+    if output is None:
+        print(digest, end="")
+        return 0
+    try:
+        with open(output, "w", encoding="utf-8", newline="") as f:
+            f.write(digest)
+    except OSError as e:
+        print(f"エラー: ファイルに書き出せません: {output} ({type(e).__name__})", file=sys.stderr)
+        return 1
     return 0

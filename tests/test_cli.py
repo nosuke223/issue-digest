@@ -196,6 +196,87 @@ def test_main_usage_mentions_show_assignees(capsys):
     assert "--show-assignees" in capsys.readouterr().err
 
 
+def test_main_output_writes_same_content_as_stdout(capsys, tmp_path):
+    assert main([str(DATA / "issues.json")]) == 0
+    expected = capsys.readouterr().out
+    out_file = tmp_path / "out.md"
+    assert main(["--output", str(out_file), str(DATA / "issues.json")]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
+    assert out_file.read_bytes() == expected.encode("utf-8")
+
+
+def test_main_output_overwrites_existing_file(tmp_path):
+    out_file = tmp_path / "out.md"
+    out_file.write_text("古い内容" * 1000, encoding="utf-8")
+    assert main([str(DATA / "empty.json"), "--output", str(out_file)]) == 0
+    assert out_file.read_text(encoding="utf-8").startswith("# Issue ダイジェスト（全 0 件）\n")
+    assert "古い内容" not in out_file.read_text(encoding="utf-8")
+
+
+def test_main_output_with_other_options(capsys, tmp_path):
+    out_file = tmp_path / "out.md"
+    args = ["--stale", "7", "--hide-empty", "--only", "agent:ready"]
+    assert main([*args, "--output", str(out_file), str(DATA / "stale.json")], now=NOW) == 0
+    assert capsys.readouterr().out == ""
+    text = out_file.read_text(encoding="utf-8")
+    assert "古い Issue（13日更新なし）" in text
+    assert "## 未分類" not in text
+    assert "(agent:blocked)" not in text
+
+
+def test_main_output_reads_stdin(capsys, monkeypatch, tmp_path):
+    text = (DATA / "issues.json").read_text(encoding="utf-8")
+    monkeypatch.setattr("sys.stdin", io.StringIO(text))
+    out_file = tmp_path / "out.md"
+    assert main(["--output", str(out_file), "-"]) == 0
+    assert capsys.readouterr().out == ""
+    assert "## 着手可能 (agent:ready) - 1件" in out_file.read_text(encoding="utf-8")
+
+
+def test_main_output_unwritable_path(capsys, tmp_path):
+    out_file = tmp_path / "no-such-dir" / "out.md"
+    assert main(["--output", str(out_file), str(DATA / "issues.json")]) == 1
+    captured = capsys.readouterr()
+    assert "書き出せません" in captured.err
+    assert "Traceback" not in captured.err
+    assert captured.out == ""
+    assert not out_file.parent.exists()
+
+
+def test_main_output_without_value_shows_usage(capsys):
+    assert main([str(DATA / "issues.json"), "--output"]) == 2
+    captured = capsys.readouterr()
+    assert "使い方" in captured.err
+    assert captured.out == ""
+
+
+def test_main_output_not_created_when_input_fails(tmp_path):
+    out_file = tmp_path / "out.md"
+    assert main(["--output", str(out_file), str(DATA / "missing.json")]) == 1
+    assert not out_file.exists()
+
+
+def test_main_usage_mentions_output(capsys):
+    assert main([]) == 2
+    assert "--output" in capsys.readouterr().err
+
+
+def test_main_version_ignores_output(capsys, tmp_path):
+    out_file = tmp_path / "out.md"
+    assert main(["--version", "--output", str(out_file)]) == 0
+    assert capsys.readouterr().out == f"issue-digest {version('issue-digest')}\n"
+    assert not out_file.exists()
+
+
+def test_main_output_with_show_assignees(capsys, tmp_path):
+    out_file = tmp_path / "out.md"
+    assert main(["--show-assignees", "--output", str(out_file), str(DATA / "assignees.json")]) == 0
+    assert capsys.readouterr().out == ""
+    assert "担当者が2人の Issue（担当: @bob, @alice）\n" in out_file.read_text(encoding="utf-8")
+
+
 def test_main_version(capsys):
     assert main(["--version"]) == 0
     assert capsys.readouterr().out == f"issue-digest {version('issue-digest')}\n"
