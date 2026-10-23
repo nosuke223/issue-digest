@@ -39,3 +39,15 @@ uv run issue-digest --hide-empty issues.json
 uv run issue-digest --only agent:needs-decision issues.json
 uv run issue-digest --only agent:needs-decision --only agent:blocked --hide-empty issues.json
 ```
+
+`--stale <日数>` を付けると、最終更新から指定日数以上たった Issue の行の末尾に `（N日更新なし）` を付けます。止まっている Issue に気づきたいときに使います。
+N は経過日数を切り捨てた整数です。`--hide-empty`、`--only` と同時に使えます。
+この印を付けるには、入力の各 Issue に `updatedAt`（ISO 8601 形式。例: `2026-10-20T12:34:56Z`）が必要です。
+`gh issue list --json number,title,labels,url,updatedAt` の出力をそのまま渡せます。
+`updatedAt` がない Issue には印を付けません。
+日数は0以上の整数で指定します。それ以外を指定すると、エラーを標準エラーに出して終了コード 2 で終わります。
+`--stale` を付けない場合の出力は変わりません。
+
+```
+gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --stale 7 -
+```
