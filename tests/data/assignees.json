@@ -1,0 +1,33 @@
+[
+  {
+    "number": 1,
+    "title": "担当者が2人の Issue",
+    "labels": [{"name": "agent:ready", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/1",
+    "updatedAt": "2026-10-10T00:00:00Z",
+    "assignees": [
+      {"login": "bob", "name": "Bob"},
+      {"login": "alice", "name": "Alice"}
+    ]
+  },
+  {
+    "number": 2,
+    "title": "担当者が空の Issue",
+    "labels": [],
+    "url": "https://github.com/example/repo/issues/2",
+    "assignees": []
+  },
+  {
+    "number": 3,
+    "title": "assignees がない Issue",
+    "labels": [],
+    "url": "https://github.com/example/repo/issues/3"
+  },
+  {
+    "number": 4,
+    "title": "assignees が null の Issue",
+    "labels": [],
+    "url": "https://github.com/example/repo/issues/4",
+    "assignees": null
+  }
+]

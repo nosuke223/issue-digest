@@ -195,6 +195,51 @@ def test_main_invalid_updated_at(capsys, tmp_path):
     assert "読み込めません" in capsys.readouterr().err
 
 
+def test_main_show_assignees(capsys):
+    assert main(["--show-assignees", str(DATA / "assignees.json")]) == 0
+    out = capsys.readouterr().out
+    assert "担当者が2人の Issue（担当: @bob, @alice）\n" in out
+    assert "担当者が空の Issue\n" in out
+    assert "assignees がない Issue\n" in out
+    assert "assignees が null の Issue\n" in out
+
+
+def test_main_show_assignees_with_stale_order(capsys):
+    args = ["--stale", "7", "--show-assignees", str(DATA / "assignees.json")]
+    assert main(args, now=NOW) == 0
+    assert "担当者が2人の Issue（13日更新なし）（担当: @bob, @alice）\n" in capsys.readouterr().out
+
+
+def test_main_without_show_assignees_unchanged(capsys):
+    assert main([str(DATA / "assignees.json")]) == 0
+    assert "（担当:" not in capsys.readouterr().out
+
+
+def test_main_show_assignees_without_assignees_field_does_not_fail(capsys):
+    assert main(["--show-assignees", str(DATA / "issues.json")]) == 0
+    assert "担当" not in capsys.readouterr().out
+
+
+def test_main_json_show_assignees(capsys):
+    assert main(["--json", "--show-assignees", str(DATA / "assignees.json")]) == 0
+    body = json.loads(capsys.readouterr().out)
+    by_title = {i["title"]: i for c in body["categories"] for i in c["issues"]}
+    assert by_title["担当者が2人の Issue"]["assignees"] == ["bob", "alice"]
+    assert by_title["担当者が空の Issue"]["assignees"] == []
+    assert by_title["assignees がない Issue"]["assignees"] == []
+    assert by_title["assignees が null の Issue"]["assignees"] == []
+
+
+def test_main_json_without_show_assignees_has_no_assignees(capsys):
+    assert main(["--json", str(DATA / "assignees.json")]) == 0
+    assert '"assignees":' not in capsys.readouterr().out
+
+
+def test_main_usage_mentions_show_assignees(capsys):
+    assert main([]) == 2
+    assert "--show-assignees" in capsys.readouterr().err
+
+
 def issue_numbers_in_output(out: str) -> list[int]:
     lines = [line for line in out.splitlines() if line.startswith("- [#")]
     return [int(line.removeprefix("- [#").split("]")[0]) for line in lines]
@@ -241,6 +286,11 @@ def test_main_sort_without_value_shows_usage(capsys):
     assert "使い方" in captured.err
     assert "--sort" in captured.err
     assert captured.out == ""
+
+
+def test_main_sort_with_show_assignees(capsys):
+    assert main(["--sort", "updated", "--show-assignees", str(DATA / "sort.json")]) == 0
+    assert issue_numbers_in_output(capsys.readouterr().out) == [8, 7, 6, 3, 4, 1, 2, 5]
 
 
 def test_main_output_writes_same_content_as_stdout(capsys, tmp_path):
@@ -325,6 +375,13 @@ def test_main_version_ignores_output(capsys, tmp_path):
     assert main(["--version", "--output", str(out_file)]) == 0
     assert capsys.readouterr().out == f"issue-digest {version('issue-digest')}\n"
     assert not out_file.exists()
+
+
+def test_main_output_with_show_assignees(capsys, tmp_path):
+    out_file = tmp_path / "out.md"
+    assert main(["--show-assignees", "--output", str(out_file), str(DATA / "assignees.json")]) == 0
+    assert capsys.readouterr().out == ""
+    assert "担当者が2人の Issue（担当: @bob, @alice）\n" in out_file.read_text(encoding="utf-8")
 
 
 def test_main_output_with_sort(tmp_path):

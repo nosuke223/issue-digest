@@ -52,6 +52,17 @@ N は経過日数を切り捨てた整数です。`--hide-empty`、`--only` と�
 gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --stale 7 -
 ```
 
+`--show-assignees` を付けると、担当者がいる Issue の行の末尾に `（担当: @alice, @bob）` を付けます。誰が対応しているかを知りたいときに使います。
+担当者は入力の `assignees` の順に、カンマと空白で区切って並べます。担当者がいない Issue には何も付けません。
+`assignees` がない入力でもエラーにはならず、担当者なしとして扱います。
+`--stale` の印と両方付くときは、`（N日更新なし）（担当: @alice）` の順です。
+`--show-assignees` を付けない場合の出力は変わりません。
+`--json` と同時に指定した場合は、各 Issue に `"assignees": ["alice", "bob"]`（login の配列。担当者がいなければ空の配列）を加えます。`--show-assignees` を付けない JSON には `assignees` を出しません。
+
+```
+gh issue list --json number,title,labels,url,assignees | uv run issue-digest --show-assignees -
+```
+
 `--summary` を付けると、総件数の見出しの次に、空行をはさんで分類ごとの件数を1行で出力します。全体の概要をひと目で知りたいときに使います。
 分類の名前と順は見出しと同じです。この行は `--only` や `--hide-empty` に関係なく、常に6つの分類すべての件数を出します。
 `--summary` を付けない場合の出力は変わりません。

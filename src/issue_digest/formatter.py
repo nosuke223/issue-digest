@@ -39,11 +39,13 @@ def format_json(
     stale_days: int | None = None,
     now: datetime | None = None,
     sort: str | None = None,
+    show_assignees: bool = False,
 ) -> str:
     """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
 
     引数の意味は format_digest と同じ。stale_days を指定したとき、印が付く Issue にだけ
-    `stale_days`（経過日数）を加える。
+    `stale_days`（経過日数）を加える。show_assignees が True のとき、各 Issue に
+    `assignees`（login の配列。担当者がいなければ空の配列）を加える。
     """
     if stale_days is not None and now is None:
         now = datetime.now(UTC)
@@ -66,6 +68,8 @@ def format_json(
             days = _stale_days_of(issue, stale_days, now)
             if days is not None:
                 item["stale_days"] = days
+            if show_assignees:
+                item["assignees"] = list(issue.assignees)
             items.append(item)
         categories.append(
             {
@@ -77,6 +81,12 @@ def format_json(
         )
     body = {"total": total, "categories": categories}
     return json.dumps(body, ensure_ascii=False, indent=2) + "\n"
+
+
+def _assignees_mark(issue: Issue, show_assignees: bool) -> str:
+    if not show_assignees or not issue.assignees:
+        return ""
+    return "（担当: " + ", ".join(f"@{login}" for login in issue.assignees) + "）"
 
 
 def _sort_by_updated(issues: list[Issue]) -> list[Issue]:
@@ -96,6 +106,7 @@ def format_digest(
     now: datetime | None = None,
     sort: str | None = None,
     summary: bool = False,
+    show_assignees: bool = False,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
@@ -107,6 +118,8 @@ def format_digest(
     （同じ場合は番号順。updatedAt がない Issue は末尾）。
     summary が True のとき、総件数の見出しの次に全分類の件数を1行で出力する。
     この行は only や hide_empty に関係なく、常に全分類を含む。
+    show_assignees が True のとき、担当者がいる Issue の行末に `（担当: @alice, @bob）` を
+    付ける（`--stale` の印があればその後ろ）。
     """
     if stale_days is not None and now is None:
         now = datetime.now(UTC)
@@ -136,6 +149,7 @@ def format_digest(
                 lines.append(
                     f"- [#{issue.number}]({issue.url}) {issue.title}"
                     f"{_stale_mark(issue, stale_days, now)}"
+                    f"{_assignees_mark(issue, show_assignees)}"
                 )
         else:
             lines.append("なし")

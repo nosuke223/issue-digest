@@ -36,5 +36,15 @@ def test_parse_issues_accepts_null_updated_at():
     assert parse_issues(text)[0].updated_at is None
 
 
+def test_load_issues_reads_assignees_in_order():
+    assert load_issues(DATA / "assignees.json")[0].assignees == ["bob", "alice"]
+
+
+def test_load_issues_assignees_missing_empty_or_null_means_none():
+    issues = load_issues(DATA / "assignees.json")
+    assert [i.assignees for i in issues[1:]] == [[], [], []]
+    assert load_issues(DATA / "issues.json")[0].assignees == []
+
+
 def test_load_issues_returns_empty_list_for_empty_file():
     assert load_issues(DATA / "empty.json") == []
