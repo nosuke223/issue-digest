@@ -1,5 +1,6 @@
 import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -9,6 +10,7 @@ class Issue:
     title: str
     labels: list[str]
     url: str
+    updated_at: datetime | None = None
 
 
 def load_issues(path: str | Path) -> list[Issue]:
@@ -18,7 +20,10 @@ def load_issues(path: str | Path) -> list[Issue]:
 
 
 def parse_issues(text: str) -> list[Issue]:
-    """`gh issue list --json number,title,labels,url` の出力（JSON 文字列）を解釈する。"""
+    """`gh issue list --json number,title,labels,url` の出力（JSON 文字列）を解釈する。
+
+    各 Issue の `updatedAt`（ISO 8601 形式）は任意。ないときや null のときは None になる。
+    """
     data = json.loads(text)
     return [
         Issue(
@@ -26,6 +31,15 @@ def parse_issues(text: str) -> list[Issue]:
             title=item["title"],
             labels=[label["name"] for label in item["labels"]],
             url=item["url"],
+            updated_at=_parse_datetime(item.get("updatedAt")),
         )
         for item in data
     ]
+
+
+def _parse_datetime(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    parsed = datetime.fromisoformat(value)
+    # タイムゾーンがない値は UTC とみなす
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)

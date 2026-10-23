@@ -1,5 +1,8 @@
 import io
+from datetime import UTC, datetime
 from pathlib import Path
+
+import pytest
 
 from issue_digest import main
 
@@ -96,6 +99,69 @@ def test_main_only_unknown_label(capsys):
 def test_main_only_without_value_shows_usage(capsys):
     assert main([str(DATA / "issues.json"), "--only"]) == 2
     assert "使い方" in capsys.readouterr().err
+
+
+NOW = datetime(2026, 10, 23, 12, 0, 0, tzinfo=UTC)
+
+
+def test_main_stale_marks_only_old_issues(capsys):
+    assert main(["--stale", "7", str(DATA / "stale.json")], now=NOW) == 0
+    out = capsys.readouterr().out
+    assert "古い Issue（13日更新なし）\n" in out
+    assert "ちょうど7日の Issue（7日更新なし）\n" in out
+    assert "7日に1秒足りない Issue\n" in out
+    assert "updatedAt がない Issue\n" in out
+
+
+def test_main_stale_zero_marks_all_with_updated_at(capsys):
+    assert main(["--stale", "0", str(DATA / "stale.json")], now=NOW) == 0
+    out = capsys.readouterr().out
+    assert "7日に1秒足りない Issue（6日更新なし）\n" in out
+    assert "updatedAt がない Issue\n" in out
+
+
+def test_main_without_stale_unchanged(capsys):
+    assert main([str(DATA / "stale.json")], now=NOW) == 0
+    assert "更新なし" not in capsys.readouterr().out
+
+
+def test_main_stale_with_hide_empty_and_only(capsys):
+    args = ["--stale", "7", "--hide-empty", "--only", "agent:ready"]
+    assert main([*args, str(DATA / "stale.json")], now=NOW) == 0
+    out = capsys.readouterr().out
+    assert "古い Issue（13日更新なし）" in out
+    assert "## 未分類" not in out
+    assert "(agent:blocked)" not in out
+
+
+def test_main_stale_reads_stdin(capsys, monkeypatch):
+    text = (DATA / "stale.json").read_text(encoding="utf-8")
+    monkeypatch.setattr("sys.stdin", io.StringIO(text))
+    assert main(["--stale", "7", "-"], now=NOW) == 0
+    assert "古い Issue（13日更新なし）" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("value", ["-1", "abc", "1.5", "", "１"])
+def test_main_stale_invalid_value(capsys, value):
+    assert main(["--stale", value, str(DATA / "stale.json")], now=NOW) == 2
+    captured = capsys.readouterr()
+    assert "--stale" in captured.err
+    assert captured.out == ""
+
+
+def test_main_stale_without_value_shows_usage(capsys):
+    assert main([str(DATA / "stale.json"), "--stale"]) == 2
+    assert "使い方" in capsys.readouterr().err
+
+
+def test_main_invalid_updated_at(capsys, tmp_path):
+    bad = tmp_path / "bad.json"
+    bad.write_text(
+        '[{"number": 1, "title": "t", "labels": [], "url": "u", "updatedAt": "xx"}]',
+        encoding="utf-8",
+    )
+    assert main(["--stale", "7", str(bad)], now=NOW) == 1
+    assert "読み込めません" in capsys.readouterr().err
 
 
 def test_main_missing_file(capsys):
