@@ -1,3 +1,4 @@
+import argparse
 import sys
 from datetime import datetime
 from importlib.metadata import version
@@ -24,71 +25,68 @@ USAGE = (
 )
 
 
+class _UsageError(Exception):
+    pass
+
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message: str):
+        raise _UsageError(message)
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    # 値の検査（--stale、--sort、--only）は日本語のエラーメッセージのため main で行う
+    parser = _Parser(add_help=False, allow_abbrev=False)
+    parser.add_argument("-h", "--help", action="store_true")
+    parser.add_argument("--hide-empty", action="store_true")
+    parser.add_argument("--summary", action="store_true")
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--show-assignees", action="store_true")
+    parser.add_argument("--only", action="append", default=[])
+    parser.add_argument("--stale")
+    parser.add_argument("--sort")
+    parser.add_argument("--output")
+    parser.add_argument("paths", nargs="*")
+    return parser
+
+
 def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     """now は --stale の経過日数の基準時刻。省略時は現在時刻（テストで固定できる）。"""
     args = sys.argv[1:] if argv is None else argv
     if "--version" in args:
         print(f"issue-digest {version('issue-digest')}")
         return 0
-    hide_empty = False
-    summary = False
-    as_json = False
-    only: list[str] = []
+    try:
+        opts = _build_parser().parse_args(args)
+    except _UsageError:
+        print(USAGE, file=sys.stderr)
+        return 2
+    if opts.help:
+        print(USAGE)
+        return 0
+    hide_empty = opts.hide_empty
+    summary = opts.summary
+    as_json = opts.json
+    only: list[str] = opts.only
+    show_assignees = opts.show_assignees
+    output: str | None = opts.output
     stale_days: int | None = None
-    sort: str | None = None
-    show_assignees = False
-    output: str | None = None
-    paths: list[str] = []
-    i = 0
-    while i < len(args):
-        arg = args[i]
-        if arg == "--hide-empty":
-            hide_empty = True
-        elif arg == "--show-assignees":
-            show_assignees = True
-        elif arg == "--summary":
-            summary = True
-        elif arg == "--json":
-            as_json = True
-        elif arg == "--only":
-            i += 1
-            if i >= len(args):
-                print(USAGE, file=sys.stderr)
-                return 2
-            only.append(args[i])
-        elif arg == "--stale":
-            i += 1
-            if i >= len(args):
-                print(USAGE, file=sys.stderr)
-                return 2
-            if not (args[i].isascii() and args[i].isdigit()):
-                print(
-                    f"エラー: --stale には0以上の整数を指定してください: {args[i]}",
-                    file=sys.stderr,
-                )
-                return 2
-            stale_days = int(args[i])
-        elif arg == "--sort":
-            i += 1
-            if i >= len(args):
-                print(USAGE, file=sys.stderr)
-                return 2
-            if args[i] != "updated":
-                print(
-                    f"エラー: --sort に指定できるのは updated だけです: {args[i]}",
-                    file=sys.stderr,
-                )
-                return 2
-            sort = args[i]
-        elif arg == "--output":
-            i += 1
-            if i >= len(args):
-                print(USAGE, file=sys.stderr)
-                return 2
-            output = args[i]
-        else:
-            paths.append(arg)
-        i += 1
+    if opts.stale is not None:
+        if not (opts.stale.isascii() and opts.stale.isdigit()):
+            print(
+                f"エラー: --stale には0以上の整数を指定してください: {opts.stale}",
+                file=sys.stderr,
+            )
+            return 2
+        stale_days = int(opts.stale)
+    sort: str | None = opts.sort
+    if sort is not None and sort != "updated":
+        print(
+            f"エラー: --sort に指定できるのは updated だけです: {sort}",
+            file=sys.stderr,
+        )
+        return 2
+    paths: list[str] = opts.paths
     if len(paths) != 1:
         print(USAGE, file=sys.stderr)
         return 2
