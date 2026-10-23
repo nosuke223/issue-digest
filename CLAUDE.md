@@ -66,7 +66,7 @@ PR のコメントで修正を頼まれたときの手順。
 
 1. Issue のラベルを `agent:working` に変える（`agent:review` または `agent:ready` から）
 2. PR のコメントを読む
-   - 全体へのコメント: `gh pr view <PR番号> --comments`
+   - 全体へのコメント: `gh api repos/<所有者>/<リポジトリ>/issues/<PR番号>/comments`（オプションを付けない。`gh pr view --comments` はトークンの権限が足りず失敗する）
    - 行ごとのコメント: `gh api repos/<所有者>/<リポジトリ>/pulls/<PR番号>/comments`（オプションを付けない）
 3. 同じブランチで修正し、指摘への対応ごとに別のコミットにする
 4. テストと lint が通ったら push する

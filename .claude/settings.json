@@ -26,6 +26,8 @@
       "Bash(gh pr comment *)",
       "Bash(gh pr checks *)",
       "Bash(gh api repos/*/pulls/*/comments)",
+      "Bash(gh api repos/*/issues/*/comments)",
+      "Bash(gh api repos/*/pulls/*/comments/*/replies -F body=@.agent-tmp/body.md)",
       "Bash(uv run pytest)",
       "Bash(uv run pytest *)",
       "Bash(uv run ruff *)",
