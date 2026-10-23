@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from issue_digest.classifier import classify_issues
 from issue_digest.formatter import format_digest
 from issue_digest.loader import Issue
@@ -95,6 +97,31 @@ def test_format_digest_only_keeps_total_of_all_issues():
         "\n"
         "- [#2](https://github.com/example/repo/issues/2) B\n"
     )
+
+
+def test_format_digest_show_assignees_appends_in_input_order():
+    issue = Issue(1, "A", ["agent:ready"], "u", assignees=["bob", "alice"])
+    out = format_digest(classify_issues([issue]), show_assignees=True)
+    assert "- [#1](u) A（担当: @bob, @alice）\n" in out
+
+
+def test_format_digest_show_assignees_skips_issue_without_assignees():
+    out = format_digest(classify_issues([make_issue(1, "A", ["agent:ready"])]), show_assignees=True)
+    assert "- [#1](https://github.com/example/repo/issues/1) A\n" in out
+    assert "担当" not in out
+
+
+def test_format_digest_assignees_hidden_by_default():
+    issue = Issue(1, "A", ["agent:ready"], "u", assignees=["alice"])
+    assert "担当" not in format_digest(classify_issues([issue]))
+
+
+def test_format_digest_stale_mark_comes_before_assignees():
+    now = datetime(2026, 10, 23, tzinfo=UTC)
+    updated = datetime(2026, 10, 10, tzinfo=UTC)
+    issue = Issue(1, "A", ["agent:ready"], "u", updated_at=updated, assignees=["alice"])
+    out = format_digest(classify_issues([issue]), stale_days=7, now=now, show_assignees=True)
+    assert "- [#1](u) A（13日更新なし）（担当: @alice）\n" in out
 
 
 def test_format_digest_total_zero():

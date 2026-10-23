@@ -25,12 +25,19 @@ def _stale_mark(issue: Issue, stale_days: int | None, now: datetime | None) -> s
     return f"（{days}日更新なし）" if days >= stale_days else ""
 
 
+def _assignees_mark(issue: Issue, show_assignees: bool) -> str:
+    if not show_assignees or not issue.assignees:
+        return ""
+    return "（担当: " + ", ".join(f"@{login}" for login in issue.assignees) + "）"
+
+
 def format_digest(
     classified: dict[str, list[Issue]],
     hide_empty: bool = False,
     only: list[str] | None = None,
     stale_days: int | None = None,
     now: datetime | None = None,
+    show_assignees: bool = False,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
@@ -38,6 +45,8 @@ def format_digest(
     only を指定すると、そこに含まれる分類だけを出力する（総件数は全件のまま）。
     stale_days を指定すると、最終更新から stale_days 日以上たった Issue の行末に
     `（N日更新なし）` を付ける。経過日数は now（省略時は現在時刻）から計算する。
+    show_assignees が True のとき、担当者がいる Issue の行末に `（担当: @alice, @bob）` を
+    付ける（`--stale` の印があればその後ろ）。
     """
     if stale_days is not None and now is None:
         now = datetime.now(UTC)
@@ -60,6 +69,7 @@ def format_digest(
                 lines.append(
                     f"- [#{issue.number}]({issue.url}) {issue.title}"
                     f"{_stale_mark(issue, stale_days, now)}"
+                    f"{_assignees_mark(issue, show_assignees)}"
                 )
         else:
             lines.append("なし")

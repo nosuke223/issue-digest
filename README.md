@@ -52,6 +52,16 @@ N は経過日数を切り捨てた整数です。`--hide-empty`、`--only` と�
 gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --stale 7 -
 ```
 
+`--show-assignees` を付けると、担当者がいる Issue の行の末尾に `（担当: @alice, @bob）` を付けます。誰が対応しているかを知りたいときに使います。
+担当者は入力の `assignees` の順に、カンマと空白で区切って並べます。担当者がいない Issue には何も付けません。
+`assignees` がない入力でもエラーにはならず、担当者なしとして扱います。
+`--stale` の印と両方付くときは、`（N日更新なし）（担当: @alice）` の順です。
+`--show-assignees` を付けない場合の出力は変わりません。
+
+```
+gh issue list --json number,title,labels,url,assignees | uv run issue-digest --show-assignees -
+```
+
 `--version` を付けると、`issue-digest 0.1.0` のようにバージョンを1行で出力し、終了コード 0 で終わります。
 バージョンは `pyproject.toml` の値です。ほかのオプションやファイルが指定されていても、バージョンだけを出力します（ファイルは読みません）。
 `--version` を付けない場合の動作は変わりません。

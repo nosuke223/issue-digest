@@ -8,11 +8,12 @@ from issue_digest.loader import load_issues, parse_issues
 
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--only <ラベル>]... [--stale <日数>]"
-    " <JSONファイルのパス | ->\n"
+    " [--show-assignees] <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
     "  --only で指定した分類だけを出力する（複数回指定できる）\n"
     "  --stale で最終更新から指定日数以上たった Issue に印を付ける\n"
+    "  --show-assignees で担当者がいる Issue の行末に担当者を表示する\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -26,12 +27,15 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     hide_empty = False
     only: list[str] = []
     stale_days: int | None = None
+    show_assignees = False
     paths: list[str] = []
     i = 0
     while i < len(args):
         arg = args[i]
         if arg == "--hide-empty":
             hide_empty = True
+        elif arg == "--show-assignees":
+            show_assignees = True
         elif arg == "--only":
             i += 1
             if i >= len(args):
@@ -72,7 +76,9 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         except (OSError, ValueError, KeyError, TypeError) as e:
             print(f"エラー: 標準入力を読み込めません ({type(e).__name__})", file=sys.stderr)
             return 1
-        digest = format_digest(classify_issues(issues), hide_empty, only_filter, stale_days, now)
+        digest = format_digest(
+            classify_issues(issues), hide_empty, only_filter, stale_days, now, show_assignees
+        )
         print(digest, end="")
         return 0
     try:
@@ -83,6 +89,8 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     except (OSError, ValueError, KeyError, TypeError) as e:
         print(f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})", file=sys.stderr)
         return 1
-    digest = format_digest(classify_issues(issues), hide_empty, only_filter, stale_days, now)
+    digest = format_digest(
+        classify_issues(issues), hide_empty, only_filter, stale_days, now, show_assignees
+    )
     print(digest, end="")
     return 0

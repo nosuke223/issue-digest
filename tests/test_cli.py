@@ -166,6 +166,36 @@ def test_main_invalid_updated_at(capsys, tmp_path):
     assert "読み込めません" in capsys.readouterr().err
 
 
+def test_main_show_assignees(capsys):
+    assert main(["--show-assignees", str(DATA / "assignees.json")]) == 0
+    out = capsys.readouterr().out
+    assert "担当者が2人の Issue（担当: @bob, @alice）\n" in out
+    assert "担当者が空の Issue\n" in out
+    assert "assignees がない Issue\n" in out
+    assert "assignees が null の Issue\n" in out
+
+
+def test_main_show_assignees_with_stale_order(capsys):
+    args = ["--stale", "7", "--show-assignees", str(DATA / "assignees.json")]
+    assert main(args, now=NOW) == 0
+    assert "担当者が2人の Issue（13日更新なし）（担当: @bob, @alice）\n" in capsys.readouterr().out
+
+
+def test_main_without_show_assignees_unchanged(capsys):
+    assert main([str(DATA / "assignees.json")]) == 0
+    assert "（担当:" not in capsys.readouterr().out
+
+
+def test_main_show_assignees_without_assignees_field_does_not_fail(capsys):
+    assert main(["--show-assignees", str(DATA / "issues.json")]) == 0
+    assert "担当" not in capsys.readouterr().out
+
+
+def test_main_usage_mentions_show_assignees(capsys):
+    assert main([]) == 2
+    assert "--show-assignees" in capsys.readouterr().err
+
+
 def test_main_version(capsys):
     assert main(["--version"]) == 0
     assert capsys.readouterr().out == f"issue-digest {version('issue-digest')}\n"
