@@ -91,8 +91,9 @@ def _selected_categories(
 ) -> list[tuple[str, list[Issue]]]:
     """出力する分類と、その中の Issue の並びを返す（Markdown と JSON で共通）。"""
     selected = []
-    for category in only if only is not None else classified:
-        issues = classified[category]
+    for category, issues in classified.items():
+        if only is not None and category not in only:
+            continue
         if hide_empty and not issues:
             continue
         if sort == "updated":
