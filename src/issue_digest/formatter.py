@@ -51,13 +51,7 @@ def format_json(
         now = datetime.now(UTC)
     total = len({issue.number for issues in classified.values() for issue in issues})
     categories = []
-    for category, issues in classified.items():
-        if only is not None and category not in only:
-            continue
-        if hide_empty and not issues:
-            continue
-        if sort == "updated":
-            issues = _sort_by_updated(issues)
+    for category, issues in _selected_categories(classified, hide_empty, only, sort):
         items = []
         for issue in issues:
             item: dict[str, object] = {
@@ -87,6 +81,24 @@ def _assignees_mark(issue: Issue, show_assignees: bool) -> str:
     if not show_assignees or not issue.assignees:
         return ""
     return "（担当: " + ", ".join(f"@{login}" for login in issue.assignees) + "）"
+
+
+def _selected_categories(
+    classified: dict[str, list[Issue]],
+    hide_empty: bool,
+    only: list[str] | None,
+    sort: str | None,
+) -> list[tuple[str, list[Issue]]]:
+    """出力する分類と、その中の Issue の並びを返す（Markdown と JSON で共通）。"""
+    selected = []
+    for category in only if only is not None else classified:
+        issues = classified[category]
+        if hide_empty and not issues:
+            continue
+        if sort == "updated":
+            issues = _sort_by_updated(issues)
+        selected.append((category, issues))
+    return selected
 
 
 def _sort_by_updated(issues: list[Issue]) -> list[Issue]:
@@ -131,19 +143,13 @@ def format_digest(
             f"{HEADINGS[category]} {len(issues)}" for category, issues in classified.items()
         )
         lines += ["", counts]
-    for category, issues in classified.items():
-        if only is not None and category not in only:
-            continue
-        if hide_empty and not issues:
-            continue
+    for category, issues in _selected_categories(classified, hide_empty, only, sort):
         title = HEADINGS[category]
         if category == UNCLASSIFIED:
             heading = f"## {title} - {len(issues)}件"
         else:
             heading = f"## {title} ({category}) - {len(issues)}件"
         lines += ["", heading, ""]
-        if sort == "updated":
-            issues = _sort_by_updated(issues)
         if issues:
             for issue in issues:
                 lines.append(
