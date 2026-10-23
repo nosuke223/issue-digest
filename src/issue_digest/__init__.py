@@ -3,17 +3,18 @@ from datetime import datetime
 from importlib.metadata import version
 
 from issue_digest.classifier import CATEGORIES, classify_issues
-from issue_digest.formatter import format_digest
+from issue_digest.formatter import format_digest, format_json
 from issue_digest.loader import load_issues, parse_issues
 
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--stale <日数>]"
-    " [--output <パス>] <JSONファイルのパス | ->\n"
+    " [--json] [--output <パス>] <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
     "  --only で指定した分類だけを出力する（複数回指定できる）\n"
     "  --summary で見出しの次に全分類の件数を1行で出力する\n"
     "  --stale で最終更新から指定日数以上たった Issue に印を付ける\n"
+    "  --json で Markdown の代わりに JSON を出力する\n"
     "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
@@ -27,6 +28,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         return 0
     hide_empty = False
     summary = False
+    as_json = False
     only: list[str] = []
     stale_days: int | None = None
     output: str | None = None
@@ -38,6 +40,8 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             hide_empty = True
         elif arg == "--summary":
             summary = True
+        elif arg == "--json":
+            as_json = True
         elif arg == "--only":
             i += 1
             if i >= len(args):
@@ -93,9 +97,12 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         except (OSError, ValueError, KeyError, TypeError) as e:
             print(f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})", file=sys.stderr)
             return 1
-    digest = format_digest(
-        classify_issues(issues), hide_empty, only_filter, stale_days, now, summary
-    )
+    classified = classify_issues(issues)
+    if as_json:
+        # JSON には分類ごとの count があるので、--summary は Markdown のときだけ効く
+        digest = format_json(classified, hide_empty, only_filter, stale_days, now)
+    else:
+        digest = format_digest(classified, hide_empty, only_filter, stale_days, now, summary)
     if output is None:
         print(digest, end="")
         return 0

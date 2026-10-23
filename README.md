@@ -55,6 +55,7 @@ gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --s
 `--summary` を付けると、総件数の見出しの次に、空行をはさんで分類ごとの件数を1行で出力します。全体の概要をひと目で知りたいときに使います。
 分類の名前と順は見出しと同じです。この行は `--only` や `--hide-empty` に関係なく、常に6つの分類すべての件数を出します。
 `--summary` を付けない場合の出力は変わりません。
+`--json` と同時に指定した場合、`--summary` は無視します（JSON には分類ごとの `count` があるため）。
 
 ```
 判断待ち 1 / 中断 0 / レビュー待ち 2 / 作業中 0 / 着手可能 3 / 未分類 1
@@ -63,6 +64,44 @@ gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --s
 ```
 uv run issue-digest --summary issues.json
 ```
+
+`--json` を付けると、Markdown の代わりに JSON を標準出力に出します。通知のスクリプトなど、ほかのツールから使いたいときに使います。
+UTF-8 で日本語はエスケープせず、インデントは2です。`--json` を付けない場合の出力は変わりません。
+
+- `total`: Markdown の見出しと同じ総件数（重複を除いた全件数。`--only` に関係なく全件）
+- `categories`: 分類の配列。順と `label`、`title` は Markdown の見出しと同じ（未分類の `label` は `unclassified`）
+- `--hide-empty`、`--only` は Markdown と同じように効き、出力する分類が変わります
+- `--stale` と同時に指定すると、印が付く Issue にだけ `stale_days`（経過日数）を加えます
+
+```
+uv run issue-digest --json issues.json
+```
+
+出力例（`--only agent:needs-decision`）:
+
+```json
+{
+  "total": 3,
+  "categories": [
+    {
+      "label": "agent:needs-decision",
+      "title": "判断待ち",
+      "count": 1,
+      "issues": [
+        {
+          "number": 12,
+          "title": "仕様を決めたい",
+          "url": "https://github.com/example/repo/issues/12"
+        }
+      ]
+    }
+  ]
+}
+```
+
+`--stale 7` を同時に指定し、その Issue が13日更新されていない場合は、Issue に `"stale_days": 13` が加わります。
+
+`--json` と `--output <パス>` を同時に指定すると、JSON をファイルに書き出します。
 
 `--output <パス>` を付けると、ダイジェストを標準出力ではなく、指定したファイルに書き出します。シェルのリダイレクトを使わずに、定期的にファイルへ保存したいときに使います。
 文字コードは UTF-8 で、ファイルが既にあれば上書きします。書き出したときは、標準出力には何も出しません。
