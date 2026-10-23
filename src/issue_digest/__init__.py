@@ -8,11 +8,12 @@ from issue_digest.loader import load_issues, parse_issues
 
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--only <ラベル>]... [--stale <日数>]"
-    " <JSONファイルのパス | ->\n"
+    " [--sort updated] <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
     "  --only で指定した分類だけを出力する（複数回指定できる）\n"
     "  --stale で最終更新から指定日数以上たった Issue に印を付ける\n"
+    "  --sort updated で各分類の中を最終更新の古い順に並べる\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -26,6 +27,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     hide_empty = False
     only: list[str] = []
     stale_days: int | None = None
+    sort: str | None = None
     paths: list[str] = []
     i = 0
     while i < len(args):
@@ -50,6 +52,18 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
                 )
                 return 2
             stale_days = int(args[i])
+        elif arg == "--sort":
+            i += 1
+            if i >= len(args):
+                print(USAGE, file=sys.stderr)
+                return 2
+            if args[i] != "updated":
+                print(
+                    f"エラー: --sort に指定できるのは updated だけです: {args[i]}",
+                    file=sys.stderr,
+                )
+                return 2
+            sort = args[i]
         else:
             paths.append(arg)
         i += 1
@@ -72,7 +86,9 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         except (OSError, ValueError, KeyError, TypeError) as e:
             print(f"エラー: 標準入力を読み込めません ({type(e).__name__})", file=sys.stderr)
             return 1
-        digest = format_digest(classify_issues(issues), hide_empty, only_filter, stale_days, now)
+        digest = format_digest(
+            classify_issues(issues), hide_empty, only_filter, stale_days, now, sort
+        )
         print(digest, end="")
         return 0
     try:
@@ -83,6 +99,6 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     except (OSError, ValueError, KeyError, TypeError) as e:
         print(f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})", file=sys.stderr)
         return 1
-    digest = format_digest(classify_issues(issues), hide_empty, only_filter, stale_days, now)
+    digest = format_digest(classify_issues(issues), hide_empty, only_filter, stale_days, now, sort)
     print(digest, end="")
     return 0

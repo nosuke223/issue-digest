@@ -1,0 +1,56 @@
+[
+  {
+    "number": 1,
+    "title": "新しい Issue",
+    "labels": [{"name": "agent:ready", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/1",
+    "updatedAt": "2026-10-20T00:00:00Z"
+  },
+  {
+    "number": 2,
+    "title": "updatedAt がない Issue（番号2）",
+    "labels": [{"name": "agent:ready", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/2"
+  },
+  {
+    "number": 3,
+    "title": "古い Issue",
+    "labels": [{"name": "agent:ready", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/3",
+    "updatedAt": "2026-10-01T00:00:00Z"
+  },
+  {
+    "number": 4,
+    "title": "古い Issue と同時刻（番号4）",
+    "labels": [{"name": "agent:ready", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/4",
+    "updatedAt": "2026-10-01T00:00:00Z"
+  },
+  {
+    "number": 5,
+    "title": "updatedAt がない Issue（番号5）",
+    "labels": [{"name": "agent:ready", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/5"
+  },
+  {
+    "number": 6,
+    "title": "先頭の古い Issue（番号6）",
+    "labels": [{"name": "agent:ready", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/6",
+    "updatedAt": "2026-09-01T00:00:00Z"
+  },
+  {
+    "number": 7,
+    "title": "別の分類の新しい Issue",
+    "labels": [{"name": "agent:review", "color": "fbca04"}],
+    "url": "https://github.com/example/repo/issues/7",
+    "updatedAt": "2026-10-22T00:00:00Z"
+  },
+  {
+    "number": 8,
+    "title": "別の分類の古い Issue",
+    "labels": [{"name": "agent:review", "color": "fbca04"}],
+    "url": "https://github.com/example/repo/issues/8",
+    "updatedAt": "2026-10-02T00:00:00Z"
+  }
+]

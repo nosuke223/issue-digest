@@ -52,6 +52,16 @@ N は経過日数を切り捨てた整数です。`--hide-empty`、`--only` と�
 gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --stale 7 -
 ```
 
+`--sort updated` を付けると、各分類の中の Issue を `updatedAt`（最終更新）の古い順に並べます。止まっている Issue を見つけやすくするために使います。
+`updatedAt` が同じ Issue は番号の小さい順、`updatedAt` がない Issue は分類の末尾に番号の小さい順で並べます。分類の順番は変わりません。
+`--hide-empty`、`--only`、`--stale` と同時に使えます。
+`--sort` に指定できる値は `updated` だけです。それ以外の値や値がない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
+`--sort` を付けない場合の並び順（Issue 番号の小さい順）は変わりません。
+
+```
+gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --sort updated --stale 7 -
+```
+
 `--version` を付けると、`issue-digest 0.1.0` のようにバージョンを1行で出力し、終了コード 0 で終わります。
 バージョンは `pyproject.toml` の値です。ほかのオプションやファイルが指定されていても、バージョンだけを出力します（ファイルは読みません）。
 `--version` を付けない場合の動作は変わりません。
