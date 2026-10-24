@@ -32,6 +32,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--csv` | Markdown の代わりに CSV を出力する | `uv run issue-digest --csv issues.json` |
 | `--title <文字列>` | 見出しの `Issue ダイジェスト` を指定した文字列に置き換える | `uv run issue-digest --title issue-digest issues.json` |
 | `--output <パス>` | 標準出力ではなく、指定したファイルに書き出す | `uv run issue-digest --output digest.md issues.json` |
+| `--diff <前回のJSONのパス>` | 前回の `--json` の出力と比べ、変化した Issue を末尾に出す | `uv run issue-digest --diff last.json issues.json` |
 
 ### 入力
 
@@ -247,6 +248,74 @@ uv run issue-digest --title issue-digest issues.json
 uv run issue-digest --output digest.md issues.json
 ```
 
+### `--diff <前回のJSONのパス>`
+
+`--diff <前回のJSONのパス>` を付けると、前回の `--json` の出力と今回の入力を比べ、Markdown の末尾に `## 前回からの変化` の節を加えます。前回のダイジェストから何が変わったかをひと目で知りたいときに使います。
+
+- 新しい Issue: 前回になく、今回ある Issue
+- なくなった Issue: 前回あり、今回ない Issue（タイトルと URL は前回の JSON のもの）
+- 分類が変わった Issue: `- [#12](url) タイトル: 着手可能 → レビュー待ち` の形で出します。複数の分類に入る Issue は、分類の集合が変わったときだけ出し、`作業中, 着手可能 → レビュー待ち` のように分類を見出しの順にカンマで区切って並べます。タイトルだけが変わった Issue は出しません。
+
+どれかに変化があるときは3つの小見出し（`### 新しい Issue - 1件` など）をすべて出し、0件の小見出しには「なし」を出します。各小見出しの中は Issue 番号の小さい順です。
+どれも変化がなければ、節の中に「変化なし」だけを出します。
+
+前回の JSON は、`--only`、`--exclude`、`--hide-empty`、`--limit` を付けずに出力したものを前提とします（付けて出力した JSON では、出力されなかった Issue が「なくなった Issue」になります）。
+今回の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit` に関係なく、全分類の全件で行います。
+`--title`、`--stale`、`--show-assignees`、`--show-labels`、`--diff` を付けて出力した JSON も、前回の JSON として使えます（増えた項目は読みません）。
+
+前回の JSON が見つからない、JSON として読めない、または `--json` の出力の形でない（`total` と `categories` がない、分類の `label` が見出しのラベルでない、Issue に `number`、`title`、`url` がないなど）ときは、エラーを標準エラーに出して終了コード 1 で終わります。
+`--diff` の後にパスがない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
+`--diff` を付けない場合の出力は変わりません。前回の JSON の自動保存はしないので、次回のために `--json --output` で保存しておきます。
+
+```
+# 前回: JSON を保存しておく
+gh issue list --json number,title,labels,url | uv run issue-digest --json --output last.json -
+
+# 次回: 前回の JSON と比べる
+gh issue list --json number,title,labels,url | uv run issue-digest --diff last.json -
+```
+
+出力例:
+
+```
+## 前回からの変化
+
+### 新しい Issue - 1件
+
+- [#5](https://github.com/example/repo/issues/5) 新しい Issue E
+
+### なくなった Issue - 0件
+
+なし
+
+### 分類が変わった Issue - 1件
+
+- [#12](https://github.com/example/repo/issues/12) 仕様を決めたい: 着手可能 → レビュー待ち
+```
+
+`--json` と同時に指定すると、JSON の末尾に `diff` を加えます。`added`、`removed`、`moved` の配列で、それぞれ Issue 番号の小さい順です。変化がなければ3つとも空の配列です。
+
+- `added`、`removed` の各要素: `number`、`title`、`url`、`categories`（`added` は今回の、`removed` は前回の分類のラベルの配列）
+- `moved` の各要素: `number`、`title`（今回のもの）、`url`、`from`（前回の分類のラベルの配列）、`to`（今回の分類のラベルの配列）
+
+```json
+"diff": {
+  "added": [
+    {"number": 5, "title": "新しい Issue E", "url": "https://github.com/example/repo/issues/5", "categories": ["agent:ready"]}
+  ],
+  "removed": [],
+  "moved": [
+    {"number": 12, "title": "仕様を決めたい", "url": "https://github.com/example/repo/issues/12", "from": ["agent:ready"], "to": ["agent:review"]}
+  ]
+}
+```
+
+`--diff` を付けた JSON も、次回の前回の JSON として使えます。
+
+```
+gh issue list --json number,title,labels,url | uv run issue-digest --json --diff last.json --output next.json -
+```
+
 ### `--version`
 
 `--version` を付けると、`issue-digest 0.1.0` のようにバージョンを1行で出力し、終了コード 0 で終わります。
@@ -259,7 +328,8 @@ uv run issue-digest --version
 
 ### 組み合わせ
 
-- `--hide-empty`、`--only`、`--stale`、`--sort`、`--limit`、`--title`、`--output` は、どれも同時に使えます（`--csv` との併用は下の項目を参照）。
+- `--hide-empty`、`--only`、`--stale`、`--sort`、`--limit`、`--title`、`--output`、`--diff` は、どれも同時に使えます（`--csv` との併用は下の項目を参照）。
+- `--diff` の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit` に関係なく全分類の全件で行います。`## 前回からの変化` の節の行には、`--stale`、`--show-assignees`、`--show-labels` の印を付けません。
 - `--exclude` は `--only` 以外と同時に使えます。`--only` と同時に指定するとエラーです。
 - `--json` と同時に指定した場合
   - `--hide-empty`、`--only`、`--exclude` は Markdown と同じように効き、出力する分類が変わります。
@@ -268,10 +338,11 @@ uv run issue-digest --version
   - `--summary` は無視します（JSON には分類ごとの `count` があるため）。
   - `--show-assignees` を同時に指定すると、各 Issue に `"assignees": ["alice", "bob"]`（login の配列。担当者がいなければ空の配列）を加えます。`--show-assignees` を付けない JSON には `assignees` を出しません。
   - `--show-labels` を同時に指定すると、各 Issue に `"labels": ["bug"]`（`agent:` で始まらないラベルの配列。なければ空の配列）を加えます。`--show-labels` を付けない JSON には `labels` を出しません。
+  - `--diff` を同時に指定すると、末尾に `diff`（`added`、`removed`、`moved`）を加えます。`--diff` を付けない JSON には `diff` を出しません。
 - `--json` と `--output <パス>` を同時に指定すると、JSON をファイルに書き出します。
 - `--csv` と同時に指定した場合
   - `--hide-empty`、`--only`、`--exclude`、`--sort`、`--limit`、`--output` は Markdown と同じように効きます（`--limit` は各分類の先頭から指定件数の行にします）。
-  - `--stale`、`--show-assignees`、`--show-labels`、`--summary`、`--title` は、CSV に対応する列や行がないので無視します（エラーにしません）。
+  - `--stale`、`--show-assignees`、`--show-labels`、`--summary`、`--title`、`--diff` は、CSV に対応する列や行がないので無視します（エラーにしません。`--diff` の前回の JSON も読みません）。
   - `--json` と同時に指定すると、`エラー: --json と --csv は同時に指定できません` を標準エラーに出して終了コード 2 で終わります。
 - `--stale`、`--show-assignees`、`--show-labels` の印が付くときは、`（N日更新なし）（担当: @alice）（ラベル: bug）` の順です。
 - `--summary` の件数の行は、`--only` や `--hide-empty` に関係なく、常に6つの分類すべての件数を出します。
