@@ -70,7 +70,8 @@ PR のコメントで修正を頼まれたときの手順。
    - 行ごとのコメント: `gh api repos/<所有者>/<リポジトリ>/pulls/<PR番号>/comments`（オプションを付けない）
 3. 同じブランチで修正し、指摘への対応ごとに別のコミットにする
 4. テストと lint が通ったら push する
-5. PR 本文の「自分で決めた前提」「確認方法」を修正後の内容に更新する（`gh pr edit <PR番号> --body-file .agent-tmp/body.md`）
+5. PR 本文の「自分で決めた前提」「確認方法」を修正後の内容に更新する
+   - Write ツールで `.agent-tmp/body.md` に本文全体を書き、`gh api -X PATCH repos/<所有者>/<リポジトリ>/pulls/<PR番号> -F body=@.agent-tmp/body.md` で更新する（`gh pr edit` はトークンの権限が足りず失敗する）
 6. PR に、何をどう直したかを返信する（`gh pr comment <PR番号> --body-file .agent-tmp/body.md`）
 7. Issue のラベルを `agent:working` から `agent:review` に戻す
 
@@ -84,7 +85,8 @@ PR のコメントで修正を頼まれたときの手順。
    - 正しい: 同じブランチで直す。指摘ごとに別のコミットにする
    - 誤っている、または Issue の範囲外: 直さない
 4. 直した場合は、テストと lint が通ったら push する
-5. PR 本文の「自分で決めた前提」「確認方法」を更新する（`gh pr edit <PR番号> --body-file .agent-tmp/body.md`）
+5. PR 本文の「自分で決めた前提」「確認方法」を更新する
+   - Write ツールで `.agent-tmp/body.md` に本文全体を書き、`gh api -X PATCH repos/<所有者>/<リポジトリ>/pulls/<PR番号> -F body=@.agent-tmp/body.md` で更新する（`gh pr edit` はトークンの権限が足りず失敗する）
 6. 指摘ごとに、その指摘のスレッドへ対応（直した内容、または直さなかった理由）を返信する
    - Write ツールで `.agent-tmp/body.md` に返信を書き、`gh api repos/<所有者>/<リポジトリ>/pulls/<PR番号>/comments/<指摘のコメントID>/replies -F body=@.agent-tmp/body.md` で送る
    - 指摘のコメントID は、手順2の結果の `id`
