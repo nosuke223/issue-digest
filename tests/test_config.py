@@ -8,13 +8,6 @@ from issue_digest import USAGE, main
 ISSUES = str(DATA / "issues.json")
 
 
-@pytest.fixture(autouse=True)
-def in_tmp_dir(tmp_path, monkeypatch):
-    """カレントディレクトリを空の一時ディレクトリにして、実際のリポジトリの設定に依存しない。"""
-    monkeypatch.chdir(tmp_path)
-    return tmp_path
-
-
 def write_config(directory, text, name=".issue-digest.toml"):
     path = directory / name
     path.write_text(text, encoding="utf-8")
