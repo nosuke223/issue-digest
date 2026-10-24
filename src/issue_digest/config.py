@@ -29,9 +29,7 @@ def load_config(path: str | None) -> dict[str, Any]:
         except tomllib.TOMLDecodeError as e:
             raise ConfigError(f"設定ファイルを TOML として読み込めません: {target} ({e})") from e
         except UnicodeDecodeError as e:
-            raise ConfigError(
-                f"設定ファイルを UTF-8 として読み込めません: {target} ({e})"
-            ) from e
+            raise ConfigError(f"設定ファイルを UTF-8 として読み込めません: {target} ({e})") from e
     return _validate(data)
 
 
