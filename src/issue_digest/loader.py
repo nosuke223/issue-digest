@@ -14,6 +14,15 @@ class Issue:
     assignees: list[str] = field(default_factory=list)
 
 
+class InvalidUpdatedAtError(ValueError):
+    """`updatedAt` が日時として読めないときのエラー。"""
+
+    def __init__(self, number: object, value: object) -> None:
+        super().__init__(f"Issue #{number} の updatedAt を日時として読めません: {value}")
+        self.number = number
+        self.value = value
+
+
 def load_issues(path: str | Path) -> list[Issue]:
     """`gh issue list --json number,title,labels,url` の出力ファイルを読み込む。"""
     with open(path, encoding="utf-8") as f:
@@ -33,16 +42,19 @@ def parse_issues(text: str) -> list[Issue]:
             title=item["title"],
             labels=[label["name"] for label in item["labels"]],
             url=item["url"],
-            updated_at=_parse_datetime(item.get("updatedAt")),
+            updated_at=_parse_datetime(item["number"], item.get("updatedAt")),
             assignees=[a["login"] for a in item.get("assignees") or []],
         )
         for item in data
     ]
 
 
-def _parse_datetime(value: str | None) -> datetime | None:
+def _parse_datetime(number: int, value: str | None) -> datetime | None:
     if value is None:
         return None
-    parsed = datetime.fromisoformat(value)
+    try:
+        parsed = datetime.fromisoformat(value)
+    except (ValueError, TypeError) as e:
+        raise InvalidUpdatedAtError(number, value) from e
     # タイムゾーンがない値は UTC とみなす
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)

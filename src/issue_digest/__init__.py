@@ -5,7 +5,7 @@ from importlib.metadata import version
 
 from issue_digest.classifier import CATEGORIES, classify_issues
 from issue_digest.formatter import format_digest, format_json
-from issue_digest.loader import load_issues, parse_issues
+from issue_digest.loader import InvalidUpdatedAtError, load_issues, parse_issues
 
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
@@ -124,6 +124,9 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     if path == "-":
         try:
             issues = parse_issues(sys.stdin.read())
+        except InvalidUpdatedAtError as e:
+            print(f"エラー: {e}", file=sys.stderr)
+            return 1
         except (OSError, ValueError, KeyError, TypeError) as e:
             print(f"エラー: 標準入力を読み込めません ({type(e).__name__})", file=sys.stderr)
             return 1
@@ -132,6 +135,9 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             issues = load_issues(path)
         except FileNotFoundError:
             print(f"エラー: ファイルが見つかりません: {path}", file=sys.stderr)
+            return 1
+        except InvalidUpdatedAtError as e:
+            print(f"エラー: {e}", file=sys.stderr)
             return 1
         except (OSError, ValueError, KeyError, TypeError) as e:
             print(f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})", file=sys.stderr)

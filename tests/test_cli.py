@@ -257,7 +257,25 @@ def test_main_invalid_updated_at(capsys, tmp_path):
         encoding="utf-8",
     )
     assert main(["--stale", "7", str(bad)], now=NOW) == 1
-    assert "読み込めません" in capsys.readouterr().err
+    captured = capsys.readouterr()
+    assert captured.err == "エラー: Issue #1 の updatedAt を日時として読めません: xx\n"
+    assert captured.out == ""
+
+
+def test_main_invalid_updated_at_on_stdin(capsys, monkeypatch):
+    text = '[{"number": 7, "title": "t", "labels": [], "url": "u", "updatedAt": "xx"}]'
+    monkeypatch.setattr("sys.stdin", io.StringIO(text))
+    assert main(["-"]) == 1
+    captured = capsys.readouterr()
+    assert captured.err == "エラー: Issue #7 の updatedAt を日時として読めません: xx\n"
+    assert captured.out == ""
+
+
+def test_main_non_string_updated_at(capsys, monkeypatch):
+    text = '[{"number": 3, "title": "t", "labels": [], "url": "u", "updatedAt": 123}]'
+    monkeypatch.setattr("sys.stdin", io.StringIO(text))
+    assert main(["-"]) == 1
+    assert capsys.readouterr().err == "エラー: Issue #3 の updatedAt を日時として読めません: 123\n"
 
 
 def test_main_show_assignees(capsys):
