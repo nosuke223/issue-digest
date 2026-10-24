@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 from datetime import datetime
 from importlib.metadata import version
@@ -20,7 +21,8 @@ USAGE = (
     "  --json で Markdown の代わりに JSON を出力する\n"
     "  --show-assignees で担当者を表示する（Markdown は行末に（担当: @alice）、"
     "JSON は各 Issue に assignees の配列を加える）\n"
-    "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
+    "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す"
+    "（上書きする。フォルダがなければ作る）\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -129,6 +131,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         print(digest, end="")
         return 0
     try:
+        os.makedirs(os.path.dirname(output), exist_ok=True)
         with open(output, "w", encoding="utf-8", newline="") as f:
             f.write(digest)
     except OSError as e:

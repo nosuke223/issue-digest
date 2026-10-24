@@ -342,14 +342,28 @@ def test_main_output_reads_stdin(capsys, monkeypatch, tmp_path):
     assert "## 着手可能 (agent:ready) - 1件" in out_file.read_text(encoding="utf-8")
 
 
+def test_main_output_creates_missing_dirs(capsys, tmp_path):
+    out_file = tmp_path / "reports" / "2026" / "out.md"
+    assert main(["--output", str(out_file), str(DATA / "issues.json")]) == 0
+    assert capsys.readouterr().out == ""
+    assert "## 着手可能 (agent:ready) - 1件" in out_file.read_text(encoding="utf-8")
+
+
+def test_main_output_existing_dir(capsys, tmp_path):
+    (tmp_path / "reports").mkdir()
+    out_file = tmp_path / "reports" / "out.md"
+    assert main(["--output", str(out_file), str(DATA / "issues.json")]) == 0
+    assert out_file.exists()
+
+
 def test_main_output_unwritable_path(capsys, tmp_path):
-    out_file = tmp_path / "no-such-dir" / "out.md"
+    (tmp_path / "file.txt").write_text("x", encoding="utf-8")
+    out_file = tmp_path / "file.txt" / "out.md"
     assert main(["--output", str(out_file), str(DATA / "issues.json")]) == 1
     captured = capsys.readouterr()
     assert "書き出せません" in captured.err
     assert "Traceback" not in captured.err
     assert captured.out == ""
-    assert not out_file.parent.exists()
 
 
 def test_main_output_without_value_shows_usage(capsys):
