@@ -4,6 +4,7 @@ from datetime import datetime
 from importlib.metadata import version
 
 from issue_digest.classifier import CATEGORIES, classify_issues
+from issue_digest.config import DEFAULT_CONFIG_PATH, ConfigError, load_config
 from issue_digest.formatter import format_csv, format_digest, format_json
 from issue_digest.loader import InvalidUpdatedAtError, load_issues, parse_issues
 
@@ -11,7 +12,7 @@ USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
     " [--stale <日数>]"
     " [--json | --csv] [--sort updated] [--limit <件数>] [--show-assignees] [--title <文字列>]"
-    " [--output <パス>]"
+    " [--output <パス>] [--config <パス>]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
@@ -30,6 +31,10 @@ USAGE = (
     "  --title で見出しの「Issue ダイジェスト」を指定した文字列に置き換える"
     "（JSON は先頭に title を加える）\n"
     "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
+    "  --config で読む設定ファイルを指定する（省略時はカレントディレクトリの .issue-digest.toml。"
+    "なければ使わない）。キーは hide_empty、summary、only、stale、sort、show_assignees、json で、"
+    "コマンドラインの指定を優先する（only は --only か --exclude を指定したら使わない）\n"
+    '    例: hide_empty = true / stale = 7 / only = ["agent:review", "agent:blocked"]\n'
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -59,6 +64,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--limit")
     parser.add_argument("--output")
     parser.add_argument("--title")
+    parser.add_argument("--config")
     parser.add_argument("paths", nargs="*")
     return parser
 
@@ -77,15 +83,35 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     if opts.help:
         print(USAGE)
         return 0
-    hide_empty = opts.hide_empty
-    summary = opts.summary
-    as_json = opts.json
+    try:
+        config = load_config(opts.config)
+    except FileNotFoundError:
+        print(f"エラー: 設定ファイルが見つかりません: {opts.config}", file=sys.stderr)
+        return 1
+    except ConfigError as e:
+        print(f"エラー: {e}", file=sys.stderr)
+        return 2
+    except OSError as e:
+        print(
+            f"エラー: 設定ファイルを読み込めません: {opts.config or DEFAULT_CONFIG_PATH}"
+            f" ({type(e).__name__})",
+            file=sys.stderr,
+        )
+        return 1
+    # コマンドラインの指定が設定ファイルより優先される
+    hide_empty = opts.hide_empty or config.get("hide_empty", False)
+    summary = opts.summary or config.get("summary", False)
     as_csv = opts.csv
+    # 設定の json は、コマンドラインの --csv があれば使わない（--csv を優先する）
+    as_json = opts.json or (config.get("json", False) and not as_csv)
     only: list[str] = opts.only
     exclude: list[str] = opts.exclude
-    show_assignees = opts.show_assignees
+    if not only and not exclude:
+        # コマンドラインで --only も --exclude も指定しないときだけ、設定の only を使う
+        only = config.get("only", [])
+    show_assignees = opts.show_assignees or config.get("show_assignees", False)
     output: str | None = opts.output
-    stale_days: int | None = None
+    stale_days: int | None = config.get("stale")
     if opts.stale is not None:
         if not (opts.stale.isascii() and opts.stale.isdigit()):
             print(
@@ -94,7 +120,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             )
             return 2
         stale_days = int(opts.stale)
-    sort: str | None = opts.sort
+    sort: str | None = opts.sort if opts.sort is not None else config.get("sort")
     if sort is not None and sort != "updated":
         print(
             f"エラー: --sort に指定できるのは updated だけです: {sort}",
