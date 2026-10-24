@@ -13,6 +13,9 @@ HEADINGS = {
     UNCLASSIFIED: "未分類",
 }
 
+# updatedAt がない Issue の並べ替えのキー
+_NO_UPDATED_AT = datetime.min.replace(tzinfo=UTC)
+
 
 def _elapsed_days(elapsed: timedelta) -> int:
     """経過時間を日数に直す（1日未満は切り捨て）。"""
@@ -104,11 +107,7 @@ def _selected_categories(
 
 def _sort_by_updated(issues: list[Issue]) -> list[Issue]:
     """updatedAt の古い順（同じなら番号順）。updatedAt がない Issue は末尾に番号順。"""
-    dated = [i for i in issues if i.updated_at is not None]
-    undated = [i for i in issues if i.updated_at is None]
-    dated.sort(key=lambda i: (i.updated_at, i.number))
-    undated.sort(key=lambda i: i.number)
-    return dated + undated
+    return sorted(issues, key=lambda i: (i.updated_at or _NO_UPDATED_AT, i.number))
 
 
 def format_digest(
