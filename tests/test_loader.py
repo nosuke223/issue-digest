@@ -48,3 +48,21 @@ def test_load_issues_assignees_missing_empty_or_null_means_none():
 
 def test_load_issues_returns_empty_list_for_empty_file():
     assert load_issues(DATA / "empty.json") == []
+
+
+def test_parse_issues_skips_issue_without_required_key(capsys):
+    text = (
+        '[{"number": 1, "title": "t", "labels": [], "url": "u"},'
+        ' {"number": 2, "labels": [], "url": "u"}]'
+    )
+    issues = parse_issues(text)
+    assert [i.number for i in issues] == [1]
+    assert "警告: 2 件目の Issue を読み飛ばしました (KeyError)" in capsys.readouterr().err
+
+
+def test_parse_issues_skips_issue_with_wrong_shape(capsys):
+    text = '[{"number": 1, "title": "t", "labels": null, "url": "u"}, "x"]'
+    assert parse_issues(text) == []
+    err = capsys.readouterr().err
+    assert "1 件目" in err
+    assert "2 件目" in err

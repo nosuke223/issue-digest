@@ -135,6 +135,9 @@ uv run issue-digest --json issues.json
 uv run issue-digest --output digest.md issues.json
 ```
 
+入力の一部の Issue に必須の項目（`number`、`title`、`labels`、`url`）がない、または形が違う場合は、その Issue だけを読み飛ばし、標準エラーに `警告: 2 件目の Issue を読み飛ばしました (KeyError)` のような警告を出します。ほかの Issue はいつもどおり出力し、終了コードは 0 です。
+JSON として読めない場合や、JSON の全体が配列でない場合は、今までどおりエラーを標準エラーに出して終了コード 1 で終わります。`updatedAt` の形式が不正な場合も、今までどおりエラーです。
+
 `--version` を付けると、`issue-digest 0.1.0` のようにバージョンを1行で出力し、終了コード 0 で終わります。
 バージョンは `pyproject.toml` の値です。ほかのオプションやファイルが指定されていても、バージョンだけを出力します（ファイルは読みません）。
 `--version` を付けない場合の動作は変わりません。

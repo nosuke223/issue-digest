@@ -1,4 +1,5 @@
 import json
+import sys
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -25,19 +26,31 @@ def parse_issues(text: str) -> list[Issue]:
 
     各 Issue の `updatedAt`（ISO 8601 形式）は任意。ないときや null のときは None になる。
     `assignees`（`[{"login": "alice"}]` の形）も任意。ないとき、null、空のときは担当者なし。
+
+    必須の項目がない、または形が違う Issue は読み飛ばし、標準エラーに警告を出す。
     """
     data = json.loads(text)
-    return [
-        Issue(
-            number=item["number"],
-            title=item["title"],
-            labels=[label["name"] for label in item["labels"]],
-            url=item["url"],
-            updated_at=_parse_datetime(item.get("updatedAt")),
-            assignees=[a["login"] for a in item.get("assignees") or []],
-        )
-        for item in data
-    ]
+    issues = []
+    for index, item in enumerate(data, start=1):
+        try:
+            issues.append(_to_issue(item))
+        except (KeyError, TypeError) as e:
+            print(
+                f"警告: {index} 件目の Issue を読み飛ばしました ({type(e).__name__})",
+                file=sys.stderr,
+            )
+    return issues
+
+
+def _to_issue(item: dict) -> Issue:
+    return Issue(
+        number=item["number"],
+        title=item["title"],
+        labels=[label["name"] for label in item["labels"]],
+        url=item["url"],
+        updated_at=_parse_datetime(item.get("updatedAt")),
+        assignees=[a["login"] for a in item.get("assignees") or []],
+    )
 
 
 def _parse_datetime(value: str | None) -> datetime | None:

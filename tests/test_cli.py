@@ -606,3 +606,23 @@ def test_main_stale_accepts_equals_form(capsys):
     equals_out = capsys.readouterr().out
     assert main(["--stale", "7", str(DATA / "issues.json")], now=now) == 0
     assert capsys.readouterr().out == equals_out
+
+
+def test_main_skips_broken_issue_and_warns(capsys, tmp_path):
+    path = tmp_path / "partial.json"
+    path.write_text(
+        '[{"number": 1, "title": "残る Issue", "labels": [], "url": "u"}, {"number": 2}]',
+        encoding="utf-8",
+    )
+    assert main([str(path)]) == 0
+    captured = capsys.readouterr()
+    assert captured.out.startswith("# Issue ダイジェスト（全 1 件）\n")
+    assert "残る Issue" in captured.out
+    assert "2 件目の Issue を読み飛ばしました" in captured.err
+
+
+def test_main_broken_json_is_still_error(capsys, tmp_path):
+    path = tmp_path / "broken.json"
+    path.write_text("[{", encoding="utf-8")
+    assert main([str(path)]) == 1
+    assert "読み込めません" in capsys.readouterr().err
