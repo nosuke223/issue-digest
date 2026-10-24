@@ -46,6 +46,11 @@ uv run issue-digest issues.json
 gh issue list --json number,title,labels,url | uv run issue-digest -
 ```
 
+### タイトルの長さ
+
+Markdown では、Issue のタイトルが40文字を超えるとき、40文字までにして末尾に `…` を付けます（行が折り返されて読みにくくなるのを避けるため）。
+Markdown の記号のエスケープは、省略した後のタイトルに対して行います。`--json` のタイトルは省略しません。
+
 ### `--hide-empty`
 
 `--hide-empty` を付けると、0件の分類の見出しと「なし」を出力しません。対応が必要な分類だけを見たいときに使います。
