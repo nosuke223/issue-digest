@@ -1,9 +1,8 @@
 from datetime import UTC, datetime
-from pathlib import Path
+
+from conftest import DATA
 
 from issue_digest.loader import Issue, load_issues, parse_issues
-
-DATA = Path(__file__).parent / "data"
 
 
 def test_load_issues_extracts_label_names():
