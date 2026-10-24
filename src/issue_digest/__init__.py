@@ -10,7 +10,8 @@ from issue_digest.loader import InvalidUpdatedAtError, load_issues, parse_issues
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
     " [--stale <日数>]"
-    " [--json] [--sort updated] [--limit <件数>] [--show-assignees] [--output <パス>]"
+    " [--json] [--sort updated] [--limit <件数>] [--show-assignees]"
+    " [--show-labels] [--output <パス>]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
@@ -24,6 +25,8 @@ USAGE = (
     "  --json で Markdown の代わりに JSON を出力する\n"
     "  --show-assignees で担当者を表示する（Markdown は行末に（担当: @alice）、"
     "JSON は各 Issue に assignees の配列を加える）\n"
+    "  --show-labels で agent: で始まらないラベルを表示する"
+    "（Markdown は行末に（ラベル: bug, docs）、JSON は各 Issue に labels の配列を加える）\n"
     "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
@@ -46,6 +49,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--summary", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--show-assignees", action="store_true")
+    parser.add_argument("--show-labels", action="store_true")
     parser.add_argument("--only", action="append", default=[])
     parser.add_argument("--exclude", action="append", default=[])
     parser.add_argument("--stale")
@@ -76,6 +80,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     only: list[str] = opts.only
     exclude: list[str] = opts.exclude
     show_assignees = opts.show_assignees
+    show_labels = opts.show_labels
     output: str | None = opts.output
     stale_days: int | None = None
     if opts.stale is not None:
@@ -155,6 +160,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             show_assignees,
             exclude_filter,
             limit,
+            show_labels,
         )
     else:
         digest = format_digest(
@@ -168,6 +174,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             show_assignees,
             exclude_filter,
             limit,
+            show_labels,
         )
     if output is None:
         print(digest, end="")

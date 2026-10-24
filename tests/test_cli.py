@@ -760,3 +760,43 @@ def test_main_stale_accepts_equals_form(capsys):
     equals_out = capsys.readouterr().out
     assert main(["--stale", "7", str(DATA / "issues.json")], now=now) == 0
     assert capsys.readouterr().out == equals_out
+
+
+def test_main_show_labels(capsys):
+    assert main(["--show-labels", str(DATA / "show_labels.json")]) == 0
+    out = capsys.readouterr().out
+    assert "ラベルが複数の Issue（ラベル: docs, bug）\n" in out
+    assert "agent のラベルだけの Issue\n" in out
+    assert "ラベルがない Issue\n" in out
+
+
+def test_main_show_labels_with_stale_and_assignees_order(capsys):
+    args = ["--stale", "7", "--show-assignees", "--show-labels", str(DATA / "show_labels.json")]
+    assert main(args, now=NOW) == 0
+    out = capsys.readouterr().out
+    assert "ラベルが複数の Issue（13日更新なし）（担当: @alice）（ラベル: docs, bug）\n" in out
+
+
+def test_main_without_show_labels_unchanged(capsys):
+    assert main([str(DATA / "show_labels.json")]) == 0
+    assert "（ラベル:" not in capsys.readouterr().out
+
+
+def test_main_json_show_labels(capsys):
+    assert main(["--json", "--show-labels", str(DATA / "show_labels.json")]) == 0
+    body = json.loads(capsys.readouterr().out)
+    issues = [i for c in body["categories"] for i in c["issues"]]
+    by_title = {i["title"]: i for i in issues}
+    assert by_title["ラベルが複数の Issue"]["labels"] == ["docs", "bug"]
+    assert by_title["agent のラベルだけの Issue"]["labels"] == []
+    assert by_title["ラベルがない Issue"]["labels"] == []
+
+
+def test_main_json_without_show_labels_has_no_labels(capsys):
+    assert main(["--json", str(DATA / "show_labels.json")]) == 0
+    assert '"labels":' not in capsys.readouterr().out
+
+
+def test_main_usage_mentions_show_labels(capsys):
+    assert main(["--help"]) == 0
+    assert "--show-labels" in capsys.readouterr().out

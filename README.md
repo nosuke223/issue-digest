@@ -27,6 +27,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--limit <件数>` | 各分類で、先頭から指定件数だけ Issue を出力する | `uv run issue-digest --limit 5 issues.json` |
 | `--summary` | 総件数の次に、分類ごとの件数を1行で出力する | `uv run issue-digest --summary issues.json` |
 | `--show-assignees` | 担当者がいる Issue に `（担当: @alice）` を付ける | `uv run issue-digest --show-assignees issues.json` |
+| `--show-labels` | `agent:` で始まらないラベルがある Issue に `（ラベル: bug, docs）` を付ける | `uv run issue-digest --show-labels issues.json` |
 | `--json` | Markdown の代わりに JSON を出力する | `uv run issue-digest --json issues.json` |
 | `--output <パス>` | 標準出力ではなく、指定したファイルに書き出す | `uv run issue-digest --output digest.md issues.json` |
 
@@ -102,6 +103,16 @@ gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --s
 
 ```
 gh issue list --json number,title,labels,url,assignees | uv run issue-digest --show-assignees -
+```
+
+### `--show-labels`
+
+`--show-labels` を付けると、`agent:` で始まらないラベルがある Issue の行の末尾に `（ラベル: bug, docs）` を付けます。`bug` や `docs` などのラベルも一緒に見たいときに使います。
+ラベルは入力の順に、カンマと空白で区切って並べます。対象のラベルがない Issue には何も付けません。
+`--show-labels` を付けない場合の出力は変わりません。
+
+```
+gh issue list --json number,title,labels,url | uv run issue-digest --show-labels -
 ```
 
 ### `--summary`
@@ -212,7 +223,8 @@ uv run issue-digest --version
   - `--sort` を同時に指定すると、各分類の `issues` の順が変わります。
   - `--summary` は無視します（JSON には分類ごとの `count` があるため）。
   - `--show-assignees` を同時に指定すると、各 Issue に `"assignees": ["alice", "bob"]`（login の配列。担当者がいなければ空の配列）を加えます。`--show-assignees` を付けない JSON には `assignees` を出しません。
+  - `--show-labels` を同時に指定すると、各 Issue に `"labels": ["bug"]`（`agent:` で始まらないラベルの配列。なければ空の配列）を加えます。`--show-labels` を付けない JSON には `labels` を出しません。
 - `--json` と `--output <パス>` を同時に指定すると、JSON をファイルに書き出します。
-- `--stale` と `--show-assignees` の印が両方付くときは、`（N日更新なし）（担当: @alice）` の順です。
+- `--stale`、`--show-assignees`、`--show-labels` の印が付くときは、`（N日更新なし）（担当: @alice）（ラベル: bug）` の順です。
 - `--summary` の件数の行は、`--only` や `--hide-empty` に関係なく、常に6つの分類すべての件数を出します。
 - `--version` は、ほかのオプションやファイルの指定があっても、バージョンだけを出力します。
