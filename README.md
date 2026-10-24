@@ -135,6 +135,15 @@ uv run issue-digest --json issues.json
 uv run issue-digest --output digest.md issues.json
 ```
 
+`--hide-unclassified` を付けると、未分類（`agent:*` ラベルのない Issue）の見出しと Issue を出力しません。エージェントの対象外の Issue が多いリポジトリで使います。
+見出しの総件数と `--summary` の行は、`--only` と同じく全件のまま（未分類も含めた数）です。
+`--json` と同時に指定した場合は、`categories` から未分類を除きます（`total` は全件のまま）。
+`--hide-empty`、`--only`、`--stale`、`--sort` と同時に使えます。`--hide-unclassified` を付けない場合の出力は変わりません。
+
+```
+uv run issue-digest --hide-unclassified issues.json
+```
+
 `--version` を付けると、`issue-digest 0.1.0` のようにバージョンを1行で出力し、終了コード 0 で終わります。
 バージョンは `pyproject.toml` の値です。ほかのオプションやファイルが指定されていても、バージョンだけを出力します（ファイルは読みません）。
 `--version` を付けない場合の動作は変わりません。

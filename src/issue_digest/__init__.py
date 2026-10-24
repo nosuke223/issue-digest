@@ -3,13 +3,14 @@ import sys
 from datetime import datetime
 from importlib.metadata import version
 
-from issue_digest.classifier import CATEGORIES, classify_issues
+from issue_digest.classifier import CATEGORIES, UNCLASSIFIED, classify_issues
 from issue_digest.formatter import format_digest, format_json
 from issue_digest.loader import load_issues, parse_issues
 
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--stale <日数>]"
     " [--json] [--sort updated] [--show-assignees] [--output <パス>]"
+    " [--hide-unclassified]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
@@ -21,6 +22,7 @@ USAGE = (
     "  --show-assignees で担当者を表示する（Markdown は行末に（担当: @alice）、"
     "JSON は各 Issue に assignees の配列を加える）\n"
     "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
+    "  --hide-unclassified で未分類を出力しない\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -39,6 +41,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = _Parser(add_help=False, allow_abbrev=False)
     parser.add_argument("-h", "--help", action="store_true")
     parser.add_argument("--hide-empty", action="store_true")
+    parser.add_argument("--hide-unclassified", action="store_true")
     parser.add_argument("--summary", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--show-assignees", action="store_true")
@@ -116,6 +119,9 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             print(f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})", file=sys.stderr)
             return 1
     classified = classify_issues(issues)
+    if opts.hide_unclassified:
+        # 未分類の見出しと Issue を出さない（Markdown と JSON の両方）
+        del classified[UNCLASSIFIED]
     if as_json:
         # JSON には分類ごとの count があるので、--summary は Markdown のときだけ効く
         digest = format_json(

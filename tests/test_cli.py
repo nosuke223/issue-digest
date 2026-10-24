@@ -606,3 +606,34 @@ def test_main_stale_accepts_equals_form(capsys):
     equals_out = capsys.readouterr().out
     assert main(["--stale", "7", str(DATA / "issues.json")], now=now) == 0
     assert capsys.readouterr().out == equals_out
+
+
+def test_main_hide_unclassified(capsys):
+    assert main(["--hide-unclassified", str(DATA / "issues.json")]) == 0
+    out = capsys.readouterr().out
+    assert "## 未分類" not in out
+    assert "ラベルなしの Issue B" not in out
+    assert (
+        "## 着手可能 (agent:ready) - 1件\n\n"
+        "- [#1](https://github.com/example/repo/issues/1) サンプルの Issue A\n"
+    ) in out
+
+
+def test_main_hide_unclassified_with_json(capsys):
+    assert main(["--json", "--hide-unclassified", str(DATA / "issues.json")]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert "unclassified" not in [c["label"] for c in data["categories"]]
+    assert len(data["categories"]) == 5
+
+
+def test_main_hide_unclassified_with_hide_empty(capsys):
+    args = ["--hide-unclassified", "--hide-empty", str(DATA / "issues.json")]
+    assert main(args) == 0
+    out = capsys.readouterr().out
+    assert out.count("## ") == 1
+    assert "## 着手可能 (agent:ready) - 1件" in out
+
+
+def test_main_without_hide_unclassified_unchanged(capsys):
+    assert main([str(DATA / "issues.json")]) == 0
+    assert "## 未分類 - 1件" in capsys.readouterr().out
