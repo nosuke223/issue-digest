@@ -8,12 +8,14 @@ from issue_digest.formatter import format_digest, format_json
 from issue_digest.loader import load_issues, parse_issues
 
 USAGE = (
-    "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--stale <日数>]"
+    "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
+    " [--stale <日数>]"
     " [--json] [--sort updated] [--limit <件数>] [--show-assignees] [--output <パス>]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
     "  --only で指定した分類だけを出力する（複数回指定できる）\n"
+    "  --exclude で指定した分類を出力しない（複数回指定できる。--only とは同時に指定できない）\n"
     "  --summary で見出しの次に全分類の件数を1行で出力する\n"
     "  --stale で最終更新から指定日数以上たった Issue に印を付ける\n"
     "  --sort updated で各分類の中を最終更新の古い順に並べる\n"
@@ -45,6 +47,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--show-assignees", action="store_true")
     parser.add_argument("--only", action="append", default=[])
+    parser.add_argument("--exclude", action="append", default=[])
     parser.add_argument("--stale")
     parser.add_argument("--sort")
     parser.add_argument("--limit")
@@ -71,6 +74,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     summary = opts.summary
     as_json = opts.json
     only: list[str] = opts.only
+    exclude: list[str] = opts.exclude
     show_assignees = opts.show_assignees
     output: str | None = opts.output
     stale_days: int | None = None
@@ -102,15 +106,20 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     if len(paths) != 1:
         print(USAGE, file=sys.stderr)
         return 2
-    for label in only:
-        if label not in CATEGORIES:
-            print(
-                f"エラー: --only に指定できないラベルです: {label}\n"
-                f"指定できるラベル: {', '.join(CATEGORIES)}",
-                file=sys.stderr,
-            )
-            return 2
+    if only and exclude:
+        print("エラー: --only と --exclude は同時に指定できません", file=sys.stderr)
+        return 2
+    for option, labels in (("--only", only), ("--exclude", exclude)):
+        for label in labels:
+            if label not in CATEGORIES:
+                print(
+                    f"エラー: {option} に指定できないラベルです: {label}\n"
+                    f"指定できるラベル: {', '.join(CATEGORIES)}",
+                    file=sys.stderr,
+                )
+                return 2
     only_filter = only or None
+    exclude_filter = exclude or None
     path = paths[0]
     if path == "-":
         try:
@@ -131,7 +140,15 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     if as_json:
         # JSON には分類ごとの count があるので、--summary は Markdown のときだけ効く
         digest = format_json(
-            classified, hide_empty, only_filter, stale_days, now, sort, show_assignees, limit
+            classified,
+            hide_empty,
+            only_filter,
+            stale_days,
+            now,
+            sort,
+            show_assignees,
+            exclude_filter,
+            limit,
         )
     else:
         digest = format_digest(
@@ -143,6 +160,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             sort,
             summary,
             show_assignees,
+            exclude_filter,
             limit,
         )
     if output is None:

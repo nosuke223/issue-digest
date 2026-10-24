@@ -19,6 +19,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--version` | バージョンだけを出力する | `uv run issue-digest --version` |
 | `--hide-empty` | 0件の分類を出力しない | `uv run issue-digest --hide-empty issues.json` |
 | `--only <ラベル>` | 指定したラベルの分類だけを出力する（複数回指定できる） | `uv run issue-digest --only agent:needs-decision issues.json` |
+| `--exclude <ラベル>` | 指定したラベルの分類を出力しない（複数回指定できる。`--only` とは同時に使えない） | `uv run issue-digest --exclude unclassified issues.json` |
 | `--stale <日数>` | 最終更新から指定日数以上たった Issue に `（N日更新なし）` を付ける | `uv run issue-digest --stale 7 issues.json` |
 | `--sort updated` | 各分類の中を最終更新の古い順に並べる | `uv run issue-digest --sort updated issues.json` |
 | `--limit <件数>` | 各分類で、先頭から指定件数だけ Issue を出力する | `uv run issue-digest --limit 5 issues.json` |
@@ -61,6 +62,19 @@ uv run issue-digest --hide-empty issues.json
 ```
 uv run issue-digest --only agent:needs-decision issues.json
 uv run issue-digest --only agent:needs-decision --only agent:blocked --hide-empty issues.json
+```
+
+### `--exclude <ラベル>`
+
+`--exclude <ラベル>` を付けると、指定したラベルの分類を出力しません。未分類など、あまり見ない分類を除きたいときに使います。
+複数回指定すると、指定したすべての分類を除きます。指定できるラベルとエラーの出し方は `--only` と同じです。
+`--hide-empty`、`--sort`、`--stale`、`--json` と同時に使えます。
+`--only` と同時に指定すると、`エラー: --only と --exclude は同時に指定できません` を標準エラーに出して終了コード 2 で終わります。
+見出しの総件数と `--summary` の行は、`--exclude` に関係なく全件・全分類のままです。
+
+```
+uv run issue-digest --exclude unclassified issues.json
+uv run issue-digest --exclude unclassified --exclude agent:working --hide-empty issues.json
 ```
 
 ### `--stale <日数>`
@@ -189,8 +203,9 @@ uv run issue-digest --version
 ### 組み合わせ
 
 - `--hide-empty`、`--only`、`--stale`、`--sort`、`--limit`、`--output` は、どれも同時に使えます。
+- `--exclude` は `--only` 以外と同時に使えます。`--only` と同時に指定するとエラーです。
 - `--json` と同時に指定した場合
-  - `--hide-empty`、`--only` は Markdown と同じように効き、出力する分類が変わります。
+  - `--hide-empty`、`--only`、`--exclude` は Markdown と同じように効き、出力する分類が変わります。
   - `--stale` を同時に指定すると、印が付く Issue にだけ `stale_days`（経過日数）を加えます。
   - `--sort` を同時に指定すると、各分類の `issues` の順が変わります。
   - `--summary` は無視します（JSON には分類ごとの `count` があるため）。
