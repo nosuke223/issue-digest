@@ -28,6 +28,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--summary` | 総件数の次に、分類ごとの件数を1行で出力する | `uv run issue-digest --summary issues.json` |
 | `--show-assignees` | 担当者がいる Issue に `（担当: @alice）` を付ける | `uv run issue-digest --show-assignees issues.json` |
 | `--json` | Markdown の代わりに JSON を出力する | `uv run issue-digest --json issues.json` |
+| `--csv` | Markdown の代わりに CSV を出力する | `uv run issue-digest --csv issues.json` |
 | `--title <文字列>` | 見出しの `Issue ダイジェスト` を指定した文字列に置き換える | `uv run issue-digest --title issue-digest issues.json` |
 | `--output <パス>` | 標準出力ではなく、指定したファイルに書き出す | `uv run issue-digest --output digest.md issues.json` |
 
@@ -186,6 +187,29 @@ uv run issue-digest --json issues.json
 
 `--stale 7` を同時に指定し、その Issue が13日更新されていない場合は、Issue に `"stale_days": 13` が加わります。
 
+### `--csv`
+
+`--csv` を付けると、Markdown の代わりに CSV を標準出力に出します。ダイジェストを表計算ソフトに読み込んで集計したいときに使います。
+文字コードは UTF-8 で、クオートと改行（行末は `\r\n`）の扱いは Python の `csv` モジュールの既定に従います。カンマ、ダブルクオート、改行を含むタイトルも正しくクオートされます。
+`--csv` を付けない場合の出力は変わりません。
+
+- 1行目は見出し行 `label,number,title,url` です。
+- 2行目からは、分類の順、各分類の中の Issue の順で1行ずつ出力します。複数の分類に入る Issue は、分類ごとに1行出力します。
+- `label` は分類のラベル（未分類は `unclassified`）です。Markdown と違い、タイトルは省略しません。
+- 出力する分類がなければ、見出し行だけを出力します。
+
+```
+uv run issue-digest --csv issues.json
+```
+
+出力例:
+
+```
+label,number,title,url
+agent:ready,1,サンプルの Issue A,https://github.com/example/repo/issues/1
+unclassified,2,ラベルなしの Issue B,https://github.com/example/repo/issues/2
+```
+
 ### `--title <文字列>`
 
 `--title <文字列>` を付けると、Markdown の1行目の `Issue ダイジェスト` を指定した文字列に置き換えます。複数のリポジトリのダイジェストを並べて読むときに、どのリポジトリのものか区別するために使います。
@@ -224,7 +248,7 @@ uv run issue-digest --version
 
 ### 組み合わせ
 
-- `--hide-empty`、`--only`、`--stale`、`--sort`、`--limit`、`--title`、`--output` は、どれも同時に使えます。
+- `--hide-empty`、`--only`、`--stale`、`--sort`、`--limit`、`--title`、`--output` は、どれも同時に使えます（`--csv` との併用は下の項目を参照）。
 - `--exclude` は `--only` 以外と同時に使えます。`--only` と同時に指定するとエラーです。
 - `--json` と同時に指定した場合
   - `--hide-empty`、`--only`、`--exclude` は Markdown と同じように効き、出力する分類が変わります。
@@ -233,6 +257,10 @@ uv run issue-digest --version
   - `--summary` は無視します（JSON には分類ごとの `count` があるため）。
   - `--show-assignees` を同時に指定すると、各 Issue に `"assignees": ["alice", "bob"]`（login の配列。担当者がいなければ空の配列）を加えます。`--show-assignees` を付けない JSON には `assignees` を出しません。
 - `--json` と `--output <パス>` を同時に指定すると、JSON をファイルに書き出します。
+- `--csv` と同時に指定した場合
+  - `--hide-empty`、`--only`、`--exclude`、`--sort`、`--limit`、`--output` は Markdown と同じように効きます（`--limit` は各分類の先頭から指定件数の行にします）。
+  - `--stale`、`--show-assignees`、`--summary`、`--title` は、CSV に対応する列や行がないので無視します（エラーにしません）。
+  - `--json` と同時に指定すると、`エラー: --json と --csv は同時に指定できません` を標準エラーに出して終了コード 2 で終わります。
 - `--stale` と `--show-assignees` の印が両方付くときは、`（N日更新なし）（担当: @alice）` の順です。
 - `--summary` の件数の行は、`--only` や `--hide-empty` に関係なく、常に6つの分類すべての件数を出します。
 - `--version` は、ほかのオプションやファイルの指定があっても、バージョンだけを出力します。
