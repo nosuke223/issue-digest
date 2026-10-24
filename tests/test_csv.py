@@ -78,10 +78,11 @@ def test_main_csv_hide_empty_drops_empty_categories_only(capsys):
     assert capsys.readouterr().out == "label,number,title,url\r\n"
 
 
-def test_main_csv_ignores_stale_assignees_summary_title(capsys):
+def test_main_csv_ignores_stale_assignees_labels_summary_title(capsys):
     assert main(["--csv", str(DATA / "sort.json")], now=NOW) == 0
     plain = capsys.readouterr().out
-    args = ["--csv", "--stale", "7", "--show-assignees", "--summary", "--title", "x"]
+    args = ["--csv", "--stale", "7", "--show-assignees", "--show-labels"]
+    args += ["--summary", "--title", "x"]
     assert main([*args, str(DATA / "sort.json")], now=NOW) == 0
     assert capsys.readouterr().out == plain
 

@@ -44,6 +44,7 @@ def format_json(
     show_assignees: bool = False,
     exclude: list[str] | None = None,
     limit: int | None = None,
+    show_labels: bool = False,
     title: str | None = None,
 ) -> str:
     """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
@@ -52,7 +53,8 @@ def format_json(
     `stale_days`（経過日数）を加える。show_assignees が True のとき、各 Issue に
     `assignees`（login の配列。担当者がいなければ空の配列）を加える。
     limit を指定したとき、各分類の `issues` を先頭 limit 件にし（`count` は全件のまま）、
-    出力しなかった件数を `omitted` に入れる。
+    出力しなかった件数を `omitted` に入れる。show_labels が True のとき、各 Issue に
+    `labels`（`agent:` で始まらないラベルの配列。なければ空の配列）を加える。
     title を指定したとき、JSON の先頭に `title` を加える。
     """
     if stale_days is not None and now is None:
@@ -73,6 +75,8 @@ def format_json(
                 item["stale_days"] = days
             if show_assignees:
                 item["assignees"] = list(issue.assignees)
+            if show_labels:
+                item["labels"] = _other_labels(issue)
             items.append(item)
         entry: dict[str, object] = {
             "label": category,
@@ -140,6 +144,18 @@ def _assignees_mark(issue: Issue, show_assignees: bool) -> str:
     return "（担当: " + ", ".join(f"@{login}" for login in issue.assignees) + "）"
 
 
+def _other_labels(issue: Issue) -> list[str]:
+    """`agent:` で始まらないラベルを入力の順に返す。"""
+    return [label for label in issue.labels if not label.startswith("agent:")]
+
+
+def _labels_mark(issue: Issue, show_labels: bool) -> str:
+    labels = _other_labels(issue)
+    if not show_labels or not labels:
+        return ""
+    return "（ラベル: " + ", ".join(labels) + "）"
+
+
 def _selected_categories(
     classified: dict[str, list[Issue]],
     hide_empty: bool,
@@ -184,6 +200,7 @@ def format_digest(
     show_assignees: bool = False,
     exclude: list[str] | None = None,
     limit: int | None = None,
+    show_labels: bool = False,
     title: str | None = None,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
@@ -201,6 +218,8 @@ def format_digest(
     付ける（`--stale` の印があればその後ろ）。
     limit を指定すると、各分類で（sort の後の）先頭 limit 件だけを出力し、出力しなかった
     Issue があれば分類の最後に `- ほか N 件` を出す。見出しの件数は全件のまま。
+    show_labels が True のとき、`agent:` で始まらないラベルがある Issue の行末に
+    `（ラベル: bug, docs）` を付ける（担当者の印があればその後ろ）。
     title を指定すると、1行目の `Issue ダイジェスト` をその文字列に置き換える。
     Issue のタイトルが40文字を超えるときは、40文字までにして末尾に `…` を付ける
     （エスケープは省略した後のタイトルに行う。JSON のタイトルは省略しない）。
@@ -217,11 +236,11 @@ def format_digest(
         )
         lines += ["", counts]
     for category, issues in _selected_categories(classified, hide_empty, only, sort, exclude):
-        title = HEADINGS[category]
+        category_title = HEADINGS[category]
         if category == UNCLASSIFIED:
-            heading = f"## {title} - {len(issues)}件"
+            heading = f"## {category_title} - {len(issues)}件"
         else:
-            heading = f"## {title} ({category}) - {len(issues)}件"
+            heading = f"## {category_title} ({category}) - {len(issues)}件"
         lines += ["", heading, ""]
         if issues:
             shown = issues if limit is None else issues[:limit]
@@ -231,6 +250,7 @@ def format_digest(
                     f"- [#{issue.number}]({issue.url}) {issue_title}"
                     f"{_stale_mark(issue, stale_days, now)}"
                     f"{_assignees_mark(issue, show_assignees)}"
+                    f"{_labels_mark(issue, show_labels)}"
                 )
             if len(shown) < len(issues):
                 lines.append(f"- ほか {len(issues) - len(shown)} 件")
