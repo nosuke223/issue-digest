@@ -218,6 +218,19 @@ def test_format_json_keeps_title_unescaped():
     assert ready["issues"][0]["title"] == "[WIP] a](x) *b*"
 
 
+def test_format_digest_show_labels_skips_agent_labels_in_input_order():
+    issue = Issue(1, "A", ["docs", "agent:ready", "bug"], "u")
+    out = format_digest(classify_issues([issue]), show_labels=True)
+    assert "- [#1](u) A（ラベル: docs, bug）\n" in out
+
+
+def test_format_json_show_labels_adds_non_agent_labels():
+    issues = [Issue(1, "A", ["agent:ready", "bug"], "u"), make_issue(2, "B", ["agent:ready"])]
+    body = json.loads(format_json(classify_issues(issues), show_labels=True))
+    ready = next(c for c in body["categories"] if c["label"] == "agent:ready")
+    assert [i["labels"] for i in ready["issues"]] == [["bug"], []]
+
+
 def test_format_digest_keeps_title_of_40_characters():
     title = "あ" * 40
     out = format_digest(classify_issues([make_issue(1, title, ["agent:ready"])]))
