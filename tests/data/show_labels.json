@@ -1,0 +1,26 @@
+[
+  {
+    "number": 1,
+    "title": "ラベルが複数の Issue",
+    "labels": [
+      {"name": "docs", "color": "0075ca"},
+      {"name": "agent:ready", "color": "0e8a16"},
+      {"name": "bug", "color": "d73a4a"}
+    ],
+    "url": "https://github.com/example/repo/issues/1",
+    "updatedAt": "2026-10-10T00:00:00Z",
+    "assignees": [{"login": "alice"}]
+  },
+  {
+    "number": 2,
+    "title": "agent のラベルだけの Issue",
+    "labels": [{"name": "agent:ready", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/2"
+  },
+  {
+    "number": 3,
+    "title": "ラベルがない Issue",
+    "labels": [],
+    "url": "https://github.com/example/repo/issues/3"
+  }
+]
