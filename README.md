@@ -21,6 +21,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--only <ラベル>` | 指定したラベルの分類だけを出力する（複数回指定できる） | `uv run issue-digest --only agent:needs-decision issues.json` |
 | `--exclude <ラベル>` | 指定したラベルの分類を出力しない（複数回指定できる。`--only` とは同時に使えない） | `uv run issue-digest --exclude unclassified issues.json` |
 | `--stale <日数>` | 最終更新から指定日数以上たった Issue に `（N日更新なし）` を付ける | `uv run issue-digest --stale 7 issues.json` |
+| `--recent <日数>` | 最終更新から指定日数以内の Issue だけを出力する | `uv run issue-digest --recent 7 issues.json` |
 | `--sort updated` | 各分類の中を最終更新の古い順に並べる | `uv run issue-digest --sort updated issues.json` |
 | `--summary` | 総件数の次に、分類ごとの件数を1行で出力する | `uv run issue-digest --summary issues.json` |
 | `--show-assignees` | 担当者がいる Issue に `（担当: @alice）` を付ける | `uv run issue-digest --show-assignees issues.json` |
@@ -172,6 +173,18 @@ uv run issue-digest --json issues.json
 
 ```
 uv run issue-digest --output digest.md issues.json
+```
+
+### `--recent <日数>`
+
+`--recent <日数>` を付けると、最終更新から指定日数以内の Issue だけを出力します。最近動いた Issue だけを見たいときに使います。
+日数は `--stale` と同じく経過日数を切り捨てた整数で数え、指定日数ちょうどの Issue も含めます（`--recent 7` なら経過日数が0〜7日の Issue）。
+`updatedAt` がない Issue は出力しません。見出しの総件数や分類ごとの件数は、絞り込んだ後の数です。
+日数は0以上の整数で指定します。それ以外を指定すると、エラーを標準エラーに出して終了コード 2 で終わります。
+`--recent` を付けない場合の出力は変わりません。
+
+```
+gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --recent 7 -
 ```
 
 ### `--version`

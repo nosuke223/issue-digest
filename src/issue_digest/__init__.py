@@ -1,6 +1,6 @@
 import argparse
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from importlib.metadata import version
 
 from issue_digest.classifier import CATEGORIES, classify_issues
@@ -11,6 +11,7 @@ USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
     " [--stale <日数>]"
     " [--json] [--sort updated] [--show-assignees] [--output <パス>]"
+    " [--recent <日数>]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
@@ -23,6 +24,7 @@ USAGE = (
     "  --show-assignees で担当者を表示する（Markdown は行末に（担当: @alice）、"
     "JSON は各 Issue に assignees の配列を加える）\n"
     "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
+    "  --recent で最終更新から指定日数以内の Issue だけを出力する\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -37,7 +39,7 @@ class _Parser(argparse.ArgumentParser):
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    # 値の検査（--stale、--sort、--only）は日本語のエラーメッセージのため main で行う
+    # 値の検査（--stale、--recent、--sort、--only）は日本語のエラーメッセージのため main で行う
     parser = _Parser(add_help=False, allow_abbrev=False)
     parser.add_argument("-h", "--help", action="store_true")
     parser.add_argument("--hide-empty", action="store_true")
@@ -49,6 +51,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--stale")
     parser.add_argument("--sort")
     parser.add_argument("--output")
+    parser.add_argument("--recent")
     parser.add_argument("paths", nargs="*")
     return parser
 
@@ -83,6 +86,15 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             )
             return 2
         stale_days = int(opts.stale)
+    recent_days: int | None = None
+    if opts.recent is not None:
+        if not (opts.recent.isascii() and opts.recent.isdigit()):
+            print(
+                f"エラー: --recent には0以上の整数を指定してください: {opts.recent}",
+                file=sys.stderr,
+            )
+            return 2
+        recent_days = int(opts.recent)
     sort: str | None = opts.sort
     if sort is not None and sort != "updated":
         print(
@@ -124,6 +136,14 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         except (OSError, ValueError, KeyError, TypeError) as e:
             print(f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})", file=sys.stderr)
             return 1
+    if recent_days is not None:
+        if now is None:
+            now = datetime.now(UTC)
+        issues = [
+            issue
+            for issue in issues
+            if issue.updated_at is not None and (now - issue.updated_at).days < recent_days
+        ]
     classified = classify_issues(issues)
     if as_json:
         # JSON には分類ごとの count があるので、--summary は Markdown のときだけ効く
