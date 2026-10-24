@@ -606,3 +606,26 @@ def test_main_stale_accepts_equals_form(capsys):
     equals_out = capsys.readouterr().out
     assert main(["--stale", "7", str(DATA / "issues.json")], now=now) == 0
     assert capsys.readouterr().out == equals_out
+
+
+def test_main_count_prints_total_only(capsys):
+    assert main(["--count", str(DATA / "issues.json")]) == 0
+    assert capsys.readouterr().out == "2\n"
+
+
+def test_main_count_empty(capsys):
+    assert main(["--count", str(DATA / "empty.json")]) == 0
+    assert capsys.readouterr().out == "0\n"
+
+
+def test_main_count_ignores_display_options(capsys):
+    args = ["--count", "--json", "--only", "agent:ready", "--hide-empty", "--summary"]
+    assert main([*args, str(DATA / "issues.json")]) == 0
+    assert capsys.readouterr().out == "2\n"
+
+
+def test_main_count_with_output(capsys, tmp_path):
+    out_file = tmp_path / "count.txt"
+    assert main(["--count", "--output", str(out_file), str(DATA / "issues.json")]) == 0
+    assert capsys.readouterr().out == ""
+    assert out_file.read_text(encoding="utf-8") == "2\n"

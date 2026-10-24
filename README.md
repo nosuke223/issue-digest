@@ -135,6 +135,14 @@ uv run issue-digest --json issues.json
 uv run issue-digest --output digest.md issues.json
 ```
 
+`--count` を付けると、ダイジェストの代わりに総件数だけを1行で出力します（例: `3`）。スクリプトで件数だけを使いたいときに使います。
+総件数は Markdown の見出しと同じ数です（複数の分類に入る Issue は1件と数えます）。
+`--hide-empty`、`--only`、`--summary`、`--json` などの表示のオプションは無視します。`--output` と同時に指定すると、件数をファイルに書き出します。
+
+```
+uv run issue-digest --count issues.json
+```
+
 `--version` を付けると、`issue-digest 0.1.0` のようにバージョンを1行で出力し、終了コード 0 で終わります。
 バージョンは `pyproject.toml` の値です。ほかのオプションやファイルが指定されていても、バージョンだけを出力します（ファイルは読みません）。
 `--version` を付けない場合の動作は変わりません。

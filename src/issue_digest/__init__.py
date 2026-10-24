@@ -10,6 +10,7 @@ from issue_digest.loader import load_issues, parse_issues
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--stale <日数>]"
     " [--json] [--sort updated] [--show-assignees] [--output <パス>]"
+    " [--count]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
@@ -21,6 +22,7 @@ USAGE = (
     "  --show-assignees で担当者を表示する（Markdown は行末に（担当: @alice）、"
     "JSON は各 Issue に assignees の配列を加える）\n"
     "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
+    "  --count で総件数だけを1行で出力する\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -46,6 +48,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--stale")
     parser.add_argument("--sort")
     parser.add_argument("--output")
+    parser.add_argument("--count", action="store_true")
     parser.add_argument("paths", nargs="*")
     return parser
 
@@ -116,7 +119,10 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             print(f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})", file=sys.stderr)
             return 1
     classified = classify_issues(issues)
-    if as_json:
+    if opts.count:
+        # 総件数だけを出す（ほかの表示のオプションは使わない）
+        digest = f"{sum(len(issues) for issues in classified.values())}\n"
+    elif as_json:
         # JSON には分類ごとの count があるので、--summary は Markdown のときだけ効く
         digest = format_json(
             classified, hide_empty, only_filter, stale_days, now, sort, show_assignees
