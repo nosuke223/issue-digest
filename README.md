@@ -124,7 +124,7 @@ uv run issue-digest --json issues.json
 
 `--json` と `--output <パス>` を同時に指定すると、JSON をファイルに書き出します。
 
-`--output <パス>` を付けると、ダイジェストを標準出力ではなく、指定したファイルに書き出します。シェルのリダイレクトを使わずに、定期的にファイルへ保存したいときに使います。
+`--output <パス>`（短い形は `-o <パス>`）を付けると、ダイジェストを標準出力ではなく、指定したファイルに書き出します。シェルのリダイレクトを使わずに、定期的にファイルへ保存したいときに使います。
 文字コードは UTF-8 で、ファイルが既にあれば上書きします。書き出したときは、標準出力には何も出しません。
 `--hide-empty`、`--only`、`--stale`、`--sort` と同時に使えます。
 フォルダは作らないので、フォルダがないなど書き出せない場合は、エラーを標準エラーに出して終了コード 1 で終わります。
@@ -133,6 +133,7 @@ uv run issue-digest --json issues.json
 
 ```
 uv run issue-digest --output digest.md issues.json
+uv run issue-digest -o digest.md issues.json
 ```
 
 `--version` を付けると、`issue-digest 0.1.0` のようにバージョンを1行で出力し、終了コード 0 で終わります。

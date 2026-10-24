@@ -9,7 +9,7 @@ from issue_digest.loader import load_issues, parse_issues
 
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--stale <日数>]"
-    " [--json] [--sort updated] [--show-assignees] [--output <パス>]"
+    " [--json] [--sort updated] [--show-assignees] [-o | --output <パス>]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
@@ -20,7 +20,7 @@ USAGE = (
     "  --json で Markdown の代わりに JSON を出力する\n"
     "  --show-assignees で担当者を表示する（Markdown は行末に（担当: @alice）、"
     "JSON は各 Issue に assignees の配列を加える）\n"
-    "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
+    "  -o, --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -42,7 +42,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--summary", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--show-assignees", action="store_true")
-    parser.add_argument("--only", action="append", default=[])
+    parser.add_argument("-o", "--only", action="append", default=[])
     parser.add_argument("--stale")
     parser.add_argument("--sort")
     parser.add_argument("--output")

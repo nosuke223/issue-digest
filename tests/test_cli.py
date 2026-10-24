@@ -606,3 +606,15 @@ def test_main_stale_accepts_equals_form(capsys):
     equals_out = capsys.readouterr().out
     assert main(["--stale", "7", str(DATA / "issues.json")], now=now) == 0
     assert capsys.readouterr().out == equals_out
+
+
+def test_main_help_shows_short_output_option(capsys):
+    assert main(["--help"]) == 0
+    assert "-o | --output <パス>" in capsys.readouterr().out
+
+
+def test_main_short_option_needs_value(capsys):
+    assert main([str(DATA / "issues.json"), "-o"]) == 2
+    captured = capsys.readouterr()
+    assert "使い方" in captured.err
+    assert captured.out == ""
