@@ -135,6 +135,16 @@ uv run issue-digest --json issues.json
 uv run issue-digest --output digest.md issues.json
 ```
 
+`--recent <日数>` を付けると、最終更新から指定日数以内の Issue だけを出力します。最近動いた Issue だけを見たいときに使います。
+日数は `--stale` と同じく経過日数を切り捨てた整数で数え、指定日数ちょうどの Issue も含めます（`--recent 7` なら経過日数が0〜7日の Issue）。
+`updatedAt` がない Issue は出力しません。見出しの総件数や分類ごとの件数は、絞り込んだ後の数です。
+日数は0以上の整数で指定します。それ以外を指定すると、エラーを標準エラーに出して終了コード 2 で終わります。
+`--recent` を付けない場合の出力は変わりません。
+
+```
+gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --recent 7 -
+```
+
 `--version` を付けると、`issue-digest 0.1.0` のようにバージョンを1行で出力し、終了コード 0 で終わります。
 バージョンは `pyproject.toml` の値です。ほかのオプションやファイルが指定されていても、バージョンだけを出力します（ファイルは読みません）。
 `--version` を付けない場合の動作は変わりません。

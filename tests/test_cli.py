@@ -606,3 +606,32 @@ def test_main_stale_accepts_equals_form(capsys):
     equals_out = capsys.readouterr().out
     assert main(["--stale", "7", str(DATA / "issues.json")], now=now) == 0
     assert capsys.readouterr().out == equals_out
+
+
+def test_main_recent_keeps_recently_updated(capsys):
+    assert main(["--recent", "10", str(DATA / "stale.json")], now=NOW) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("# Issue ダイジェスト（全 2 件）\n")
+    assert "#2]" in out
+    assert "#3]" in out
+    assert "#1]" not in out
+    assert "#4]" not in out  # updatedAt がない
+
+
+def test_main_recent_drops_older(capsys):
+    assert main(["--recent", "3", str(DATA / "stale.json")], now=NOW) == 0
+    assert capsys.readouterr().out.startswith("# Issue ダイジェスト（全 0 件）\n")
+
+
+def test_main_recent_with_json(capsys):
+    assert main(["--json", "--recent", "10", str(DATA / "stale.json")], now=NOW) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["total"] == 2
+
+
+@pytest.mark.parametrize("value", ["-1", "a", "", "１"])
+def test_main_recent_invalid_value(capsys, value):
+    assert main(["--recent", value, str(DATA / "stale.json")]) == 2
+    captured = capsys.readouterr()
+    assert "--recent" in captured.err
+    assert captured.out == ""
