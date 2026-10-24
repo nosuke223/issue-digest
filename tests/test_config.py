@@ -125,6 +125,15 @@ def test_broken_toml_exits_2(in_tmp_dir, capsys):
     assert "TOML" in capsys.readouterr().err
 
 
+def test_non_utf8_config_exits_2(in_tmp_dir, capsys):
+    path = in_tmp_dir / ".issue-digest.toml"
+    path.write_bytes("# 日本語のコメント\nhide_empty = true\n".encode("shift_jis"))
+    assert main([ISSUES]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("エラー: ")
+    assert "UTF-8" in err
+
+
 def test_usage_mentions_config(capsys):
     assert main(["--help"]) == 0
     assert capsys.readouterr().out.strip() == USAGE
