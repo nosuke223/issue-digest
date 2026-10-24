@@ -5,13 +5,14 @@ from importlib.metadata import version
 
 from issue_digest.classifier import CATEGORIES, classify_issues
 from issue_digest.formatter import format_digest, format_json
-from issue_digest.loader import load_issues, parse_issues
+from issue_digest.loader import Issue, load_issues, parse_issues
 
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--stale <日数>]"
     " [--json] [--sort updated] [--show-assignees] [--output <パス>]"
-    " <JSONファイルのパス | ->\n"
+    " <JSONファイルのパス | ->...\n"
     "       issue-digest --version\n"
+    "  ファイルは複数指定できる（同じ番号の Issue は後のファイルのものを使う）\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
     "  --only で指定した分類だけを出力する（複数回指定できる）\n"
     "  --summary で見出しの次に全分類の件数を1行で出力する\n"
@@ -87,7 +88,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         )
         return 2
     paths: list[str] = opts.paths
-    if len(paths) != 1:
+    if not paths or paths.count("-") > 1:
         print(USAGE, file=sys.stderr)
         return 2
     for label in only:
@@ -99,22 +100,30 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             )
             return 2
     only_filter = only or None
-    path = paths[0]
-    if path == "-":
-        try:
-            issues = parse_issues(sys.stdin.read())
-        except (OSError, ValueError, KeyError, TypeError) as e:
-            print(f"エラー: 標準入力を読み込めません ({type(e).__name__})", file=sys.stderr)
-            return 1
-    else:
-        try:
-            issues = load_issues(path)
-        except FileNotFoundError:
-            print(f"エラー: ファイルが見つかりません: {path}", file=sys.stderr)
-            return 1
-        except (OSError, ValueError, KeyError, TypeError) as e:
-            print(f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})", file=sys.stderr)
-            return 1
+    # 同じ番号の Issue が複数のファイルにあれば、1件にまとめる
+    merged: dict[int, Issue] = {}
+    for path in paths:
+        if path == "-":
+            try:
+                loaded = parse_issues(sys.stdin.read())
+            except (OSError, ValueError, KeyError, TypeError) as e:
+                print(f"エラー: 標準入力を読み込めません ({type(e).__name__})", file=sys.stderr)
+                return 1
+        else:
+            try:
+                loaded = load_issues(path)
+            except FileNotFoundError:
+                print(f"エラー: ファイルが見つかりません: {path}", file=sys.stderr)
+                return 1
+            except (OSError, ValueError, KeyError, TypeError) as e:
+                print(
+                    f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})",
+                    file=sys.stderr,
+                )
+                return 1
+        for issue in loaded:
+            merged.setdefault(issue.number, issue)
+    issues = list(merged.values())
     classified = classify_issues(issues)
     if as_json:
         # JSON には分類ごとの count があるので、--summary は Markdown のときだけ効く

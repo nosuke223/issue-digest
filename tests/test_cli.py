@@ -575,8 +575,8 @@ def test_main_without_args_shows_usage(capsys):
     assert captured.out == ""
 
 
-def test_main_with_too_many_args_shows_usage(capsys):
-    assert main(["a.json", "b.json"]) != 0
+def test_main_with_stdin_twice_shows_usage(capsys):
+    assert main(["-", "-"]) == 2
     assert "使い方" in capsys.readouterr().err
 
 
@@ -606,3 +606,30 @@ def test_main_stale_accepts_equals_form(capsys):
     equals_out = capsys.readouterr().out
     assert main(["--stale", "7", str(DATA / "issues.json")], now=now) == 0
     assert capsys.readouterr().out == equals_out
+
+
+def test_main_multiple_files(capsys):
+    assert main([str(DATA / "issues.json"), str(DATA / "more.json")]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("# Issue ダイジェスト（全 4 件）\n")
+    assert "追加の Issue C" in out
+    assert "追加の Issue D" in out
+
+
+def test_main_multiple_files_merges_same_number(capsys):
+    assert main([str(DATA / "issues.json"), str(DATA / "issues.json")]) == 0
+    assert capsys.readouterr().out.startswith("# Issue ダイジェスト（全 2 件）\n")
+
+
+def test_main_multiple_files_with_stdin(capsys, monkeypatch):
+    text = (DATA / "more.json").read_text(encoding="utf-8")
+    monkeypatch.setattr("sys.stdin", io.StringIO(text))
+    assert main([str(DATA / "issues.json"), "-"]) == 0
+    assert capsys.readouterr().out.startswith("# Issue ダイジェスト（全 4 件）\n")
+
+
+def test_main_multiple_files_missing_one(capsys):
+    assert main([str(DATA / "issues.json"), "nonexistent.json"]) == 1
+    captured = capsys.readouterr()
+    assert "nonexistent.json" in captured.err
+    assert captured.out == ""

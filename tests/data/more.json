@@ -1,0 +1,14 @@
+[
+  {
+    "number": 10,
+    "title": "追加の Issue C",
+    "labels": [{"name": "agent:review", "color": "fbca04"}],
+    "url": "https://github.com/example/repo/issues/10"
+  },
+  {
+    "number": 11,
+    "title": "追加の Issue D",
+    "labels": [],
+    "url": "https://github.com/example/repo/issues/11"
+  }
+]
