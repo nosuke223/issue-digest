@@ -120,16 +120,18 @@ def _selected_categories(
         if hide_empty and not issues:
             continue
         if sort == "updated":
-            issues = _sort_by_updated(issues)
+            issues = _sort_by_date(issues, "updated_at")
+        elif sort == "created":
+            issues = _sort_by_date(issues, "created_at")
         selected.append((category, issues))
     return selected
 
 
-def _sort_by_updated(issues: list[Issue]) -> list[Issue]:
-    """updatedAt の古い順（同じなら番号順）。updatedAt がない Issue は末尾に番号順。"""
-    dated = [i for i in issues if i.updated_at is not None]
-    undated = [i for i in issues if i.updated_at is None]
-    dated.sort(key=lambda i: (i.updated_at, i.number))
+def _sort_by_date(issues: list[Issue], attr: str) -> list[Issue]:
+    """日時（attr）の古い順（同じなら番号順）。日時がない Issue は末尾に番号順。"""
+    dated = [i for i in issues if getattr(i, attr) is not None]
+    undated = [i for i in issues if getattr(i, attr) is None]
+    dated.sort(key=lambda i: (getattr(i, attr), i.number))
     undated.sort(key=lambda i: i.number)
     return dated + undated
 
@@ -155,7 +157,7 @@ def format_digest(
     stale_days を指定すると、最終更新から stale_days 日以上たった Issue の行末に
     `（N日更新なし）` を付ける。経過日数は now（省略時は現在時刻）から計算する。
     sort が "updated" のとき、各分類の中を updatedAt の古い順に並べる
-    （同じ場合は番号順。updatedAt がない Issue は末尾）。
+    （同じ場合は番号順。updatedAt がない Issue は末尾）。"created" のときは createdAt の古い順。
     summary が True のとき、総件数の見出しの次に全分類の件数を1行で出力する。
     この行は only や hide_empty に関係なく、常に全分類を含む。
     show_assignees が True のとき、担当者がいる Issue の行末に `（担当: @alice, @bob）` を

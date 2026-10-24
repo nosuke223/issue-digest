@@ -346,12 +346,55 @@ def test_main_sort_reads_stdin(capsys, monkeypatch):
     assert issue_numbers_in_output(capsys.readouterr().out) == [8, 7, 6, 3, 4, 1, 2, 5]
 
 
-@pytest.mark.parametrize("value", ["created", "", "Updated", "asc"])
+@pytest.mark.parametrize("value", ["", "Updated", "Created", "asc"])
 def test_main_sort_invalid_value(capsys, value):
     assert main(["--sort", value, str(DATA / "sort.json")]) == 2
     captured = capsys.readouterr()
     assert "--sort" in captured.err
+    assert "updated か created" in captured.err
     assert captured.out == ""
+
+
+def test_main_sort_created_orders_oldest_first(capsys):
+    assert main(["--sort", "created", str(DATA / "sort_created.json")]) == 0
+    # レビュー待ち → 着手可能の順。各分類は古い順、同時刻は番号順、createdAt なしは末尾
+    assert issue_numbers_in_output(capsys.readouterr().out) == [7, 8, 3, 4, 1, 6, 2, 5]
+
+
+def test_main_sort_updated_ignores_created_at(capsys):
+    assert main(["--sort", "updated", str(DATA / "sort_created.json")]) == 0
+    assert issue_numbers_in_output(capsys.readouterr().out) == [8, 7, 2, 6, 1, 4, 3, 5]
+
+
+def test_main_without_sort_ignores_created_at(capsys):
+    assert main([str(DATA / "sort_created.json")]) == 0
+    assert issue_numbers_in_output(capsys.readouterr().out) == [7, 8, 1, 2, 3, 4, 5, 6]
+
+
+def test_main_json_with_sort_created(capsys):
+    assert main(["--json", "--sort", "created", str(DATA / "sort_created.json")]) == 0
+    data = json_out(capsys)
+    numbers = [i["number"] for c in data["categories"] for i in c["issues"]]
+    assert numbers == [7, 8, 3, 4, 1, 6, 2, 5]
+
+
+def test_main_sort_created_without_created_at_orders_by_number(capsys):
+    assert main(["--sort", "created", str(DATA / "sort.json")]) == 0
+    assert issue_numbers_in_output(capsys.readouterr().out) == [7, 8, 1, 2, 3, 4, 5, 6]
+
+
+def test_main_invalid_created_at(capsys, monkeypatch):
+    text = '[{"number": 4, "title": "t", "labels": [], "url": "u", "createdAt": "xx"}]'
+    monkeypatch.setattr("sys.stdin", io.StringIO(text))
+    assert main(["--sort", "created", "-"]) == 1
+    captured = capsys.readouterr()
+    assert captured.err == "エラー: Issue #4 の createdAt を日時として読めません: xx\n"
+    assert captured.out == ""
+
+
+def test_main_usage_mentions_sort_created(capsys):
+    assert main([]) == 2
+    assert "--sort updated|created" in capsys.readouterr().err
 
 
 def test_main_sort_without_value_shows_usage(capsys):
@@ -447,7 +490,7 @@ def test_main_title_markdown(capsys):
 
 def test_main_title_json(capsys):
     assert main(["--json", "--title", "issue-digest", str(DATA / "issues.json")]) == 0
-    body = _json_out(capsys)
+    body = json_out(capsys)
     assert list(body)[0] == "title"
     assert body["title"] == "issue-digest"
     assert body["total"] == 2
@@ -457,7 +500,7 @@ def test_main_without_title_unchanged(capsys):
     assert main([str(DATA / "issues.json")]) == 0
     assert capsys.readouterr().out.startswith("# Issue ダイジェスト（全 2 件）\n")
     assert main(["--json", str(DATA / "issues.json")]) == 0
-    assert "title" not in _json_out(capsys)
+    assert "title" not in json_out(capsys)
 
 
 def test_main_title_empty(capsys):
