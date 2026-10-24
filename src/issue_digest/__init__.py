@@ -4,13 +4,13 @@ from datetime import datetime
 from importlib.metadata import version
 
 from issue_digest.classifier import CATEGORIES, classify_issues
-from issue_digest.formatter import format_digest, format_json
+from issue_digest.formatter import format_csv, format_digest, format_json
 from issue_digest.loader import InvalidUpdatedAtError, load_issues, parse_issues
 
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
     " [--stale <日数>]"
-    " [--json] [--sort updated] [--limit <件数>] [--show-assignees] [--show-labels]"
+    " [--json | --csv] [--sort updated] [--limit <件数>] [--show-assignees] [--show-labels]"
     " [--title <文字列>] [--output <パス>]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
@@ -23,6 +23,9 @@ USAGE = (
     "  --limit で各分類の出力を先頭から指定件数までにする（Markdown は最後に「- ほか N 件」、"
     "JSON は各分類に omitted を加える。件数は全件のまま）\n"
     "  --json で Markdown の代わりに JSON を出力する\n"
+    "  --csv で Markdown の代わりに CSV（見出し行 label,number,title,url）を出力する"
+    "（--json とは同時に指定できない。--stale、--show-assignees、--show-labels、--summary、"
+    "--title は無視する）\n"
     "  --show-assignees で担当者を表示する（Markdown は行末に（担当: @alice）、"
     "JSON は各 Issue に assignees の配列を加える）\n"
     "  --show-labels で agent: で始まらないラベルを表示する"
@@ -50,6 +53,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--hide-empty", action="store_true")
     parser.add_argument("--summary", action="store_true")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--csv", action="store_true")
     parser.add_argument("--show-assignees", action="store_true")
     parser.add_argument("--show-labels", action="store_true")
     parser.add_argument("--only", action="append", default=[])
@@ -80,6 +84,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     hide_empty = opts.hide_empty
     summary = opts.summary
     as_json = opts.json
+    as_csv = opts.csv
     only: list[str] = opts.only
     exclude: list[str] = opts.exclude
     show_assignees = opts.show_assignees
@@ -118,6 +123,9 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     if len(paths) != 1:
         print(USAGE, file=sys.stderr)
         return 2
+    if as_json and as_csv:
+        print("エラー: --json と --csv は同時に指定できません", file=sys.stderr)
+        return 2
     if only and exclude:
         print("エラー: --only と --exclude は同時に指定できません", file=sys.stderr)
         return 2
@@ -155,7 +163,10 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             print(f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})", file=sys.stderr)
             return 1
     classified = classify_issues(issues)
-    if as_json:
+    if as_csv:
+        # CSV に列のない --stale、--show-assignees、--show-labels、--summary、--title は無視する
+        digest = format_csv(classified, hide_empty, only_filter, sort, exclude_filter, limit)
+    elif as_json:
         # JSON には分類ごとの count があるので、--summary は Markdown のときだけ効く
         digest = format_json(
             classified,
