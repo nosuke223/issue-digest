@@ -42,6 +42,7 @@ def format_json(
     show_assignees: bool = False,
     exclude: list[str] | None = None,
     limit: int | None = None,
+    title: str | None = None,
 ) -> str:
     """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
 
@@ -50,6 +51,7 @@ def format_json(
     `assignees`（login の配列。担当者がいなければ空の配列）を加える。
     limit を指定したとき、各分類の `issues` を先頭 limit 件にし（`count` は全件のまま）、
     出力しなかった件数を `omitted` に入れる。
+    title を指定したとき、JSON の先頭に `title` を加える。
     """
     if stale_days is not None and now is None:
         now = datetime.now(UTC)
@@ -79,7 +81,11 @@ def format_json(
         if limit is not None:
             entry["omitted"] = len(issues) - len(shown)
         categories.append(entry)
-    body = {"total": total, "categories": categories}
+    body: dict[str, object] = {}
+    if title is not None:
+        body["title"] = title
+    body["total"] = total
+    body["categories"] = categories
     return json.dumps(body, ensure_ascii=False, indent=2) + "\n"
 
 
@@ -139,6 +145,7 @@ def format_digest(
     show_assignees: bool = False,
     exclude: list[str] | None = None,
     limit: int | None = None,
+    title: str | None = None,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
@@ -155,12 +162,14 @@ def format_digest(
     付ける（`--stale` の印があればその後ろ）。
     limit を指定すると、各分類で（sort の後の）先頭 limit 件だけを出力し、出力しなかった
     Issue があれば分類の最後に `- ほか N 件` を出す。見出しの件数は全件のまま。
+    title を指定すると、1行目の `Issue ダイジェスト` をその文字列に置き換える。
     """
     if stale_days is not None and now is None:
         now = datetime.now(UTC)
     # 複数の分類に入る Issue を二重に数えないよう、番号で重複を除く
     total = len({issue.number for issues in classified.values() for issue in issues})
-    lines = [f"# Issue ダイジェスト（全 {total} 件）"]
+    heading_title = "Issue ダイジェスト" if title is None else title
+    lines = [f"# {heading_title}（全 {total} 件）"]
     if summary:
         counts = " / ".join(
             f"{HEADINGS[category]} {len(issues)}" for category, issues in classified.items()

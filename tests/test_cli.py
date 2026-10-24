@@ -447,6 +447,47 @@ def test_main_usage_mentions_limit(capsys):
     assert "--limit" in capsys.readouterr().out
 
 
+def test_main_title_markdown(capsys):
+    assert main(["--title", "issue-digest", str(DATA / "issues.json")]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("# issue-digest（全 2 件）\n")
+    assert "Issue ダイジェスト" not in out
+
+
+def test_main_title_json(capsys):
+    assert main(["--json", "--title", "issue-digest", str(DATA / "issues.json")]) == 0
+    body = _json_out(capsys)
+    assert list(body)[0] == "title"
+    assert body["title"] == "issue-digest"
+    assert body["total"] == 2
+
+
+def test_main_without_title_unchanged(capsys):
+    assert main([str(DATA / "issues.json")]) == 0
+    assert capsys.readouterr().out.startswith("# Issue ダイジェスト（全 2 件）\n")
+    assert main(["--json", str(DATA / "issues.json")]) == 0
+    assert "title" not in _json_out(capsys)
+
+
+def test_main_title_empty(capsys):
+    assert main(["--title", "", str(DATA / "issues.json")]) == 2
+    captured = capsys.readouterr()
+    assert captured.err == "エラー: --title には1文字以上を指定してください\n"
+    assert captured.out == ""
+
+
+def test_main_title_without_value_shows_usage(capsys):
+    assert main([str(DATA / "issues.json"), "--title"]) == 2
+    captured = capsys.readouterr()
+    assert "使い方" in captured.err
+    assert captured.out == ""
+
+
+def test_main_usage_mentions_title(capsys):
+    assert main(["--help"]) == 0
+    assert "--title" in capsys.readouterr().out
+
+
 def test_main_output_writes_same_content_as_stdout(capsys, tmp_path):
     assert main([str(DATA / "issues.json")]) == 0
     expected = capsys.readouterr().out
