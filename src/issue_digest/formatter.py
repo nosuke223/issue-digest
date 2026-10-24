@@ -41,12 +41,15 @@ def format_json(
     sort: str | None = None,
     show_assignees: bool = False,
     exclude: list[str] | None = None,
+    limit: int | None = None,
 ) -> str:
     """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
 
     引数の意味は format_digest と同じ。stale_days を指定したとき、印が付く Issue にだけ
     `stale_days`（経過日数）を加える。show_assignees が True のとき、各 Issue に
     `assignees`（login の配列。担当者がいなければ空の配列）を加える。
+    limit を指定したとき、各分類の `issues` を先頭 limit 件にし（`count` は全件のまま）、
+    出力しなかった件数を `omitted` に入れる。
     """
     if stale_days is not None and now is None:
         now = datetime.now(UTC)
@@ -54,7 +57,8 @@ def format_json(
     categories = []
     for category, issues in _selected_categories(classified, hide_empty, only, sort, exclude):
         items = []
-        for issue in issues:
+        shown = issues if limit is None else issues[:limit]
+        for issue in shown:
             item: dict[str, object] = {
                 "number": issue.number,
                 "title": issue.title,
@@ -66,14 +70,15 @@ def format_json(
             if show_assignees:
                 item["assignees"] = list(issue.assignees)
             items.append(item)
-        categories.append(
-            {
-                "label": category,
-                "title": HEADINGS[category],
-                "count": len(issues),
-                "issues": items,
-            }
-        )
+        entry: dict[str, object] = {
+            "label": category,
+            "title": HEADINGS[category],
+            "count": len(issues),
+            "issues": items,
+        }
+        if limit is not None:
+            entry["omitted"] = len(issues) - len(shown)
+        categories.append(entry)
     body = {"total": total, "categories": categories}
     return json.dumps(body, ensure_ascii=False, indent=2) + "\n"
 
@@ -133,6 +138,7 @@ def format_digest(
     summary: bool = False,
     show_assignees: bool = False,
     exclude: list[str] | None = None,
+    limit: int | None = None,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
@@ -147,6 +153,8 @@ def format_digest(
     この行は only や hide_empty に関係なく、常に全分類を含む。
     show_assignees が True のとき、担当者がいる Issue の行末に `（担当: @alice, @bob）` を
     付ける（`--stale` の印があればその後ろ）。
+    limit を指定すると、各分類で（sort の後の）先頭 limit 件だけを出力し、出力しなかった
+    Issue があれば分類の最後に `- ほか N 件` を出す。見出しの件数は全件のまま。
     """
     if stale_days is not None and now is None:
         now = datetime.now(UTC)
@@ -166,12 +174,15 @@ def format_digest(
             heading = f"## {title} ({category}) - {len(issues)}件"
         lines += ["", heading, ""]
         if issues:
-            for issue in issues:
+            shown = issues if limit is None else issues[:limit]
+            for issue in shown:
                 lines.append(
                     f"- [#{issue.number}]({issue.url}) {_escape_markdown(issue.title)}"
                     f"{_stale_mark(issue, stale_days, now)}"
                     f"{_assignees_mark(issue, show_assignees)}"
                 )
+            if len(shown) < len(issues):
+                lines.append(f"- ほか {len(issues) - len(shown)} 件")
         else:
             lines.append("なし")
     return "\n".join(lines) + "\n"

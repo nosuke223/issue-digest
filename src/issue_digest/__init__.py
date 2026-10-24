@@ -10,7 +10,7 @@ from issue_digest.loader import load_issues, parse_issues
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
     " [--stale <日数>]"
-    " [--json] [--sort updated] [--show-assignees] [--output <パス>]"
+    " [--json] [--sort updated] [--limit <件数>] [--show-assignees] [--output <パス>]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
@@ -19,6 +19,8 @@ USAGE = (
     "  --summary で見出しの次に全分類の件数を1行で出力する\n"
     "  --stale で最終更新から指定日数以上たった Issue に印を付ける\n"
     "  --sort updated で各分類の中を最終更新の古い順に並べる\n"
+    "  --limit で各分類の出力を先頭から指定件数までにする（Markdown は最後に「- ほか N 件」、"
+    "JSON は各分類に omitted を加える。件数は全件のまま）\n"
     "  --json で Markdown の代わりに JSON を出力する\n"
     "  --show-assignees で担当者を表示する（Markdown は行末に（担当: @alice）、"
     "JSON は各 Issue に assignees の配列を加える）\n"
@@ -48,6 +50,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--exclude", action="append", default=[])
     parser.add_argument("--stale")
     parser.add_argument("--sort")
+    parser.add_argument("--limit")
     parser.add_argument("--output")
     parser.add_argument("paths", nargs="*")
     return parser
@@ -90,6 +93,15 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             file=sys.stderr,
         )
         return 2
+    limit: int | None = None
+    if opts.limit is not None:
+        if not (opts.limit.isascii() and opts.limit.isdigit()) or int(opts.limit) < 1:
+            print(
+                f"エラー: --limit には1以上の整数を指定してください: {opts.limit}",
+                file=sys.stderr,
+            )
+            return 2
+        limit = int(opts.limit)
     paths: list[str] = opts.paths
     if len(paths) != 1:
         print(USAGE, file=sys.stderr)
@@ -136,6 +148,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             sort,
             show_assignees,
             exclude_filter,
+            limit,
         )
     else:
         digest = format_digest(
@@ -148,6 +161,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             summary,
             show_assignees,
             exclude_filter,
+            limit,
         )
     if output is None:
         print(digest, end="")

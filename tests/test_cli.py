@@ -358,6 +358,77 @@ def test_main_sort_with_show_assignees(capsys):
     assert issue_numbers_in_output(capsys.readouterr().out) == [8, 7, 6, 3, 4, 1, 2, 5]
 
 
+def test_main_limit_markdown(capsys):
+    assert main(["--limit", "2", str(DATA / "sort.json")]) == 0
+    out = capsys.readouterr().out
+    assert issue_numbers_in_output(out) == [7, 8, 1, 2]
+    # 見出しの件数は全件のまま。省略がある分類だけ「ほか N 件」を出す
+    assert "## 着手可能 (agent:ready) - 6件" in out
+    assert "- ほか 4 件" in out
+    assert out.count("- ほか") == 1
+
+
+def test_main_limit_after_sort(capsys):
+    assert main(["--limit", "2", "--sort", "updated", str(DATA / "sort.json")]) == 0
+    assert issue_numbers_in_output(capsys.readouterr().out) == [8, 7, 6, 3]
+
+
+def test_main_limit_larger_than_count_omits_nothing(capsys):
+    assert main(["--limit", "100", str(DATA / "sort.json")]) == 0
+    out = capsys.readouterr().out
+    assert issue_numbers_in_output(out) == [7, 8, 1, 2, 3, 4, 5, 6]
+    assert "ほか" not in out
+
+
+def test_main_without_limit_unchanged(capsys):
+    assert main([str(DATA / "sort.json")]) == 0
+    out = capsys.readouterr().out
+    assert issue_numbers_in_output(out) == [7, 8, 1, 2, 3, 4, 5, 6]
+    assert "ほか" not in out
+
+
+def test_main_limit_json(capsys):
+    assert main(["--json", "--limit", "2", "--sort", "updated", str(DATA / "sort.json")]) == 0
+    body = _json_out(capsys)
+    by_label = {c["label"]: c for c in body["categories"]}
+    ready = by_label["agent:ready"]
+    assert [i["number"] for i in ready["issues"]] == [6, 3]
+    assert ready["count"] == 6
+    assert ready["omitted"] == 4
+    review = by_label["agent:review"]
+    assert [i["number"] for i in review["issues"]] == [8, 7]
+    assert review["omitted"] == 0
+    # 0件の分類にも omitted を付ける
+    assert by_label["agent:ready"]["omitted"] == 4
+    assert by_label["agent:blocked"]["omitted"] == 0
+    assert body["total"] == 8
+
+
+def test_main_json_without_limit_has_no_omitted(capsys):
+    assert main(["--json", str(DATA / "sort.json")]) == 0
+    assert all("omitted" not in c for c in _json_out(capsys)["categories"])
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "abc", "1.5", "", "１"])
+def test_main_limit_invalid_value(capsys, value):
+    assert main(["--limit", value, str(DATA / "sort.json")]) == 2
+    captured = capsys.readouterr()
+    assert captured.err == f"エラー: --limit には1以上の整数を指定してください: {value}\n"
+    assert captured.out == ""
+
+
+def test_main_limit_without_value_shows_usage(capsys):
+    assert main([str(DATA / "sort.json"), "--limit"]) == 2
+    captured = capsys.readouterr()
+    assert "使い方" in captured.err
+    assert captured.out == ""
+
+
+def test_main_usage_mentions_limit(capsys):
+    assert main(["--help"]) == 0
+    assert "--limit" in capsys.readouterr().out
+
+
 def test_main_output_writes_same_content_as_stdout(capsys, tmp_path):
     assert main([str(DATA / "issues.json")]) == 0
     expected = capsys.readouterr().out
