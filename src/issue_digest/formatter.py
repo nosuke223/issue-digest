@@ -43,6 +43,7 @@ def format_json(
     exclude: list[str] | None = None,
     limit: int | None = None,
     show_labels: bool = False,
+    title: str | None = None,
 ) -> str:
     """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
 
@@ -52,6 +53,7 @@ def format_json(
     limit を指定したとき、各分類の `issues` を先頭 limit 件にし（`count` は全件のまま）、
     出力しなかった件数を `omitted` に入れる。show_labels が True のとき、各 Issue に
     `labels`（`agent:` で始まらないラベルの配列。なければ空の配列）を加える。
+    title を指定したとき、JSON の先頭に `title` を加える。
     """
     if stale_days is not None and now is None:
         now = datetime.now(UTC)
@@ -83,7 +85,11 @@ def format_json(
         if limit is not None:
             entry["omitted"] = len(issues) - len(shown)
         categories.append(entry)
-    body = {"total": total, "categories": categories}
+    body: dict[str, object] = {}
+    if title is not None:
+        body["title"] = title
+    body["total"] = total
+    body["categories"] = categories
     return json.dumps(body, ensure_ascii=False, indent=2) + "\n"
 
 
@@ -156,6 +162,7 @@ def format_digest(
     exclude: list[str] | None = None,
     limit: int | None = None,
     show_labels: bool = False,
+    title: str | None = None,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
@@ -174,23 +181,25 @@ def format_digest(
     Issue があれば分類の最後に `- ほか N 件` を出す。見出しの件数は全件のまま。
     show_labels が True のとき、`agent:` で始まらないラベルがある Issue の行末に
     `（ラベル: bug, docs）` を付ける（担当者の印があればその後ろ）。
+    title を指定すると、1行目の `Issue ダイジェスト` をその文字列に置き換える。
     """
     if stale_days is not None and now is None:
         now = datetime.now(UTC)
     # 複数の分類に入る Issue を二重に数えないよう、番号で重複を除く
     total = len({issue.number for issues in classified.values() for issue in issues})
-    lines = [f"# Issue ダイジェスト（全 {total} 件）"]
+    heading_title = "Issue ダイジェスト" if title is None else title
+    lines = [f"# {heading_title}（全 {total} 件）"]
     if summary:
         counts = " / ".join(
             f"{HEADINGS[category]} {len(issues)}" for category, issues in classified.items()
         )
         lines += ["", counts]
     for category, issues in _selected_categories(classified, hide_empty, only, sort, exclude):
-        title = HEADINGS[category]
+        category_title = HEADINGS[category]
         if category == UNCLASSIFIED:
-            heading = f"## {title} - {len(issues)}件"
+            heading = f"## {category_title} - {len(issues)}件"
         else:
-            heading = f"## {title} ({category}) - {len(issues)}件"
+            heading = f"## {category_title} ({category}) - {len(issues)}件"
         lines += ["", heading, ""]
         if issues:
             shown = issues if limit is None else issues[:limit]

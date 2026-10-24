@@ -10,8 +10,8 @@ from issue_digest.loader import InvalidUpdatedAtError, load_issues, parse_issues
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
     " [--stale <日数>]"
-    " [--json] [--sort updated] [--limit <件数>] [--show-assignees]"
-    " [--show-labels] [--output <パス>]"
+    " [--json] [--sort updated] [--limit <件数>] [--show-assignees] [--show-labels]"
+    " [--title <文字列>] [--output <パス>]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
@@ -27,6 +27,8 @@ USAGE = (
     "JSON は各 Issue に assignees の配列を加える）\n"
     "  --show-labels で agent: で始まらないラベルを表示する"
     "（Markdown は行末に（ラベル: bug, docs）、JSON は各 Issue に labels の配列を加える）\n"
+    "  --title で見出しの「Issue ダイジェスト」を指定した文字列に置き換える"
+    "（JSON は先頭に title を加える）\n"
     "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
@@ -56,6 +58,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sort")
     parser.add_argument("--limit")
     parser.add_argument("--output")
+    parser.add_argument("--title")
     parser.add_argument("paths", nargs="*")
     return parser
 
@@ -107,6 +110,10 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             )
             return 2
         limit = int(opts.limit)
+    title: str | None = opts.title
+    if title == "":
+        print("エラー: --title には1文字以上を指定してください", file=sys.stderr)
+        return 2
     paths: list[str] = opts.paths
     if len(paths) != 1:
         print(USAGE, file=sys.stderr)
@@ -161,6 +168,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             exclude_filter,
             limit,
             show_labels,
+            title,
         )
     else:
         digest = format_digest(
@@ -175,6 +183,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             exclude_filter,
             limit,
             show_labels,
+            title,
         )
     if output is None:
         print(digest, end="")

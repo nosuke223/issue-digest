@@ -29,6 +29,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--show-assignees` | 担当者がいる Issue に `（担当: @alice）` を付ける | `uv run issue-digest --show-assignees issues.json` |
 | `--show-labels` | `agent:` で始まらないラベルがある Issue に `（ラベル: bug, docs）` を付ける | `uv run issue-digest --show-labels issues.json` |
 | `--json` | Markdown の代わりに JSON を出力する | `uv run issue-digest --json issues.json` |
+| `--title <文字列>` | 見出しの `Issue ダイジェスト` を指定した文字列に置き換える | `uv run issue-digest --title issue-digest issues.json` |
 | `--output <パス>` | 標準出力ではなく、指定したファイルに書き出す | `uv run issue-digest --output digest.md issues.json` |
 
 ### 入力
@@ -191,6 +192,20 @@ uv run issue-digest --json issues.json
 
 `--stale 7` を同時に指定し、その Issue が13日更新されていない場合は、Issue に `"stale_days": 13` が加わります。
 
+### `--title <文字列>`
+
+`--title <文字列>` を付けると、Markdown の1行目の `Issue ダイジェスト` を指定した文字列に置き換えます。複数のリポジトリのダイジェストを並べて読むときに、どのリポジトリのものか区別するために使います。
+
+- Markdown: `--title issue-digest` なら、1行目は `# issue-digest（全 5 件）` になります。
+- JSON: `--json` と同時に指定すると、JSON の先頭に `"title": "issue-digest"` を加えます。
+- 空の文字列は、エラーを標準エラーに出して終了コード 2 で終わります。
+
+`--title` を付けない場合の出力は変わりません（JSON に `title` も出しません）。
+
+```
+uv run issue-digest --title issue-digest issues.json
+```
+
 ### `--output <パス>`
 
 `--output <パス>` を付けると、ダイジェストを標準出力ではなく、指定したファイルに書き出します。シェルのリダイレクトを使わずに、定期的にファイルへ保存したいときに使います。
@@ -215,7 +230,7 @@ uv run issue-digest --version
 
 ### 組み合わせ
 
-- `--hide-empty`、`--only`、`--stale`、`--sort`、`--limit`、`--output` は、どれも同時に使えます。
+- `--hide-empty`、`--only`、`--stale`、`--sort`、`--limit`、`--title`、`--output` は、どれも同時に使えます。
 - `--exclude` は `--only` 以外と同時に使えます。`--only` と同時に指定するとエラーです。
 - `--json` と同時に指定した場合
   - `--hide-empty`、`--only`、`--exclude` は Markdown と同じように効き、出力する分類が変わります。

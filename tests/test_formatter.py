@@ -1,18 +1,11 @@
 import json
 from datetime import UTC, datetime
 
+from conftest import make_issue
+
 from issue_digest.classifier import classify_issues
 from issue_digest.formatter import format_digest, format_json
 from issue_digest.loader import Issue
-
-
-def make_issue(number: int, title: str, labels: list[str]) -> Issue:
-    return Issue(
-        number=number,
-        title=title,
-        labels=labels,
-        url=f"https://github.com/example/repo/issues/{number}",
-    )
 
 
 def test_format_digest_lists_issues_and_none():
