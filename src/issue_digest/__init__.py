@@ -4,6 +4,7 @@ from datetime import datetime
 from importlib.metadata import version
 
 from issue_digest.classifier import CATEGORIES, classify_issues
+from issue_digest.diff import Diff, InvalidPreviousError, compute_diff, load_previous
 from issue_digest.formatter import format_csv, format_digest, format_json
 from issue_digest.loader import InvalidUpdatedAtError, load_issues, parse_issues
 
@@ -11,7 +12,7 @@ USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
     " [--stale <日数>]"
     " [--json | --csv] [--sort updated] [--limit <件数>] [--show-assignees] [--show-labels]"
-    " [--title <文字列>] [--output <パス>]"
+    " [--title <文字列>] [--output <パス>] [--diff <前回のJSONのパス>]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
@@ -33,6 +34,11 @@ USAGE = (
     "  --title で見出しの「Issue ダイジェスト」を指定した文字列に置き換える"
     "（JSON は先頭に title を加える）\n"
     "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
+    "  --diff で前回の --json の出力と比べ、新しい Issue、なくなった Issue、分類が変わった Issue を"
+    "出す（Markdown は末尾に「## 前回からの変化」、JSON は diff を加える。--csv では無視する。"
+    "前回の JSON は --only、--exclude、--hide-empty、--limit を付けずに出力したもの）\n"
+    "    例: issue-digest --json --output last.json issues.json で保存し、"
+    "次回 issue-digest --diff last.json issues.json\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -63,6 +69,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--limit")
     parser.add_argument("--output")
     parser.add_argument("--title")
+    parser.add_argument("--diff")
     parser.add_argument("paths", nargs="*")
     return parser
 
@@ -163,8 +170,29 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             print(f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})", file=sys.stderr)
             return 1
     classified = classify_issues(issues)
+    diff: Diff | None = None
+    if opts.diff is not None and not as_csv:
+        try:
+            # 今回の --only などに関係なく、全分類で比べる
+            diff = compute_diff(load_previous(opts.diff), classified)
+        except FileNotFoundError:
+            print(f"エラー: 前回の JSON が見つかりません: {opts.diff}", file=sys.stderr)
+            return 1
+        except InvalidPreviousError:
+            print(
+                f"エラー: 前回の JSON が --json の出力の形ではありません: {opts.diff}",
+                file=sys.stderr,
+            )
+            return 1
+        except (OSError, ValueError) as e:
+            print(
+                f"エラー: 前回の JSON を読み込めません: {opts.diff} ({type(e).__name__})",
+                file=sys.stderr,
+            )
+            return 1
     if as_csv:
-        # CSV に列のない --stale、--show-assignees、--show-labels、--summary、--title は無視する
+        # CSV に列のない --stale、--show-assignees、--show-labels、--summary、--title、--diff は
+        # 無視する
         digest = format_csv(classified, hide_empty, only_filter, sort, exclude_filter, limit)
     elif as_json:
         # JSON には分類ごとの count があるので、--summary は Markdown のときだけ効く
@@ -180,6 +208,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             limit,
             show_labels,
             title,
+            diff,
         )
     else:
         digest = format_digest(
@@ -195,6 +224,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             limit,
             show_labels,
             title,
+            diff,
         )
     if output is None:
         print(digest, end="")
