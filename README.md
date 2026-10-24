@@ -10,6 +10,25 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 
 `gh issue list --json number,title,labels,url` の出力を渡します。
 
+### オプション一覧
+
+| オプション | 何をするか | 例 |
+| --- | --- | --- |
+| `-` | 標準入力から読む | `gh issue list --json number,title,labels,url \| uv run issue-digest -` |
+| `-h` / `--help` | 使い方を出力する | `uv run issue-digest --help` |
+| `--version` | バージョンだけを出力する | `uv run issue-digest --version` |
+| `--hide-empty` | 0件の分類を出力しない | `uv run issue-digest --hide-empty issues.json` |
+| `--only <ラベル>` | 指定したラベルの分類だけを出力する（複数回指定できる） | `uv run issue-digest --only agent:needs-decision issues.json` |
+| `--exclude <ラベル>` | 指定したラベルの分類を出力しない（複数回指定できる。`--only` とは同時に使えない） | `uv run issue-digest --exclude unclassified issues.json` |
+| `--stale <日数>` | 最終更新から指定日数以上たった Issue に `（N日更新なし）` を付ける | `uv run issue-digest --stale 7 issues.json` |
+| `--sort updated` | 各分類の中を最終更新の古い順に並べる | `uv run issue-digest --sort updated issues.json` |
+| `--summary` | 総件数の次に、分類ごとの件数を1行で出力する | `uv run issue-digest --summary issues.json` |
+| `--show-assignees` | 担当者がいる Issue に `（担当: @alice）` を付ける | `uv run issue-digest --show-assignees issues.json` |
+| `--json` | Markdown の代わりに JSON を出力する | `uv run issue-digest --json issues.json` |
+| `--output <パス>` | 標準出力ではなく、指定したファイルに書き出す | `uv run issue-digest --output digest.md issues.json` |
+
+### 入力
+
 ファイルを指定する場合:
 
 ```
@@ -22,12 +41,16 @@ uv run issue-digest issues.json
 gh issue list --json number,title,labels,url | uv run issue-digest -
 ```
 
+### `--hide-empty`
+
 `--hide-empty` を付けると、0件の分類の見出しと「なし」を出力しません。対応が必要な分類だけを見たいときに使います。
 付けない場合は、0件の分類も見出しと「なし」を出力します。
 
 ```
 uv run issue-digest --hide-empty issues.json
 ```
+
+### `--only <ラベル>`
 
 `--only <ラベル>` を付けると、指定したラベルの分類だけを出力します。見たい分類だけを素早く確認したいときに使います。
 複数回指定すると、指定したすべての分類を出力します。`--hide-empty` と同時に使えます。
@@ -40,6 +63,8 @@ uv run issue-digest --only agent:needs-decision issues.json
 uv run issue-digest --only agent:needs-decision --only agent:blocked --hide-empty issues.json
 ```
 
+### `--exclude <ラベル>`
+
 `--exclude <ラベル>` を付けると、指定したラベルの分類を出力しません。未分類など、あまり見ない分類を除きたいときに使います。
 複数回指定すると、指定したすべての分類を除きます。指定できるラベルとエラーの出し方は `--only` と同じです。
 `--hide-empty`、`--sort`、`--stale`、`--json` と同時に使えます。
@@ -50,6 +75,8 @@ uv run issue-digest --only agent:needs-decision --only agent:blocked --hide-empt
 uv run issue-digest --exclude unclassified issues.json
 uv run issue-digest --exclude unclassified --exclude agent:working --hide-empty issues.json
 ```
+
+### `--stale <日数>`
 
 `--stale <日数>` を付けると、最終更新から指定日数以上たった Issue の行の末尾に `（N日更新なし）` を付けます。止まっている Issue に気づきたいときに使います。
 N は経過日数を切り捨てた整数です。`--hide-empty`、`--only` と同時に使えます。
@@ -63,21 +90,22 @@ N は経過日数を切り捨てた整数です。`--hide-empty`、`--only` と�
 gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --stale 7 -
 ```
 
+### `--show-assignees`
+
 `--show-assignees` を付けると、担当者がいる Issue の行の末尾に `（担当: @alice, @bob）` を付けます。誰が対応しているかを知りたいときに使います。
 担当者は入力の `assignees` の順に、カンマと空白で区切って並べます。担当者がいない Issue には何も付けません。
 `assignees` がない入力でもエラーにはならず、担当者なしとして扱います。
-`--stale` の印と両方付くときは、`（N日更新なし）（担当: @alice）` の順です。
 `--show-assignees` を付けない場合の出力は変わりません。
-`--json` と同時に指定した場合は、各 Issue に `"assignees": ["alice", "bob"]`（login の配列。担当者がいなければ空の配列）を加えます。`--show-assignees` を付けない JSON には `assignees` を出しません。
 
 ```
 gh issue list --json number,title,labels,url,assignees | uv run issue-digest --show-assignees -
 ```
 
+### `--summary`
+
 `--summary` を付けると、総件数の見出しの次に、空行をはさんで分類ごとの件数を1行で出力します。全体の概要をひと目で知りたいときに使います。
 分類の名前と順は見出しと同じです。この行は `--only` や `--hide-empty` に関係なく、常に6つの分類すべての件数を出します。
 `--summary` を付けない場合の出力は変わりません。
-`--json` と同時に指定した場合、`--summary` は無視します（JSON には分類ごとの `count` があるため）。
 
 ```
 判断待ち 1 / 中断 0 / レビュー待ち 2 / 作業中 0 / 着手可能 3 / 未分類 1
@@ -87,9 +115,10 @@ gh issue list --json number,title,labels,url,assignees | uv run issue-digest --s
 uv run issue-digest --summary issues.json
 ```
 
+### `--sort updated`
+
 `--sort updated` を付けると、各分類の中の Issue を `updatedAt`（最終更新）の古い順に並べます。止まっている Issue を見つけやすくするために使います。
 `updatedAt` が同じ Issue は番号の小さい順、`updatedAt` がない Issue は分類の末尾に番号の小さい順で並べます。分類の順番は変わりません。
-`--hide-empty`、`--only`、`--stale`、`--json` と同時に使えます（`--json` のときは各分類の `issues` の順が変わります）。
 `--sort` に指定できる値は `updated` だけです。それ以外の値や値がない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
 `--sort` を付けない場合の並び順（Issue 番号の小さい順）は変わりません。
 
@@ -97,13 +126,13 @@ uv run issue-digest --summary issues.json
 gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --sort updated --stale 7 -
 ```
 
+### `--json`
+
 `--json` を付けると、Markdown の代わりに JSON を標準出力に出します。通知のスクリプトなど、ほかのツールから使いたいときに使います。
 UTF-8 で日本語はエスケープせず、インデントは2です。`--json` を付けない場合の出力は変わりません。
 
 - `total`: Markdown の見出しと同じ総件数（重複を除いた全件数。`--only` に関係なく全件）
 - `categories`: 分類の配列。順と `label`、`title` は Markdown の見出しと同じ（未分類の `label` は `unclassified`）
-- `--hide-empty`、`--only`、`--exclude` は Markdown と同じように効き、出力する分類が変わります
-- `--stale` と同時に指定すると、印が付く Issue にだけ `stale_days`（経過日数）を加えます
 
 ```
 uv run issue-digest --json issues.json
@@ -133,11 +162,10 @@ uv run issue-digest --json issues.json
 
 `--stale 7` を同時に指定し、その Issue が13日更新されていない場合は、Issue に `"stale_days": 13` が加わります。
 
-`--json` と `--output <パス>` を同時に指定すると、JSON をファイルに書き出します。
+### `--output <パス>`
 
 `--output <パス>` を付けると、ダイジェストを標準出力ではなく、指定したファイルに書き出します。シェルのリダイレクトを使わずに、定期的にファイルへ保存したいときに使います。
 文字コードは UTF-8 で、ファイルが既にあれば上書きします。書き出したときは、標準出力には何も出しません。
-`--hide-empty`、`--only`、`--stale`、`--sort` と同時に使えます。
 フォルダは作らないので、フォルダがないなど書き出せない場合は、エラーを標準エラーに出して終了コード 1 で終わります。
 `--output` の後にパスがない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
 `--output` を付けない場合の動作は変わりません。`--version` の出力先も変わりません（標準出力に出します）。
@@ -146,6 +174,8 @@ uv run issue-digest --json issues.json
 uv run issue-digest --output digest.md issues.json
 ```
 
+### `--version`
+
 `--version` を付けると、`issue-digest 0.1.0` のようにバージョンを1行で出力し、終了コード 0 で終わります。
 バージョンは `pyproject.toml` の値です。ほかのオプションやファイルが指定されていても、バージョンだけを出力します（ファイルは読みません）。
 `--version` を付けない場合の動作は変わりません。
@@ -153,3 +183,18 @@ uv run issue-digest --output digest.md issues.json
 ```
 uv run issue-digest --version
 ```
+
+### 組み合わせ
+
+- `--hide-empty`、`--only`、`--stale`、`--sort`、`--output` は、どれも同時に使えます。
+- `--exclude` は `--only` 以外と同時に使えます。`--only` と同時に指定するとエラーです。
+- `--json` と同時に指定した場合
+  - `--hide-empty`、`--only`、`--exclude` は Markdown と同じように効き、出力する分類が変わります。
+  - `--stale` を同時に指定すると、印が付く Issue にだけ `stale_days`（経過日数）を加えます。
+  - `--sort` を同時に指定すると、各分類の `issues` の順が変わります。
+  - `--summary` は無視します（JSON には分類ごとの `count` があるため）。
+  - `--show-assignees` を同時に指定すると、各 Issue に `"assignees": ["alice", "bob"]`（login の配列。担当者がいなければ空の配列）を加えます。`--show-assignees` を付けない JSON には `assignees` を出しません。
+- `--json` と `--output <パス>` を同時に指定すると、JSON をファイルに書き出します。
+- `--stale` と `--show-assignees` の印が両方付くときは、`（N日更新なし）（担当: @alice）` の順です。
+- `--summary` の件数の行は、`--only` や `--hide-empty` に関係なく、常に6つの分類すべての件数を出します。
+- `--version` は、ほかのオプションやファイルの指定があっても、バージョンだけを出力します。

@@ -78,6 +78,14 @@ def format_json(
     return json.dumps(body, ensure_ascii=False, indent=2) + "\n"
 
 
+_MARKDOWN_SPECIAL = str.maketrans({c: "\\" + c for c in "\\`*_[]<>"})
+
+
+def _escape_markdown(text: str) -> str:
+    """Markdown の記号の前にバックスラッシュを付ける。"""
+    return text.translate(_MARKDOWN_SPECIAL)
+
+
 def _assignees_mark(issue: Issue, show_assignees: bool) -> str:
     if not show_assignees or not issue.assignees:
         return ""
@@ -160,7 +168,7 @@ def format_digest(
         if issues:
             for issue in issues:
                 lines.append(
-                    f"- [#{issue.number}]({issue.url}) {issue.title}"
+                    f"- [#{issue.number}]({issue.url}) {_escape_markdown(issue.title)}"
                     f"{_stale_mark(issue, stale_days, now)}"
                     f"{_assignees_mark(issue, show_assignees)}"
                 )

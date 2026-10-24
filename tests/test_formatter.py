@@ -206,6 +206,25 @@ def test_format_digest_without_summary_unchanged():
     assert SUMMARY_LINE not in format_digest(classified)
 
 
+def test_format_digest_escapes_markdown_in_title():
+    issue = make_issue(1, "[WIP] a](x) *b*", ["agent:ready"])
+    out = format_digest(classify_issues([issue]))
+    assert "- [#1](https://github.com/example/repo/issues/1) \\[WIP\\] a\\](x) \\*b\\*\n" in out
+
+
+def test_format_digest_escapes_all_special_characters():
+    issue = make_issue(1, "\\ ` * _ [ ] < >", ["agent:ready"])
+    out = format_digest(classify_issues([issue]))
+    assert " \\\\ \\` \\* \\_ \\[ \\] \\< \\>\n" in out
+
+
+def test_format_json_keeps_title_unescaped():
+    issue = make_issue(1, "[WIP] a](x) *b*", ["agent:ready"])
+    body = json.loads(format_json(classify_issues([issue])))
+    ready = next(c for c in body["categories"] if c["label"] == "agent:ready")
+    assert ready["issues"][0]["title"] == "[WIP] a](x) *b*"
+
+
 def test_format_digest_total_zero():
     out = format_digest(classify_issues([]))
     assert out.splitlines()[0] == "# Issue ダイジェスト（全 0 件）"
