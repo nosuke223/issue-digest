@@ -6,6 +6,8 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 タスクは GitHub Issue で管理し、Claude Code が実装、Codex がレビューします。
 ルールは [CLAUDE.md](CLAUDE.md)（実装担当向け）と [AGENTS.md](AGENTS.md)（レビュー担当向け）にあります。
 
+これまでの変更は [CHANGELOG.md](CHANGELOG.md) にまとめています。
+
 ## 使い方
 
 `gh issue list --json number,title,labels,url` の出力を渡します。
