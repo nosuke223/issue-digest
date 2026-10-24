@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 from datetime import UTC, datetime, timedelta
 
@@ -87,6 +89,31 @@ def format_json(
     body["total"] = total
     body["categories"] = categories
     return json.dumps(body, ensure_ascii=False, indent=2) + "\n"
+
+
+def format_csv(
+    classified: dict[str, list[Issue]],
+    hide_empty: bool = False,
+    only: list[str] | None = None,
+    sort: str | None = None,
+    exclude: list[str] | None = None,
+    limit: int | None = None,
+) -> str:
+    """分類結果を CSV にする。1行目は見出し行 `label,number,title,url`。
+
+    分類の順、各分類の中の順に1行ずつ出力する（複数の分類に入る Issue は分類ごとに1行）。
+    クオートや改行コードは csv モジュールの既定に従う（行末は `\\r\\n`）。
+    limit を指定すると、各分類の先頭 limit 件だけを出力する。
+    stale や担当者など、CSV に列のない情報は扱わない。
+    """
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["label", "number", "title", "url"])
+    for category, issues in _selected_categories(classified, hide_empty, only, sort, exclude):
+        shown = issues if limit is None else issues[:limit]
+        for issue in shown:
+            writer.writerow([category, issue.number, issue.title, issue.url])
+    return buffer.getvalue()
 
 
 _MARKDOWN_SPECIAL = str.maketrans({c: "\\" + c for c in "\\`*_[]<>"})
