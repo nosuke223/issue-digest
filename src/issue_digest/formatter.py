@@ -83,6 +83,13 @@ def _assignees_mark(issue: Issue, show_assignees: bool) -> str:
     return "（担当: " + ", ".join(f"@{login}" for login in issue.assignees) + "）"
 
 
+def _updated_mark(issue: Issue, show_updated: bool) -> str:
+    """最終更新日を日本時間の月/日で表す（例: `（更新: 10/20）`）。"""
+    if not show_updated or issue.updated_at is None:
+        return ""
+    return f"（更新: {issue.updated_at.strftime('%m/%d')}）"
+
+
 def _selected_categories(
     classified: dict[str, list[Issue]],
     hide_empty: bool,
@@ -120,6 +127,7 @@ def format_digest(
     sort: str | None = None,
     summary: bool = False,
     show_assignees: bool = False,
+    show_updated: bool = False,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
@@ -133,6 +141,8 @@ def format_digest(
     この行は only や hide_empty に関係なく、常に全分類を含む。
     show_assignees が True のとき、担当者がいる Issue の行末に `（担当: @alice, @bob）` を
     付ける（`--stale` の印があればその後ろ）。
+    show_updated が True のとき、updatedAt がある Issue の行末に、日本時間の最終更新日を
+    `（更新: 10/20）` の形で付ける（担当者の後ろ）。
     """
     if stale_days is not None and now is None:
         now = datetime.now(UTC)
@@ -157,6 +167,7 @@ def format_digest(
                     f"- [#{issue.number}]({issue.url}) {issue.title}"
                     f"{_stale_mark(issue, stale_days, now)}"
                     f"{_assignees_mark(issue, show_assignees)}"
+                    f"{_updated_mark(issue, show_updated)}"
                 )
         else:
             lines.append("なし")

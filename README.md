@@ -135,6 +135,16 @@ uv run issue-digest --json issues.json
 uv run issue-digest --output digest.md issues.json
 ```
 
+`--show-updated` を付けると、Issue の行の末尾に最終更新日を `（更新: 10/20）` の形で付けます。いつ動いたかをひと目で知りたいときに使います。
+日付は**日本時間**の月/日（2桁）です。`updatedAt` がない Issue には何も付けません。
+`--stale` の印や担当者と一緒に付くときは、`（N日更新なし）（担当: @alice）（更新: 10/20）` の順です。
+`--json` と同時に指定した場合は無視します（JSON を使う側で `updatedAt` を扱えるため）。
+`--show-updated` を付けない場合の出力は変わりません。
+
+```
+gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --show-updated -
+```
+
 `--version` を付けると、`issue-digest 0.1.0` のようにバージョンを1行で出力し、終了コード 0 で終わります。
 バージョンは `pyproject.toml` の値です。ほかのオプションやファイルが指定されていても、バージョンだけを出力します（ファイルは読みません）。
 `--version` を付けない場合の動作は変わりません。

@@ -606,3 +606,27 @@ def test_main_stale_accepts_equals_form(capsys):
     equals_out = capsys.readouterr().out
     assert main(["--stale", "7", str(DATA / "issues.json")], now=now) == 0
     assert capsys.readouterr().out == equals_out
+
+
+def test_main_show_updated(capsys):
+    assert main(["--show-updated", str(DATA / "stale.json")]) == 0
+    out = capsys.readouterr().out
+    assert "古い Issue（更新: 10/10）\n" in out
+    assert "ちょうど7日の Issue（更新: 10/16）\n" in out
+    assert "updatedAt がない Issue\n" in out
+
+
+def test_main_show_updated_after_other_marks(capsys):
+    args = ["--show-updated", "--show-assignees", "--stale", "7"]
+    assert main([*args, str(DATA / "assignees.json")], now=NOW) == 0
+    assert "（13日更新なし）（担当: @bob, @alice）（更新: 10/10）" in capsys.readouterr().out
+
+
+def test_main_show_updated_ignored_for_json(capsys):
+    assert main(["--json", "--show-updated", str(DATA / "stale.json")]) == 0
+    assert "更新:" not in capsys.readouterr().out
+
+
+def test_main_without_show_updated_unchanged(capsys):
+    assert main([str(DATA / "stale.json")]) == 0
+    assert "（更新:" not in capsys.readouterr().out
