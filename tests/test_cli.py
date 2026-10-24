@@ -490,7 +490,7 @@ def test_main_title_markdown(capsys):
 
 def test_main_title_json(capsys):
     assert main(["--json", "--title", "issue-digest", str(DATA / "issues.json")]) == 0
-    body = json_out(capsys)
+    body = _json_out(capsys)
     assert list(body)[0] == "title"
     assert body["title"] == "issue-digest"
     assert body["total"] == 2
@@ -500,7 +500,7 @@ def test_main_without_title_unchanged(capsys):
     assert main([str(DATA / "issues.json")]) == 0
     assert capsys.readouterr().out.startswith("# Issue ダイジェスト（全 2 件）\n")
     assert main(["--json", str(DATA / "issues.json")]) == 0
-    assert "title" not in json_out(capsys)
+    assert "title" not in _json_out(capsys)
 
 
 def test_main_title_empty(capsys):
