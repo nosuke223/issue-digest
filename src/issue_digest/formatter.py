@@ -40,6 +40,7 @@ def format_json(
     now: datetime | None = None,
     sort: str | None = None,
     show_assignees: bool = False,
+    exclude: list[str] | None = None,
 ) -> str:
     """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
 
@@ -51,7 +52,7 @@ def format_json(
         now = datetime.now(UTC)
     total = len({issue.number for issues in classified.values() for issue in issues})
     categories = []
-    for category, issues in _selected_categories(classified, hide_empty, only, sort):
+    for category, issues in _selected_categories(classified, hide_empty, only, sort, exclude):
         items = []
         for issue in issues:
             item: dict[str, object] = {
@@ -96,11 +97,14 @@ def _selected_categories(
     hide_empty: bool,
     only: list[str] | None,
     sort: str | None,
+    exclude: list[str] | None = None,
 ) -> list[tuple[str, list[Issue]]]:
     """出力する分類と、その中の Issue の並びを返す（Markdown と JSON で共通）。"""
     selected = []
     for category, issues in classified.items():
         if only is not None and category not in only:
+            continue
+        if exclude is not None and category in exclude:
             continue
         if hide_empty and not issues:
             continue
@@ -128,11 +132,13 @@ def format_digest(
     sort: str | None = None,
     summary: bool = False,
     show_assignees: bool = False,
+    exclude: list[str] | None = None,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
     hide_empty が True のとき、0件の分類は見出しも「なし」も出力しない。
     only を指定すると、そこに含まれる分類だけを出力する（総件数は全件のまま）。
+    exclude を指定すると、そこに含まれる分類を出力しない（総件数は全件のまま）。
     stale_days を指定すると、最終更新から stale_days 日以上たった Issue の行末に
     `（N日更新なし）` を付ける。経過日数は now（省略時は現在時刻）から計算する。
     sort が "updated" のとき、各分類の中を updatedAt の古い順に並べる
@@ -152,7 +158,7 @@ def format_digest(
             f"{HEADINGS[category]} {len(issues)}" for category, issues in classified.items()
         )
         lines += ["", counts]
-    for category, issues in _selected_categories(classified, hide_empty, only, sort):
+    for category, issues in _selected_categories(classified, hide_empty, only, sort, exclude):
         title = HEADINGS[category]
         if category == UNCLASSIFIED:
             heading = f"## {title} - {len(issues)}件"
