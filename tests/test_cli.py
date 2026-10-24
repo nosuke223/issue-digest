@@ -606,3 +606,26 @@ def test_main_stale_accepts_equals_form(capsys):
     equals_out = capsys.readouterr().out
     assert main(["--stale", "7", str(DATA / "issues.json")], now=now) == 0
     assert capsys.readouterr().out == equals_out
+
+
+def test_main_fail_if_any_found(capsys):
+    assert main(["--fail-if-any", "agent:ready", str(DATA / "issues.json")]) == 3
+    assert "## 着手可能 (agent:ready) - 1件" in capsys.readouterr().out
+
+
+def test_main_fail_if_any_not_found(capsys):
+    assert main(["--fail-if-any", "agent:blocked", str(DATA / "issues.json")]) == 0
+    assert capsys.readouterr().out.startswith("# Issue ダイジェスト（全 2 件）\n")
+
+
+def test_main_fail_if_any_uses_hidden_category(capsys):
+    args = ["--fail-if-any", "unclassified", "--only", "agent:ready"]
+    assert main([*args, str(DATA / "issues.json")]) == 3
+    assert "## 未分類" not in capsys.readouterr().out
+
+
+def test_main_fail_if_any_invalid_label(capsys):
+    assert main(["--fail-if-any", "bug", str(DATA / "issues.json")]) == 2
+    captured = capsys.readouterr()
+    assert "--fail-if-any" in captured.err
+    assert captured.out == ""

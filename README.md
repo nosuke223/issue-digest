@@ -135,6 +135,16 @@ uv run issue-digest --json issues.json
 uv run issue-digest --output digest.md issues.json
 ```
 
+`--fail-if-any <ラベル>` を付けると、指定した分類に Issue が1件以上あるとき、終了コード 3 で終わります。定期実行のスクリプトで、判断待ちなどがあるときだけ通知したいときに使います。
+ダイジェストはいつもどおり出力します（`--output` があればファイルに書き出してから終わります）。該当する Issue がなければ終了コード 0 です。
+指定できるラベルは `--only` と同じ6つです。それ以外を指定すると、エラーを標準エラーに出して終了コード 2 で終わります。
+`--only` や `--hide-empty` で出力しない分類も、判定には使います。
+`--fail-if-any` を付けない場合の動作は変わりません。
+
+```
+uv run issue-digest --fail-if-any agent:needs-decision --output digest.md issues.json || notify.sh
+```
+
 `--version` を付けると、`issue-digest 0.1.0` のようにバージョンを1行で出力し、終了コード 0 で終わります。
 バージョンは `pyproject.toml` の値です。ほかのオプションやファイルが指定されていても、バージョンだけを出力します（ファイルは読みません）。
 `--version` を付けない場合の動作は変わりません。

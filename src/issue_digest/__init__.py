@@ -10,6 +10,7 @@ from issue_digest.loader import load_issues, parse_issues
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--stale <日数>]"
     " [--json] [--sort updated] [--show-assignees] [--output <パス>]"
+    " [--fail-if-any <ラベル>]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
@@ -21,6 +22,7 @@ USAGE = (
     "  --show-assignees で担当者を表示する（Markdown は行末に（担当: @alice）、"
     "JSON は各 Issue に assignees の配列を加える）\n"
     "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
+    "  --fail-if-any で指定した分類に Issue があれば終了コード 3 で終わる\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -35,7 +37,7 @@ class _Parser(argparse.ArgumentParser):
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    # 値の検査（--stale、--sort、--only）は日本語のエラーメッセージのため main で行う
+    # 値の検査（--stale、--sort、--only、--fail-if-any）は日本語のエラーメッセージのため main で行う
     parser = _Parser(add_help=False, allow_abbrev=False)
     parser.add_argument("-h", "--help", action="store_true")
     parser.add_argument("--hide-empty", action="store_true")
@@ -46,6 +48,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--stale")
     parser.add_argument("--sort")
     parser.add_argument("--output")
+    parser.add_argument("--fail-if-any")
     parser.add_argument("paths", nargs="*")
     return parser
 
@@ -98,6 +101,14 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
+    fail_label: str | None = opts.fail_if_any
+    if fail_label is not None and fail_label not in CATEGORIES:
+        print(
+            f"エラー: --fail-if-any に指定できないラベルです: {fail_label}\n"
+            f"指定できるラベル: {', '.join(CATEGORIES)}",
+            file=sys.stderr,
+        )
+        return 2
     only_filter = only or None
     path = paths[0]
     if path == "-":
@@ -125,9 +136,11 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         digest = format_digest(
             classified, hide_empty, only_filter, stale_days, now, sort, summary, show_assignees
         )
+    # 出力の内容は変えず、終了コードだけで知らせる
+    found = fail_label is not None and bool(classified[fail_label])
     if output is None:
         print(digest, end="")
-        return 0
+        return 3 if found else 0
     try:
         with open(output, "w", encoding="utf-8", newline="") as f:
             f.write(digest)
