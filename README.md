@@ -40,6 +40,17 @@ uv run issue-digest --only agent:needs-decision issues.json
 uv run issue-digest --only agent:needs-decision --only agent:blocked --hide-empty issues.json
 ```
 
+`--exclude <ラベル>` を付けると、指定したラベルの分類を出力しません。未分類など、あまり見ない分類を除きたいときに使います。
+複数回指定すると、指定したすべての分類を除きます。指定できるラベルとエラーの出し方は `--only` と同じです。
+`--hide-empty`、`--sort`、`--stale`、`--json` と同時に使えます。
+`--only` と同時に指定すると、`エラー: --only と --exclude は同時に指定できません` を標準エラーに出して終了コード 2 で終わります。
+見出しの総件数と `--summary` の行は、`--exclude` に関係なく全件・全分類のままです。
+
+```
+uv run issue-digest --exclude unclassified issues.json
+uv run issue-digest --exclude unclassified --exclude agent:working --hide-empty issues.json
+```
+
 `--stale <日数>` を付けると、最終更新から指定日数以上たった Issue の行の末尾に `（N日更新なし）` を付けます。止まっている Issue に気づきたいときに使います。
 N は経過日数を切り捨てた整数です。`--hide-empty`、`--only` と同時に使えます。
 この印を付けるには、入力の各 Issue に `updatedAt`（ISO 8601 形式。例: `2026-10-20T12:34:56Z`）が必要です。
@@ -91,7 +102,7 @@ UTF-8 で日本語はエスケープせず、インデントは2です。`--json
 
 - `total`: Markdown の見出しと同じ総件数（重複を除いた全件数。`--only` に関係なく全件）
 - `categories`: 分類の配列。順と `label`、`title` は Markdown の見出しと同じ（未分類の `label` は `unclassified`）
-- `--hide-empty`、`--only` は Markdown と同じように効き、出力する分類が変わります
+- `--hide-empty`、`--only`、`--exclude` は Markdown と同じように効き、出力する分類が変わります
 - `--stale` と同時に指定すると、印が付く Issue にだけ `stale_days`（経過日数）を加えます
 
 ```

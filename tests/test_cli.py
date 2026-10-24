@@ -132,6 +132,71 @@ def test_main_only_without_value_shows_usage(capsys):
     assert "使い方" in capsys.readouterr().err
 
 
+def test_main_exclude_removes_category_and_keeps_total_and_summary(capsys):
+    args = ["--exclude", "unclassified", "--summary", str(DATA / "issues.json")]
+    assert main(args) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("# Issue ダイジェスト（全 2 件）\n")
+    assert "未分類 1" in out
+    assert "## 未分類" not in out
+    assert "## 着手可能 (agent:ready) - 1件" in out
+    assert "## 判断待ち (agent:needs-decision) - 0件\n\nなし\n" in out
+
+
+def test_main_exclude_multiple(capsys):
+    args = ["--exclude", "unclassified", "--exclude", "agent:ready", str(DATA / "issues.json")]
+    assert main(args) == 0
+    out = capsys.readouterr().out
+    assert "## 未分類" not in out
+    assert "(agent:ready)" not in out
+    assert "(agent:blocked)" in out
+
+
+def test_main_exclude_with_hide_empty_sort_and_stale(capsys):
+    args = ["--exclude", "unclassified", "--hide-empty", "--sort", "updated", "--stale", "7"]
+    assert main([*args, str(DATA / "issues.json")], now=NOW) == 0
+    out = capsys.readouterr().out
+    assert "## 着手可能 (agent:ready) - 1件" in out
+    assert "## 未分類" not in out
+    assert "(agent:blocked)" not in out
+
+
+def test_main_json_exclude_keeps_total(capsys):
+    assert main(["--json", "--exclude", "agent:ready", str(DATA / "issues.json")]) == 0
+    data = _json_out(capsys)
+    assert data["total"] == 2
+    labels = [c["label"] for c in data["categories"]]
+    assert "agent:ready" not in labels
+    assert "unclassified" in labels
+
+
+def test_main_json_exclude_with_hide_empty(capsys):
+    args = ["--json", "--exclude", "agent:ready", "--hide-empty", str(DATA / "issues.json")]
+    assert main(args) == 0
+    data = _json_out(capsys)
+    assert [c["label"] for c in data["categories"]] == ["unclassified"]
+
+
+def test_main_exclude_unknown_label(capsys):
+    assert main(["--exclude", "agent:nope", str(DATA / "issues.json")]) == 2
+    captured = capsys.readouterr()
+    assert "--exclude に指定できないラベルです: agent:nope" in captured.err
+    assert captured.out == ""
+
+
+def test_main_exclude_with_only_is_error(capsys):
+    args = ["--only", "agent:ready", "--exclude", "unclassified", str(DATA / "issues.json")]
+    assert main(args) == 2
+    captured = capsys.readouterr()
+    assert "エラー: --only と --exclude は同時に指定できません" in captured.err
+    assert captured.out == ""
+
+
+def test_main_exclude_without_value_shows_usage(capsys):
+    assert main([str(DATA / "issues.json"), "--exclude"]) == 2
+    assert "使い方" in capsys.readouterr().err
+
+
 NOW = datetime(2026, 10, 23, 12, 0, 0, tzinfo=UTC)
 
 
