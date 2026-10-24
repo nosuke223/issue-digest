@@ -21,6 +21,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--only <ラベル>` | 指定したラベルの分類だけを出力する（複数回指定できる） | `uv run issue-digest --only agent:needs-decision issues.json` |
 | `--stale <日数>` | 最終更新から指定日数以上たった Issue に `（N日更新なし）` を付ける | `uv run issue-digest --stale 7 issues.json` |
 | `--sort updated` | 各分類の中を最終更新の古い順に並べる | `uv run issue-digest --sort updated issues.json` |
+| `--limit <件数>` | 各分類で、先頭から指定件数だけ Issue を出力する | `uv run issue-digest --limit 5 issues.json` |
 | `--summary` | 総件数の次に、分類ごとの件数を1行で出力する | `uv run issue-digest --summary issues.json` |
 | `--show-assignees` | 担当者がいる Issue に `（担当: @alice）` を付ける | `uv run issue-digest --show-assignees issues.json` |
 | `--json` | Markdown の代わりに JSON を出力する | `uv run issue-digest --json issues.json` |
@@ -112,6 +113,21 @@ uv run issue-digest --summary issues.json
 gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --sort updated --stale 7 -
 ```
 
+### `--limit <件数>`
+
+`--limit <件数>` を付けると、各分類で先頭から指定件数だけ Issue を出力します。件数の多い分類があっても、ほかの分類が見づらくならないようにするために使います。
+`--sort` を同時に指定した場合は、並べ替えた後の先頭から数えます。見出しの件数と総件数は全件のままです。
+
+- Markdown: 出力しなかった Issue があれば、その分類の最後に `- ほか N 件` を出します。
+- JSON: 各分類の `issues` を先頭の指定件数だけにします（`count` は全件のまま）。各分類に `omitted`（出力しなかった件数。0 も含む）を加えます。
+- 件数は1以上の整数です。それ以外の値や値がない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
+
+`--limit` を付けない場合の出力は変わりません（`omitted` も出しません）。
+
+```
+uv run issue-digest --limit 5 --sort updated issues.json
+```
+
 ### `--json`
 
 `--json` を付けると、Markdown の代わりに JSON を標準出力に出します。通知のスクリプトなど、ほかのツールから使いたいときに使います。
@@ -172,7 +188,7 @@ uv run issue-digest --version
 
 ### 組み合わせ
 
-- `--hide-empty`、`--only`、`--stale`、`--sort`、`--output` は、どれも同時に使えます。
+- `--hide-empty`、`--only`、`--stale`、`--sort`、`--limit`、`--output` は、どれも同時に使えます。
 - `--json` と同時に指定した場合
   - `--hide-empty`、`--only` は Markdown と同じように効き、出力する分類が変わります。
   - `--stale` を同時に指定すると、印が付く Issue にだけ `stale_days`（経過日数）を加えます。
