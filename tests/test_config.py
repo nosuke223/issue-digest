@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from conftest import DATA, NOW
+from conftest import DATA, NOW, issue_numbers_in_output
 
 from issue_digest import USAGE, main
 
@@ -34,10 +34,22 @@ def test_config_only_and_json(in_tmp_dir, capsys):
     assert [c["label"] for c in data["categories"]] == ["agent:ready"]
 
 
-def test_config_stale_sort_show_assignees(in_tmp_dir, capsys):
-    write_config(in_tmp_dir, 'stale = 0\nsort = "updated"\nshow_assignees = true\n')
+def test_config_stale(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, "stale = 0\n")
     assert main([str(DATA / "stale.json")], now=NOW) == 0
     assert "日更新なし" in capsys.readouterr().out
+
+
+def test_config_sort_orders_oldest_first(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, 'sort = "updated"\n')
+    assert main([str(DATA / "sort.json")]) == 0
+    assert issue_numbers_in_output(capsys.readouterr().out) == [8, 7, 6, 3, 4, 1, 2, 5]
+
+
+def test_config_show_assignees(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, "show_assignees = true\n")
+    assert main([str(DATA / "assignees.json")]) == 0
+    assert "担当者が2人の Issue（担当: @bob, @alice）\n" in capsys.readouterr().out
 
 
 def test_config_option_selects_file(in_tmp_dir, capsys):
