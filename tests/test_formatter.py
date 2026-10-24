@@ -231,6 +231,32 @@ def test_format_json_show_labels_adds_non_agent_labels():
     assert [i["labels"] for i in ready["issues"]] == [["bug"], []]
 
 
+def test_format_digest_keeps_title_of_40_characters():
+    title = "あ" * 40
+    out = format_digest(classify_issues([make_issue(1, title, ["agent:ready"])]))
+    assert f" {title}\n" in out
+
+
+def test_format_digest_shortens_title_over_40_characters():
+    out = format_digest(classify_issues([make_issue(1, "あ" * 41, ["agent:ready"])]))
+    assert f" {'あ' * 40}…\n" in out
+    assert "あ" * 41 not in out
+
+
+def test_format_digest_escapes_after_shortening():
+    # 40文字目までに `*` が入るときだけエスケープされ、切り捨てられた `*` は残らない
+    title = "*" + "a" * 38 + "*" + "*b"
+    out = format_digest(classify_issues([make_issue(1, title, ["agent:ready"])]))
+    assert f" \\*{'a' * 38}\\*…\n" in out
+
+
+def test_format_json_keeps_long_title():
+    title = "あ" * 41
+    body = json.loads(format_json(classify_issues([make_issue(1, title, ["agent:ready"])])))
+    ready = next(c for c in body["categories"] if c["label"] == "agent:ready")
+    assert ready["issues"][0]["title"] == title
+
+
 def test_format_digest_total_zero():
     out = format_digest(classify_issues([]))
     assert out.splitlines()[0] == "# Issue ダイジェスト（全 0 件）"

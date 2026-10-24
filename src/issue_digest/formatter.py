@@ -101,6 +101,16 @@ def _escape_markdown(text: str) -> str:
     return text.translate(_MARKDOWN_SPECIAL)
 
 
+MAX_TITLE_LENGTH = 40
+
+
+def _shorten_title(text: str) -> str:
+    """MAX_TITLE_LENGTH 文字を超えるタイトルを、その長さまでにして末尾に `…` を付ける。"""
+    if len(text) <= MAX_TITLE_LENGTH:
+        return text
+    return text[:MAX_TITLE_LENGTH] + "…"
+
+
 def _assignees_mark(issue: Issue, show_assignees: bool) -> str:
     if not show_assignees or not issue.assignees:
         return ""
@@ -182,6 +192,8 @@ def format_digest(
     show_labels が True のとき、`agent:` で始まらないラベルがある Issue の行末に
     `（ラベル: bug, docs）` を付ける（担当者の印があればその後ろ）。
     title を指定すると、1行目の `Issue ダイジェスト` をその文字列に置き換える。
+    Issue のタイトルが40文字を超えるときは、40文字までにして末尾に `…` を付ける
+    （エスケープは省略した後のタイトルに行う。JSON のタイトルは省略しない）。
     """
     if stale_days is not None and now is None:
         now = datetime.now(UTC)
@@ -204,8 +216,9 @@ def format_digest(
         if issues:
             shown = issues if limit is None else issues[:limit]
             for issue in shown:
+                issue_title = _escape_markdown(_shorten_title(issue.title))
                 lines.append(
-                    f"- [#{issue.number}]({issue.url}) {_escape_markdown(issue.title)}"
+                    f"- [#{issue.number}]({issue.url}) {issue_title}"
                     f"{_stale_mark(issue, stale_days, now)}"
                     f"{_assignees_mark(issue, show_assignees)}"
                     f"{_labels_mark(issue, show_labels)}"
