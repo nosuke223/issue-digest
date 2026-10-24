@@ -6,10 +6,9 @@ from importlib.metadata import version
 from pathlib import Path
 
 import pytest
+from conftest import DATA, NOW, issue_numbers_in_output, json_out
 
 from issue_digest import main
-
-DATA = Path(__file__).parent / "data"
 
 
 def test_main_prints_digest(capsys):
@@ -163,7 +162,7 @@ def test_main_exclude_with_hide_empty_sort_and_stale(capsys):
 
 def test_main_json_exclude_keeps_total(capsys):
     assert main(["--json", "--exclude", "agent:ready", str(DATA / "issues.json")]) == 0
-    data = _json_out(capsys)
+    data = json_out(capsys)
     assert data["total"] == 2
     labels = [c["label"] for c in data["categories"]]
     assert "agent:ready" not in labels
@@ -173,7 +172,7 @@ def test_main_json_exclude_keeps_total(capsys):
 def test_main_json_exclude_with_hide_empty(capsys):
     args = ["--json", "--exclude", "agent:ready", "--hide-empty", str(DATA / "issues.json")]
     assert main(args) == 0
-    data = _json_out(capsys)
+    data = json_out(capsys)
     assert [c["label"] for c in data["categories"]] == ["unclassified"]
 
 
@@ -195,9 +194,6 @@ def test_main_exclude_with_only_is_error(capsys):
 def test_main_exclude_without_value_shows_usage(capsys):
     assert main([str(DATA / "issues.json"), "--exclude"]) == 2
     assert "使い方" in capsys.readouterr().err
-
-
-NOW = datetime(2026, 10, 23, 12, 0, 0, tzinfo=UTC)
 
 
 def test_main_stale_marks_only_old_issues(capsys):
@@ -323,11 +319,6 @@ def test_main_usage_mentions_show_assignees(capsys):
     assert "--show-assignees" in capsys.readouterr().err
 
 
-def issue_numbers_in_output(out: str) -> list[int]:
-    lines = [line for line in out.splitlines() if line.startswith("- [#")]
-    return [int(line.removeprefix("- [#").split("]")[0]) for line in lines]
-
-
 def test_main_sort_updated_orders_oldest_first(capsys):
     assert main(["--sort", "updated", str(DATA / "sort.json")]) == 0
     # レビュー待ち → 着手可能の順。各分類は古い順、同時刻は番号順、updatedAt なしは末尾
@@ -407,7 +398,7 @@ def test_main_without_limit_unchanged(capsys):
 
 def test_main_limit_json(capsys):
     assert main(["--json", "--limit", "2", "--sort", "updated", str(DATA / "sort.json")]) == 0
-    body = _json_out(capsys)
+    body = json_out(capsys)
     by_label = {c["label"]: c for c in body["categories"]}
     ready = by_label["agent:ready"]
     assert [i["number"] for i in ready["issues"]] == [6, 3]
@@ -424,7 +415,7 @@ def test_main_limit_json(capsys):
 
 def test_main_json_without_limit_has_no_omitted(capsys):
     assert main(["--json", str(DATA / "sort.json")]) == 0
-    assert all("omitted" not in c for c in _json_out(capsys)["categories"])
+    assert all("omitted" not in c for c in json_out(capsys)["categories"])
 
 
 @pytest.mark.parametrize("value", ["0", "-1", "abc", "1.5", "", "１"])
@@ -605,10 +596,6 @@ def test_main_version_ignores_other_args(capsys):
     assert captured.err == ""
 
 
-def _json_out(capsys) -> dict:
-    return json.loads(capsys.readouterr().out)
-
-
 def test_main_json_shape(capsys):
     assert main(["--json", str(DATA / "issues.json")]) == 0
     out = capsys.readouterr().out
@@ -644,13 +631,13 @@ def test_main_json_shape(capsys):
 
 def test_main_json_hide_empty(capsys):
     assert main(["--json", "--hide-empty", str(DATA / "issues.json")]) == 0
-    data = _json_out(capsys)
+    data = json_out(capsys)
     assert [c["label"] for c in data["categories"]] == ["agent:ready", "unclassified"]
 
 
 def test_main_json_only_keeps_total(capsys):
     assert main(["--json", "--only", "agent:ready", str(DATA / "issues.json")]) == 0
-    data = _json_out(capsys)
+    data = json_out(capsys)
     assert data["total"] == 2
     assert [c["label"] for c in data["categories"]] == ["agent:ready"]
 
@@ -658,13 +645,13 @@ def test_main_json_only_keeps_total(capsys):
 def test_main_json_only_with_hide_empty(capsys):
     args = ["--json", "--only", "agent:blocked", "--only", "agent:ready", "--hide-empty"]
     assert main([*args, str(DATA / "issues.json")]) == 0
-    data = _json_out(capsys)
+    data = json_out(capsys)
     assert [c["label"] for c in data["categories"]] == ["agent:ready"]
 
 
 def test_main_json_stale_adds_days_only_to_marked(capsys):
     assert main(["--json", "--stale", "7", str(DATA / "stale.json")], now=NOW) == 0
-    data = _json_out(capsys)
+    data = json_out(capsys)
     issues = {i["number"]: i for c in data["categories"] for i in c["issues"]}
     assert issues[1]["stale_days"] == 13
     assert issues[2]["stale_days"] == 7
@@ -675,7 +662,7 @@ def test_main_json_stale_adds_days_only_to_marked(capsys):
 def test_main_json_stale_with_hide_empty_and_only(capsys):
     args = ["--json", "--stale", "7", "--hide-empty", "--only", "agent:ready"]
     assert main([*args, str(DATA / "stale.json")], now=NOW) == 0
-    data = _json_out(capsys)
+    data = json_out(capsys)
     assert data["total"] == 4
     assert [c["label"] for c in data["categories"]] == ["agent:ready"]
     assert data["categories"][0]["issues"][0]["stale_days"] == 13
@@ -683,7 +670,7 @@ def test_main_json_stale_with_hide_empty_and_only(capsys):
 
 def test_main_json_with_sort_orders_oldest_first(capsys):
     assert main(["--json", "--sort", "updated", str(DATA / "sort.json")]) == 0
-    data = _json_out(capsys)
+    data = json_out(capsys)
     numbers = [i["number"] for c in data["categories"] for i in c["issues"]]
     assert numbers == [8, 7, 6, 3, 4, 1, 2, 5]
 
@@ -697,7 +684,7 @@ def test_main_json_reads_stdin(capsys, monkeypatch):
     text = (DATA / "issues.json").read_text(encoding="utf-8")
     monkeypatch.setattr("sys.stdin", io.StringIO(text))
     assert main(["--json", "-"]) == 0
-    assert _json_out(capsys)["total"] == 2
+    assert json_out(capsys)["total"] == 2
 
 
 def test_main_json_ignores_summary(capsys):
