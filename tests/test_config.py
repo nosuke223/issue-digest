@@ -86,10 +86,16 @@ def test_command_line_exclude_replaces_config_only(in_tmp_dir, capsys):
     assert "## 未分類" in out
 
 
-def test_command_line_stale_and_sort_take_precedence(in_tmp_dir, capsys):
-    write_config(in_tmp_dir, 'stale = 1000\nsort = "updated"\n')
+def test_command_line_stale_takes_precedence(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, "stale = 1000\n")
     assert main(["--stale", "0", str(DATA / "stale.json")], now=NOW) == 0
     assert "日更新なし" in capsys.readouterr().out
+
+
+def test_command_line_sort_takes_precedence(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, 'sort = "updated"\n')
+    assert main(["--sort", "created", str(DATA / "sort_created.json")]) == 0
+    assert issue_numbers_in_output(capsys.readouterr().out) == [7, 8, 3, 4, 1, 6, 2, 5]
 
 
 def test_command_line_csv_takes_precedence_over_config_json(in_tmp_dir, capsys):
