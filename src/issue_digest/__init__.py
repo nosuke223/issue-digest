@@ -11,8 +11,8 @@ from issue_digest.loader import InvalidUpdatedAtError, load_issues, parse_issues
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
     " [--stale <日数>]"
-    " [--json | --csv] [--sort updated] [--limit <件数>] [--show-assignees] [--show-labels]"
-    " [--title <文字列>] [--output <パス>] [--diff <前回のJSONのパス>]"
+    " [--json | --csv] [--sort updated|created] [--limit <件数>] [--show-assignees]"
+    " [--show-labels] [--title <文字列>] [--output <パス>] [--diff <前回のJSONのパス>]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
@@ -20,7 +20,8 @@ USAGE = (
     "  --exclude で指定した分類を出力しない（複数回指定できる。--only とは同時に指定できない）\n"
     "  --summary で見出しの次に全分類の件数を1行で出力する\n"
     "  --stale で最終更新から指定日数以上たった Issue に印を付ける\n"
-    "  --sort updated で各分類の中を最終更新の古い順に並べる\n"
+    "  --sort updated で各分類の中を最終更新の古い順に並べる"
+    "（--sort created なら作成日時の古い順）\n"
     "  --limit で各分類の出力を先頭から指定件数までにする（Markdown は最後に「- ほか N 件」、"
     "JSON は各分類に omitted を加える。件数は全件のまま）\n"
     "  --json で Markdown の代わりに JSON を出力する\n"
@@ -107,9 +108,9 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             return 2
         stale_days = int(opts.stale)
     sort: str | None = opts.sort
-    if sort is not None and sort != "updated":
+    if sort is not None and sort not in ("updated", "created"):
         print(
-            f"エラー: --sort に指定できるのは updated だけです: {sort}",
+            f"エラー: --sort に指定できる値は updated か created です: {sort}",
             file=sys.stderr,
         )
         return 2
