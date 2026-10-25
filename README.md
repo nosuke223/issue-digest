@@ -24,6 +24,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--exclude <ラベル>` | 指定したラベルの分類を出力しない（複数回指定できる。`--only` とは同時に使えない） | `uv run issue-digest --exclude unclassified issues.json` |
 | `--stale <日数>` | 最終更新から指定日数以上たった Issue に `（N日更新なし）` を付ける | `uv run issue-digest --stale 7 issues.json` |
 | `--sort updated` | 各分類の中を最終更新の古い順に並べる | `uv run issue-digest --sort updated issues.json` |
+| `--sort created` | 各分類の中を作成日時の古い順に並べる | `uv run issue-digest --sort created issues.json` |
 | `--limit <件数>` | 各分類で、先頭から指定件数だけ Issue を出力する | `uv run issue-digest --limit 5 issues.json` |
 | `--summary` | 総件数の次に、分類ごとの件数を1行で出力する | `uv run issue-digest --summary issues.json` |
 | `--show-assignees` | 担当者がいる Issue に `（担当: @alice）` を付ける | `uv run issue-digest --show-assignees issues.json` |
@@ -141,11 +142,22 @@ uv run issue-digest --summary issues.json
 
 `--sort updated` を付けると、各分類の中の Issue を `updatedAt`（最終更新）の古い順に並べます。止まっている Issue を見つけやすくするために使います。
 `updatedAt` が同じ Issue は番号の小さい順、`updatedAt` がない Issue は分類の末尾に番号の小さい順で並べます。分類の順番は変わりません。
-`--sort` に指定できる値は `updated` だけです。それ以外の値や値がない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
+`--sort` に指定できる値は `updated` と `created` です。それ以外の値や値がない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
 `--sort` を付けない場合の並び順（Issue 番号の小さい順）は変わりません。
 
 ```
 gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --sort updated --stale 7 -
+```
+
+### `--sort created`
+
+`--sort created` を付けると、各分類の中の Issue を `createdAt`（作成日時）の古い順に並べます。古くからある Issue を優先して片付けたいときに使います。
+並べ方の決まりは `--sort updated` と同じです。`createdAt` が同じ Issue は番号の小さい順、`createdAt` がない Issue は分類の末尾に番号の小さい順で並べます。分類の順番は変わりません。
+入力の各 Issue の `createdAt`（ISO 8601 形式。例: `2026-10-20T12:34:56Z`）は省略できます。日時として読めない値のときは、エラーを標準エラーに出して終了コード 1 で終わります。
+`--sort updated` と `--sort` なしの動作は変わりません。`--sort` は1つの値しか指定できないため、`updated` と `created` は同時に使えません。
+
+```
+gh issue list --json number,title,labels,url,createdAt | uv run issue-digest --sort created -
 ```
 
 ### `--limit <件数>`
@@ -304,7 +316,7 @@ uv run issue-digest --version
 - `--json` と同時に指定した場合
   - `--hide-empty`、`--only`、`--exclude` は Markdown と同じように効き、出力する分類が変わります。
   - `--stale` を同時に指定すると、印が付く Issue にだけ `stale_days`（経過日数）を加えます。
-  - `--sort` を同時に指定すると、各分類の `issues` の順が変わります。
+  - `--sort updated` または `--sort created` を同時に指定すると、各分類の `issues` の順が変わります。
   - `--summary` は無視します（JSON には分類ごとの `count` があるため）。
   - `--show-assignees` を同時に指定すると、各 Issue に `"assignees": ["alice", "bob"]`（login の配列。担当者がいなければ空の配列）を加えます。`--show-assignees` を付けない JSON には `assignees` を出しません。
   - `--show-labels` を同時に指定すると、各 Issue に `"labels": ["bug"]`（`agent:` で始まらないラベルの配列。なければ空の配列）を加えます。`--show-labels` を付けない JSON には `labels` を出しません。
