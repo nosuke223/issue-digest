@@ -110,6 +110,38 @@ def test_command_line_sort_updated_takes_precedence_over_config_created(in_tmp_d
     assert issue_numbers_in_output(capsys.readouterr().out) == [8, 7, 6, 3, 4, 1, 2, 5]
 
 
+def test_config_show_labels(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, "show_labels = true\n")
+    assert main([str(DATA / "show_labels.json")]) == 0
+    assert "（ラベル: " in capsys.readouterr().out
+
+
+def test_config_title(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, 'title = "my-repo"\n')
+    assert main([ISSUES]) == 0
+    assert capsys.readouterr().out.startswith("# my-repo（全 ")
+
+
+def test_command_line_title_takes_precedence(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, 'title = "my-repo"\n')
+    assert main(["--title", "other", ISSUES]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("# other（全 ")
+    assert "my-repo" not in out
+
+
+def test_config_limit(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, "limit = 1\n")
+    assert main([str(DATA / "sort.json")]) == 0
+    assert "- ほか " in capsys.readouterr().out
+
+
+def test_command_line_limit_takes_precedence(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, "limit = 1\n")
+    assert main(["--limit", "100", str(DATA / "sort.json")]) == 0
+    assert "- ほか " not in capsys.readouterr().out
+
+
 def test_command_line_csv_takes_precedence_over_config_json(in_tmp_dir, capsys):
     write_config(in_tmp_dir, "json = true\n")
     assert main(["--csv", ISSUES]) == 0
@@ -133,6 +165,14 @@ def test_command_line_csv_takes_precedence_over_config_json(in_tmp_dir, capsys):
         ("stale = 1.5\n", "stale"),
         ('sort = "name"\n', "sort"),
         ("sort = 1\n", "sort"),
+        ('show_labels = "yes"\n', "show_labels"),
+        ("title = 1\n", "title"),
+        ('title = ""\n', "title"),
+        ("limit = 0\n", "limit"),
+        ("limit = -1\n", "limit"),
+        ('limit = "5"\n', "limit"),
+        ("limit = true\n", "limit"),
+        ("limit = 1.5\n", "limit"),
         ('headings = "x"\n', "headings"),
         ('[headings]\n"agent:nothing" = "x"\n', "agent:nothing"),
         ('[headings]\n"agent:review" = 1\n', "agent:review"),
