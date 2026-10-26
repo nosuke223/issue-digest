@@ -23,6 +23,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--only <ラベル>` | 指定したラベルの分類だけを出力する（複数回指定できる） | `uv run issue-digest --only agent:needs-decision issues.json` |
 | `--exclude <ラベル>` | 指定したラベルの分類を出力しない（複数回指定できる。`--only` とは同時に使えない） | `uv run issue-digest --exclude unclassified issues.json` |
 | `--stale <日数>` | 最終更新から指定日数以上たった Issue に `（N日更新なし）` を付ける | `uv run issue-digest --stale 7 issues.json` |
+| `--since <日付>` | 最終更新が指定日（`YYYY-MM-DD`、UTC の0時）以降の Issue だけを出力する | `uv run issue-digest --since 2026-10-01 issues.json` |
 | `--sort updated` | 各分類の中を最終更新の古い順に並べる | `uv run issue-digest --sort updated issues.json` |
 | `--sort created` | 各分類の中を作成日時の古い順に並べる | `uv run issue-digest --sort created issues.json` |
 | `--limit <件数>` | 各分類で、先頭から指定件数だけ Issue を出力する | `uv run issue-digest --limit 5 issues.json` |
@@ -103,6 +104,22 @@ N は経過日数を切り捨てた整数です。`--hide-empty`、`--only` と�
 
 ```
 gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --stale 7 -
+```
+
+### `--since <日付>`
+
+`--since <日付>` を付けると、最終更新（`updatedAt`）が指定日以降の Issue だけを出力します。最近動いた Issue だけを見たいときに使います。
+
+- 日付は `YYYY-MM-DD` の形で、UTC のその日の0時（`T00:00:00Z`）以降を対象にします。0時ちょうどに更新された Issue も出ます。時刻やタイムゾーンは指定できません。
+- `updatedAt` がない Issue は出ません。
+- 絞った後の Issue が、見出しの総件数、分類ごとの件数、`--summary` の対象になります。
+- 日付の形が不正なとき、または `2026-02-30` のようなない日付のときは、エラーを標準エラーに出して終了コード 2 で終わります。
+- Markdown、`--json`、`--csv` のどれでも効きます。設定ファイルには `since` キーはありません。
+
+`--since` を付けない場合の出力は変わりません。
+
+```
+gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --since 2026-10-01 -
 ```
 
 ### `--show-assignees`
@@ -354,7 +371,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 | `summary` | 真偽値 | `--summary` |
 | `only` | 文字列の配列（`--only` と同じ6つのラベル） | `--only` |
 | `stale` | 0以上の整数 | `--stale` |
-| `sort` | `"updated"` | `--sort updated` |
+| `sort` | `"updated"` か `"created"` | `--sort updated` / `--sort created` |
 | `show_assignees` | 真偽値 | `--show-assignees` |
 | `json` | 真偽値 | `--json` |
 | `headings` | テーブル（`[headings]`）。キーは `--only` と同じ6つのラベル、値は1文字以上の文字列 | なし（下の「分類の見出しを変える」を参照） |
@@ -408,8 +425,9 @@ uv run issue-digest --version
 
 ### 組み合わせ
 
-- `--hide-empty`、`--only`、`--stale`、`--sort`、`--limit`、`--title`、`--output`、`--diff` は、どれも同時に使えます（`--csv` との併用は下の項目を参照）。
-- `--diff` の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit` に関係なく全分類の全件で行います。`## 前回からの変化` の節の行には、`--stale`、`--show-assignees`、`--show-labels`、`--age` の印を付けません。
+- `--hide-empty`、`--only`、`--stale`、`--since`、`--sort`、`--limit`、`--title`、`--output`、`--diff` は、どれも同時に使えます（`--csv` との併用は下の項目を参照）。
+- `--since` で絞るのは出力する Issue です。件数（総件数、分類ごとの件数、`--summary`）は絞った後の Issue で数えます。`--json`、`--csv` でも同じです。
+- `--diff` の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since` に関係なく全分類の全件で行います。`## 前回からの変化` の節の行には、`--stale`、`--show-assignees`、`--show-labels`、`--age` の印を付けません。
 - `--exclude` は `--only` 以外と同時に使えます。`--only` と同時に指定するとエラーです。
 - `--json` と同時に指定した場合
   - `--hide-empty`、`--only`、`--exclude` は Markdown と同じように効き、出力する分類が変わります。
@@ -422,7 +440,7 @@ uv run issue-digest --version
   - `--diff` を同時に指定すると、末尾に `diff`（`added`、`removed`、`moved`）を加えます。`--diff` を付けない JSON には `diff` を出しません。
 - `--json` と `--output <パス>` を同時に指定すると、JSON をファイルに書き出します。
 - `--csv` と同時に指定した場合
-  - `--hide-empty`、`--only`、`--exclude`、`--sort`、`--limit`、`--output` は Markdown と同じように効きます（`--limit` は各分類の先頭から指定件数の行にします）。
+  - `--hide-empty`、`--only`、`--exclude`、`--since`、`--sort`、`--limit`、`--output` は Markdown と同じように効きます（`--limit` は各分類の先頭から指定件数の行にします）。
   - `--stale`、`--age`、`--show-assignees`、`--show-labels`、`--summary`、`--title`、`--diff` は、CSV に対応する列や行がないので無視します（エラーにしません。`--diff` の前回の JSON も読みません）。
   - `--json` と同時に指定すると、`エラー: --json と --csv は同時に指定できません` を標準エラーに出して終了コード 2 で終わります。
 - `--stale`、`--show-assignees`、`--show-labels`、`--age` の印が付くときは、`（N日更新なし）（担当: @alice）（ラベル: bug）（作成から12日）` の順です。

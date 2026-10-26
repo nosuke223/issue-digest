@@ -1,6 +1,6 @@
 import argparse
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from importlib.metadata import version
 
 from issue_digest.classifier import CATEGORIES, classify_issues
@@ -11,7 +11,7 @@ from issue_digest.loader import InvalidUpdatedAtError, load_issues, parse_issues
 
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
-    " [--stale <日数>] [--age]"
+    " [--stale <日数>] [--age] [--since <YYYY-MM-DD>]"
     " [--json | --csv] [--sort updated|created] [--limit <件数>] [--show-assignees]"
     " [--show-labels] [--title <文字列>] [--output <パス>] [--diff <前回のJSONのパス>]"
     " [--config <パス>]"
@@ -24,6 +24,8 @@ USAGE = (
     "  --stale で最終更新から指定日数以上たった Issue に印を付ける\n"
     "  --age で作成日時がある Issue の行末に作成からの日数（作成から12日）を付ける"
     "（JSON は各 Issue に age_days を加える。createdAt がなければ null）\n"
+    "  --since で最終更新（updatedAt）が指定日（YYYY-MM-DD、UTC の0時）以降の Issue だけを出す"
+    "（updatedAt がない Issue は出さない。件数も絞った後の数。--diff の比較は全件で行う）\n"
     "  --sort updated で各分類の中を最終更新の古い順に並べる"
     "（--sort created なら作成日時の古い順）\n"
     "  --limit で各分類の出力を先頭から指定件数までにする（Markdown は最後に「- ほか N 件」、"
@@ -47,7 +49,7 @@ USAGE = (
     "次回 issue-digest --diff last.json issues.json\n"
     "  --config で読む設定ファイルを指定する（省略時はカレントディレクトリの .issue-digest.toml。"
     "なければ使わない）。キーは hide_empty、summary、only、stale、sort、show_assignees、json、"
-    "headings で、コマンドラインの指定を優先する"
+    "headings で、コマンドラインの指定を優先する（sort は updated か created）"
     "（only は --only か --exclude を指定したら使わない）\n"
     '    例: hide_empty = true / stale = 7 / only = ["agent:review", "agent:blocked"]\n'
     "    [headings] テーブルで分類の見出しを変えられる"
@@ -81,12 +83,26 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--stale")
     parser.add_argument("--sort")
     parser.add_argument("--limit")
+    parser.add_argument("--since")
     parser.add_argument("--output")
     parser.add_argument("--title")
     parser.add_argument("--diff")
     parser.add_argument("--config")
     parser.add_argument("paths", nargs="*")
     return parser
+
+
+def _parse_since(value: str) -> datetime | None:
+    """YYYY-MM-DD を UTC のその日の0時にする。形が不正またはない日付なら None。"""
+    if not (len(value) == 10 and value.isascii() and value[4] == "-" and value[7] == "-"):
+        return None
+    year, month, day = value[:4], value[5:7], value[8:]
+    if not (year.isdigit() and month.isdigit() and day.isdigit()):
+        return None
+    try:
+        return datetime(int(year), int(month), int(day), tzinfo=UTC)
+    except ValueError:
+        return None
 
 
 def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
@@ -157,6 +173,15 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             )
             return 2
         limit = int(opts.limit)
+    since: datetime | None = None
+    if opts.since is not None:
+        since = _parse_since(opts.since)
+        if since is None:
+            print(
+                f"エラー: --since には YYYY-MM-DD の形の日付を指定してください: {opts.since}",
+                file=sys.stderr,
+            )
+            return 2
     headings: dict[str, str] | None = config.get("headings")
     title: str | None = opts.title
     if title == "":
@@ -205,12 +230,17 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         except (OSError, ValueError, KeyError, TypeError) as e:
             print(f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})", file=sys.stderr)
             return 1
-    classified = classify_issues(issues)
+    all_classified = classify_issues(issues)
+    classified = all_classified
+    if since is not None:
+        classified = classify_issues(
+            [i for i in issues if i.updated_at is not None and i.updated_at >= since]
+        )
     diff: Diff | None = None
     if opts.diff is not None and not as_csv:
         try:
-            # 今回の --only などに関係なく、全分類で比べる
-            diff = compute_diff(load_previous(opts.diff), classified)
+            # 今回の --only や --since などに関係なく、全分類の全件で比べる
+            diff = compute_diff(load_previous(opts.diff), all_classified)
         except FileNotFoundError:
             print(f"エラー: 前回の JSON が見つかりません: {opts.diff}", file=sys.stderr)
             return 1

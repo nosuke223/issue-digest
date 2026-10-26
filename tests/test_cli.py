@@ -930,3 +930,92 @@ def test_main_usage_mentions_age(capsys):
 def test_main_usage_mentions_show_labels(capsys):
     assert main(["--help"]) == 0
     assert "--show-labels" in capsys.readouterr().out
+
+
+SINCE = str(DATA / "since.json")
+
+
+def test_main_since_includes_boundary_and_excludes_older_and_missing(capsys):
+    assert main(["--since", "2026-10-10", SINCE]) == 0
+    out = capsys.readouterr().out
+    # 0時ちょうどの #2 は出る。前日の #1 と updatedAt がない #4 は出ない
+    assert sorted(issue_numbers_in_output(out)) == [2, 3]
+    assert out.startswith("# Issue ダイジェスト（全 2 件）\n")
+    assert "## 着手可能 (agent:ready) - 1件" in out
+    assert "## 作業中 (agent:working) - 0件" in out
+
+
+def test_main_since_next_day_excludes_boundary_issue(capsys):
+    assert main(["--since", "2026-10-11", SINCE]) == 0
+    assert issue_numbers_in_output(capsys.readouterr().out) == [3]
+
+
+def test_main_since_summary_counts_filtered(capsys):
+    assert main(["--since", "2026-10-10", "--summary", SINCE]) == 0
+    assert (
+        "判断待ち 0 / 中断 0 / レビュー待ち 1 / 作業中 0 / 着手可能 1 / 未分類 0\n"
+    ) in capsys.readouterr().out
+
+
+def test_main_since_json(capsys):
+    assert main(["--json", "--since", "2026-10-10", SINCE]) == 0
+    body = json_out(capsys)
+    assert body["total"] == 2
+    numbers = [i["number"] for c in body["categories"] for i in c["issues"]]
+    assert sorted(numbers) == [2, 3]
+
+
+def test_main_since_csv(capsys):
+    assert main(["--csv", "--since", "2026-10-10", SINCE]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert len(lines) == 3
+    assert sorted(line.split(",")[1] for line in lines[1:]) == ["2", "3"]
+
+
+def test_main_without_since_unchanged(capsys):
+    assert main([SINCE]) == 0
+    assert sorted(issue_numbers_in_output(capsys.readouterr().out)) == [1, 2, 3, 4]
+
+
+def test_main_since_with_diff_compares_all_issues(capsys, tmp_path):
+    previous = tmp_path / "previous.json"
+    assert main(["--json", "--output", str(previous), SINCE]) == 0
+    capsys.readouterr()
+    assert main(["--json", "--since", "2026-10-11", "--diff", str(previous), SINCE]) == 0
+    body = json_out(capsys)
+    assert body["total"] == 1
+    assert body["diff"] == {"added": [], "removed": [], "moved": []}
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "2026-02-30",
+        "2026-13-01",
+        "2026/10/10",
+        "20261010",
+        "2026-1-10",
+        "abc",
+        "",
+        "２０２６-10-10",
+    ],
+)
+def test_main_since_invalid_value(capsys, value):
+    assert main(["--since", value, SINCE]) == 2
+    captured = capsys.readouterr()
+    assert (
+        captured.err == f"エラー: --since には YYYY-MM-DD の形の日付を指定してください: {value}\n"
+    )
+    assert captured.out == ""
+
+
+def test_main_since_without_value_shows_usage(capsys):
+    assert main([SINCE, "--since"]) == 2
+    captured = capsys.readouterr()
+    assert "使い方" in captured.err
+    assert captured.out == ""
+
+
+def test_main_usage_mentions_since(capsys):
+    assert main(["--help"]) == 0
+    assert "--since" in capsys.readouterr().out
