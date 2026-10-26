@@ -33,6 +33,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--csv` | Markdown の代わりに CSV を出力する | `uv run issue-digest --csv issues.json` |
 | `--title <文字列>` | 見出しの `Issue ダイジェスト` を指定した文字列に置き換える | `uv run issue-digest --title issue-digest issues.json` |
 | `--output <パス>` | 標準出力ではなく、指定したファイルに書き出す | `uv run issue-digest --output digest.md issues.json` |
+| `--config <パス>` | 読む設定ファイルを指定する（省略時はカレントディレクトリの `.issue-digest.toml`） | `uv run issue-digest --config my.toml issues.json` |
 
 ### 入力
 
@@ -259,6 +260,45 @@ uv run issue-digest --title issue-digest issues.json
 uv run issue-digest --output digest.md issues.json
 ```
 
+### 設定ファイルと `--config <パス>`
+
+毎回同じオプションを指定する手間を省くため、カレントディレクトリの `.issue-digest.toml` をオプションの既定値として読みます。ファイルがなければ、何も読まず今までどおり動きます。
+`--config <パス>` で読むファイルを指定できます（このとき `.issue-digest.toml` は読みません）。指定したファイルがなければ、`エラー: 設定ファイルが見つかりません: <パス>` を標準エラーに出して終了コード 1 で終わります。
+ホームディレクトリなど、ほかの場所の設定ファイルは探しません。
+
+書けるキーは次の7つです。
+
+| キー | 型 | 対応するオプション |
+| --- | --- | --- |
+| `hide_empty` | 真偽値 | `--hide-empty` |
+| `summary` | 真偽値 | `--summary` |
+| `only` | 文字列の配列（`--only` と同じ6つのラベル） | `--only` |
+| `stale` | 0以上の整数 | `--stale` |
+| `sort` | `"updated"` | `--sort updated` |
+| `show_assignees` | 真偽値 | `--show-assignees` |
+| `json` | 真偽値 | `--json` |
+
+`--output`、`--version` など、上に挙げていないオプションは設定できません。
+
+- コマンドラインの指定が設定ファイルより優先されます。`--stale 3` は設定の `stale` を上書きします。
+- 設定の `only` は、コマンドラインで `--only` を1つでも指定したら使いません（`--exclude` を指定したときも、`--only` と同時に使えないため使いません）。
+- 設定の `json = true` は、コマンドラインで `--csv` を指定したら使いません（`--csv` が優先です）。
+- 真偽値のキーは、`false` と書いても何も起きません（コマンドラインで打ち消すオプションはありません）。
+- 知らないキー、型の違う値、TOML として読めない内容は、どのキーかを示すエラーを標準エラーに出して終了コード 2 で終わります。
+
+例（`.issue-digest.toml`）:
+
+```toml
+hide_empty = true
+stale = 7
+only = ["agent:needs-decision", "agent:blocked", "agent:review"]
+```
+
+```
+uv run issue-digest issues.json
+uv run issue-digest --config my.toml --stale 3 issues.json
+```
+
 ### `--version`
 
 `--version` を付けると、`issue-digest 0.1.0` のようにバージョンを1行で出力し、終了コード 0 で終わります。
@@ -287,4 +327,5 @@ uv run issue-digest --version
   - `--json` と同時に指定すると、`エラー: --json と --csv は同時に指定できません` を標準エラーに出して終了コード 2 で終わります。
 - `--stale`、`--show-assignees`、`--show-labels` の印が付くときは、`（N日更新なし）（担当: @alice）（ラベル: bug）` の順です。
 - `--summary` の件数の行は、`--only` や `--hide-empty` に関係なく、常に6つの分類すべての件数を出します。
+- `--config` は、ほかのオプションすべてと同時に使えます。設定ファイルの値は、コマンドラインで同じオプションを指定したときは使いません（詳しくは「設定ファイルと `--config <パス>`」）。
 - `--version` は、ほかのオプションやファイルの指定があっても、バージョンだけを出力します。

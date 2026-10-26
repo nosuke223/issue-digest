@@ -2,10 +2,19 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+
 from issue_digest.loader import Issue
 
 DATA = Path(__file__).parent / "data"
 NOW = datetime(2026, 10, 23, 12, 0, 0, tzinfo=UTC)
+
+
+@pytest.fixture(autouse=True)
+def in_tmp_dir(tmp_path, monkeypatch):
+    """カレントディレクトリを空の一時ディレクトリにして、実際のリポジトリの設定に依存しない。"""
+    monkeypatch.chdir(tmp_path)
+    return tmp_path
 
 
 def make_issue(number: int, title: str | None = None, labels: list[str] | None = None) -> Issue:
