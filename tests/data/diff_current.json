@@ -1,0 +1,26 @@
+[
+  {
+    "number": 1,
+    "title": "変わらない Issue A",
+    "labels": [{"name": "agent:ready"}],
+    "url": "https://github.com/example/repo/issues/1"
+  },
+  {
+    "number": 2,
+    "title": "タイトルだけ変わった Issue B",
+    "labels": [{"name": "bug"}],
+    "url": "https://github.com/example/repo/issues/2"
+  },
+  {
+    "number": 4,
+    "title": "複数の分類の Issue D",
+    "labels": [{"name": "agent:review"}],
+    "url": "https://github.com/example/repo/issues/4"
+  },
+  {
+    "number": 5,
+    "title": "新しい Issue E",
+    "labels": [{"name": "agent:needs-decision"}, {"name": "agent:blocked"}],
+    "url": "https://github.com/example/repo/issues/5"
+  }
+]

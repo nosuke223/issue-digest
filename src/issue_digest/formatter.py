@@ -4,6 +4,7 @@ import json
 from datetime import UTC, datetime, timedelta
 
 from issue_digest.classifier import UNCLASSIFIED
+from issue_digest.diff import Diff, DiffEntry
 from issue_digest.loader import Issue
 
 HEADINGS = {
@@ -53,6 +54,7 @@ def format_json(
     limit: int | None = None,
     show_labels: bool = False,
     title: str | None = None,
+    diff: Diff | None = None,
     headings: dict[str, str] | None = None,
 ) -> str:
     """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
@@ -64,6 +66,9 @@ def format_json(
     出力しなかった件数を `omitted` に入れる。show_labels が True のとき、各 Issue に
     `labels`（`agent:` で始まらないラベルの配列。なければ空の配列）を加える。
     title を指定したとき、JSON の先頭に `title` を加える。
+    diff を指定したとき、末尾に `diff`（`added`、`removed`、`moved` の配列）を加える。
+    `added` と `removed` の各要素は `number`、`title`、`url`、`categories`（今回・前回の分類）、
+    `moved` の各要素は `number`、`title`、`url`、`from`、`to`（前回・今回の分類）。
     headings に書かれた分類は、各分類の `title` をその文字列に置き換える。
     """
     if stale_days is not None and now is None:
@@ -101,7 +106,19 @@ def format_json(
         body["title"] = title
     body["total"] = total
     body["categories"] = categories
+    if diff is not None:
+        body["diff"] = {
+            "added": [_diff_item(e, categories=list(e.after)) for e in diff.added],
+            "removed": [_diff_item(e, categories=list(e.before)) for e in diff.removed],
+            "moved": [
+                _diff_item(e, **{"from": list(e.before), "to": list(e.after)}) for e in diff.moved
+            ],
+        }
     return json.dumps(body, ensure_ascii=False, indent=2) + "\n"
+
+
+def _diff_item(entry: DiffEntry, **extra: object) -> dict[str, object]:
+    return {"number": entry.number, "title": entry.title, "url": entry.url, **extra}
 
 
 def format_csv(
@@ -211,6 +228,7 @@ def format_digest(
     limit: int | None = None,
     show_labels: bool = False,
     title: str | None = None,
+    diff: Diff | None = None,
     headings: dict[str, str] | None = None,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
@@ -234,6 +252,8 @@ def format_digest(
     headings に書かれた分類は、分類の見出しと summary の行の名前をその文字列に置き換える。
     Issue のタイトルが40文字を超えるときは、40文字までにして末尾に `…` を付ける
     （エスケープは省略した後のタイトルに行う。JSON のタイトルは省略しない）。
+    diff を指定すると、末尾に `## 前回からの変化` の節を加える（_diff_lines を参照）。
+    分類が変わった Issue の分類の名前にも headings を使う。
     """
     if stale_days is not None and now is None:
         now = datetime.now(UTC)
@@ -268,4 +288,42 @@ def format_digest(
                 lines.append(f"- ほか {len(issues) - len(shown)} 件")
         else:
             lines.append("なし")
+    if diff is not None:
+        lines += _diff_lines(diff, headings)
     return "\n".join(lines) + "\n"
+
+
+def _diff_lines(diff: Diff, headings: dict[str, str] | None = None) -> list[str]:
+    """`## 前回からの変化` の節の行。変化がなければ「変化なし」だけを出す。
+
+    変化があるときは、新しい Issue、なくなった Issue、分類が変わった Issue の小見出しを
+    すべて出し、0件の小見出しには「なし」を出す。
+    """
+    lines = ["", "## 前回からの変化", ""]
+    if diff.is_empty():
+        return lines + ["変化なし"]
+    sections = [
+        ("新しい Issue", diff.added, False),
+        ("なくなった Issue", diff.removed, False),
+        ("分類が変わった Issue", diff.moved, True),
+    ]
+    for i, (heading, entries, show_move) in enumerate(sections):
+        if i > 0:
+            lines.append("")
+        lines += [f"### {heading} - {len(entries)}件", ""]
+        if not entries:
+            lines.append("なし")
+        for entry in entries:
+            line = (
+                f"- [#{entry.number}]({entry.url}) {_escape_markdown(_shorten_title(entry.title))}"
+            )
+            if show_move:
+                before = _category_names(entry.before, headings)
+                after = _category_names(entry.after, headings)
+                line += f": {before} → {after}"
+            lines.append(line)
+    return lines
+
+
+def _category_names(categories: tuple[str, ...], headings: dict[str, str] | None) -> str:
+    return ", ".join(_heading_of(c, headings) for c in categories)

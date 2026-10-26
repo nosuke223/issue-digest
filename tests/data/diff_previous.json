@@ -1,0 +1,77 @@
+{
+  "title": "前回",
+  "total": 4,
+  "categories": [
+    {
+      "label": "agent:needs-decision",
+      "title": "判断待ち",
+      "count": 0,
+      "issues": []
+    },
+    {
+      "label": "agent:blocked",
+      "title": "中断",
+      "count": 0,
+      "issues": []
+    },
+    {
+      "label": "agent:review",
+      "title": "レビュー待ち",
+      "count": 1,
+      "issues": [
+        {
+          "number": 3,
+          "title": "片付いた Issue *C*",
+          "url": "https://github.com/example/repo/issues/3"
+        }
+      ]
+    },
+    {
+      "label": "agent:working",
+      "title": "作業中",
+      "count": 1,
+      "issues": [
+        {
+          "number": 4,
+          "title": "複数の分類の Issue D",
+          "url": "https://github.com/example/repo/issues/4"
+        }
+      ]
+    },
+    {
+      "label": "agent:ready",
+      "title": "着手可能",
+      "count": 2,
+      "issues": [
+        {
+          "number": 1,
+          "title": "変わらない Issue A",
+          "url": "https://github.com/example/repo/issues/1",
+          "stale_days": 10
+        },
+        {
+          "number": 4,
+          "title": "複数の分類の Issue D",
+          "url": "https://github.com/example/repo/issues/4"
+        }
+      ]
+    },
+    {
+      "label": "unclassified",
+      "title": "未分類",
+      "count": 1,
+      "issues": [
+        {
+          "number": 2,
+          "title": "前回のタイトル B",
+          "url": "https://github.com/example/repo/issues/2"
+        }
+      ]
+    }
+  ],
+  "diff": {
+    "added": [],
+    "removed": [],
+    "moved": []
+  }
+}
