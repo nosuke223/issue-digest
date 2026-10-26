@@ -6,7 +6,12 @@ from importlib.metadata import version
 from issue_digest.classifier import CATEGORIES, classify_issues
 from issue_digest.config import DEFAULT_CONFIG_PATH, ConfigError, load_config
 from issue_digest.diff import Diff, InvalidPreviousError, compute_diff, load_previous
-from issue_digest.formatter import format_csv, format_digest, format_json
+from issue_digest.formatter import (
+    format_csv,
+    format_digest,
+    format_digest_by_assignee,
+    format_json,
+)
 from issue_digest.loader import InvalidUpdatedAtError, load_issues, parse_issues
 
 USAGE = (
@@ -15,7 +20,7 @@ USAGE = (
     " [--json | --csv] [--sort updated|created] [--limit <件数>] [--max-chars <文字数>]"
     " [--show-assignees]"
     " [--show-labels] [--title <文字列>] [--output <パス>] [--diff <前回のJSONのパス>]"
-    " [--config <パス>]"
+    " [--config <パス>] [--group-by assignee]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
@@ -34,7 +39,8 @@ USAGE = (
     "  --max-chars で Markdown の出力全体（末尾の改行を含む）を指定文字数以内にする"
     "（最後の分類から順に末尾の Issue の行を削り、「- ほか N 件」にする。"
     "見出し、件数、--summary の行、--diff の節は削らない。"
-    "収まらなければそのまま出し、標準エラーに警告を出す。--json、--csv とは同時に指定できない）\n"
+    "収まらなければそのまま出し、標準エラーに警告を出す。--json、--csv、--group-by とは"
+    "同時に指定できない）\n"
     "  --json で Markdown の代わりに JSON を出力する\n"
     "  --csv で Markdown の代わりに CSV（見出し行 label,number,title,url）を出力する"
     "（--json とは同時に指定できない。--stale、--age、--show-assignees、--show-labels、--summary、"
@@ -60,6 +66,11 @@ USAGE = (
     '    例: hide_empty = true / stale = 7 / limit = 5 / only = ["agent:review", "agent:blocked"]\n'
     "    [headings] テーブルで分類の見出しを変えられる"
     '（例: [headings] の下に "agent:review" = "確認待ち"）\n'
+    "  --group-by assignee で分類ごとの代わりに担当者ごとの見出し（## @alice - 3件、最後に"
+    "## 担当者なし - N件）で並べ、各 Issue の行末に分類の名前を（作業中, 着手可能）の形で付ける"
+    "（Markdown だけで使える。--json、--csv、--max-chars とは同時に指定できない。"
+    "--sort、--limit は各担当者の中で効く。--summary は担当者ごとの件数を出す。"
+    "--hide-empty は効果がない）\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -95,6 +106,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--title")
     parser.add_argument("--diff")
     parser.add_argument("--config")
+    parser.add_argument("--group-by")
     parser.add_argument("paths", nargs="*")
     return parser
 
@@ -145,8 +157,10 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     hide_empty = opts.hide_empty or config.get("hide_empty", False)
     summary = opts.summary or config.get("summary", False)
     as_csv = opts.csv
-    # 設定の json は、コマンドラインの --csv があれば使わない（--csv を優先する）
-    as_json = opts.json or (config.get("json", False) and not as_csv)
+    group_by: str | None = opts.group_by
+    # 設定の json は、コマンドラインの --csv か --group-by があれば使わない
+    # （コマンドラインを優先する）
+    as_json = opts.json or (config.get("json", False) and not as_csv and group_by is None)
     only: list[str] = opts.only
     exclude: list[str] = opts.exclude
     if not only and not exclude:
@@ -198,6 +212,12 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
+    if group_by is not None and group_by != "assignee":
+        print(
+            f"エラー: --group-by に指定できる値は assignee です: {group_by}",
+            file=sys.stderr,
+        )
+        return 2
     headings: dict[str, str] | None = config.get("headings")
     title: str | None = opts.title if opts.title is not None else config.get("title")
     if title == "":
@@ -210,6 +230,13 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     if as_json and as_csv:
         print("エラー: --json と --csv は同時に指定できません", file=sys.stderr)
         return 2
+    if group_by is not None and (as_json or as_csv):
+        print(
+            f"エラー: --group-by と {'--json' if as_json else '--csv'} は同時に指定できません"
+            "（--group-by は Markdown だけで使えます）",
+            file=sys.stderr,
+        )
+        return 2
     # 設定ファイルの json = true でも JSON を出すので、--json と同じくエラーにする
     if max_chars is not None and (as_json or as_csv):
         print(
@@ -217,6 +244,9 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             "（Markdown だけで使えます）",
             file=sys.stderr,
         )
+        return 2
+    if max_chars is not None and group_by is not None:
+        print("エラー: --max-chars と --group-by は同時に指定できません", file=sys.stderr)
         return 2
     if only and exclude:
         print("エラー: --only と --exclude は同時に指定できません", file=sys.stderr)
@@ -293,6 +323,24 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             stale_days,
             now,
             sort,
+            show_assignees,
+            exclude_filter,
+            limit,
+            show_labels,
+            title,
+            diff,
+            headings,
+            opts.age,
+        )
+    elif group_by == "assignee":
+        # 0件の担当者の見出しは出さないので、--hide-empty は効果がない
+        digest = format_digest_by_assignee(
+            classified,
+            only_filter,
+            stale_days,
+            now,
+            sort,
+            summary,
             show_assignees,
             exclude_filter,
             limit,

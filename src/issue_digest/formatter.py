@@ -348,6 +348,113 @@ def _join_digest(header: list[str], sections: list[_Section], footer: list[str])
     return "\n".join(lines) + "\n"
 
 
+NO_ASSIGNEE = "担当者なし"
+
+
+def _group_by_assignee(
+    classified: dict[str, list[Issue]],
+    only: list[str] | None = None,
+    exclude: list[str] | None = None,
+) -> tuple[list[tuple[str | None, list[Issue]]], dict[int, list[str]]]:
+    """only と exclude で選んだ分類の Issue を、担当者ごとにまとめる。
+
+    1つ目の戻り値は (担当者の login、その担当者の Issue を番号順に並べたもの) の配列。
+    担当者は login の順（大文字と小文字を区別せずに比べる）で、担当者なしの Issue があれば
+    最後に login が None の組を置く。0件の担当者は含まない。
+    2つ目の戻り値は、Issue 番号から、その Issue が入る分類（選んだ分類だけ。見出しの順）への辞書。
+    """
+    categories_of: dict[int, list[str]] = {}
+    issue_of: dict[int, Issue] = {}
+    for category, issues in _selected_categories(classified, False, only, None, exclude):
+        for issue in issues:
+            categories_of.setdefault(issue.number, []).append(category)
+            issue_of[issue.number] = issue
+    by_login: dict[str, list[Issue]] = {}
+    unassigned: list[Issue] = []
+    for number in sorted(issue_of):
+        issue = issue_of[number]
+        if not issue.assignees:
+            unassigned.append(issue)
+        # 同じ担当者が重複して書かれていても、1回だけ数える
+        for login in dict.fromkeys(issue.assignees):
+            by_login.setdefault(login, []).append(issue)
+    groups: list[tuple[str | None, list[Issue]]] = [
+        (login, by_login[login]) for login in sorted(by_login, key=lambda s: (s.lower(), s))
+    ]
+    if unassigned:
+        groups.append((None, unassigned))
+    return groups, categories_of
+
+
+def _assignee_heading(login: str | None) -> str:
+    return NO_ASSIGNEE if login is None else f"@{login}"
+
+
+def format_digest_by_assignee(
+    classified: dict[str, list[Issue]],
+    only: list[str] | None = None,
+    stale_days: int | None = None,
+    now: datetime | None = None,
+    sort: str | None = None,
+    summary: bool = False,
+    show_assignees: bool = False,
+    exclude: list[str] | None = None,
+    limit: int | None = None,
+    show_labels: bool = False,
+    title: str | None = None,
+    diff: Diff | None = None,
+    headings: dict[str, str] | None = None,
+    age: bool = False,
+) -> str:
+    """分類結果を、担当者ごとの見出しで並べた Markdown のダイジェストにする。
+
+    見出しは `## @alice - 3件` の形で、担当者の login の順、最後に `## 担当者なし - N件`。
+    担当者が複数いる Issue は、それぞれの担当者の下に出す。0件の担当者の見出しは出さない。
+    only と exclude は出す Issue を選ぶ（選んだ分類のどれかに入る Issue だけを出す）。
+    各 Issue の行末に、選んだ分類のうちその Issue が入るものの名前を見出しの順に
+    `（作業中, 着手可能）` の形で付け、その後ろに format_digest と同じ印を付ける。
+    sort と limit は各担当者の中で効く。総件数と summary の行は only と exclude に関係なく
+    全件で数える。出す Issue が1件もなければ、見出しの代わりに「なし」を出す。
+    ほかの引数の意味は format_digest と同じ。
+    """
+    if (stale_days is not None or age) and now is None:
+        now = datetime.now(UTC)
+    total = len({issue.number for issues in classified.values() for issue in issues})
+    heading_title = "Issue ダイジェスト" if title is None else title
+    lines = [f"# {heading_title}（全 {total} 件）"]
+    if summary:
+        all_groups, _ = _group_by_assignee(classified)
+        counts = " / ".join(
+            f"{_assignee_heading(login)} {len(issues)}" for login, issues in all_groups
+        )
+        lines += ["", counts or "なし"]
+    groups, categories_of = _group_by_assignee(classified, only, exclude)
+    if not groups:
+        lines += ["", "なし"]
+    for login, issues in groups:
+        lines += ["", f"## {_assignee_heading(login)} - {len(issues)}件", ""]
+        if sort == "updated":
+            issues = _sort_by_date(issues, "updated_at")
+        elif sort == "created":
+            issues = _sort_by_date(issues, "created_at")
+        shown = issues if limit is None else issues[:limit]
+        for issue in shown:
+            issue_title = _escape_markdown(_shorten_title(issue.title))
+            names = _category_names(tuple(categories_of[issue.number]), headings)
+            lines.append(
+                f"- [#{issue.number}]({issue.url}) {issue_title}（{names}）"
+                f"{_stale_mark(issue, stale_days, now)}"
+                f"{_assignees_mark(issue, show_assignees)}"
+                f"{_labels_mark(issue, show_labels)}"
+                f"{_age_mark(issue, age, now)}"
+            )
+        if len(shown) < len(issues):
+            lines.append(f"- ほか {len(issues) - len(shown)} 件")
+    if diff is not None:
+        lines += _diff_lines(diff, headings)
+    return "\n".join(lines) + "\n"
+
+
 def _diff_lines(diff: Diff, headings: dict[str, str] | None = None) -> list[str]:
     """`## 前回からの変化` の節の行。変化がなければ「変化なし」だけを出す。
 

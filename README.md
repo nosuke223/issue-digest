@@ -38,6 +38,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--output <パス>` | 標準出力ではなく、指定したファイルに書き出す | `uv run issue-digest --output digest.md issues.json` |
 | `--diff <前回のJSONのパス>` | 前回の `--json` の出力と比べ、変化した Issue を末尾に出す | `uv run issue-digest --diff last.json issues.json` |
 | `--config <パス>` | 読む設定ファイルを指定する（省略時はカレントディレクトリの `.issue-digest.toml`） | `uv run issue-digest --config my.toml issues.json` |
+| `--group-by assignee` | 分類ごとの代わりに、担当者ごとの見出しで並べる（Markdown だけ） | `uv run issue-digest --group-by assignee issues.json` |
 
 ### 入力
 
@@ -404,7 +405,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 - コマンドラインの指定が設定ファイルより優先されます。`--stale 3` は設定の `stale` を上書きします。
 - 設定の `only` は、コマンドラインで `--only` を1つでも指定したら使いません（`--exclude` を指定したときも、`--only` と同時に使えないため使いません）。
 - 設定の `title` と `limit` も、コマンドラインで `--title`、`--limit` を指定したら使いません。
-- 設定の `json = true` は、コマンドラインで `--csv` を指定したら使いません（`--csv` が優先です）。
+- 設定の `json = true` は、コマンドラインで `--csv` または `--group-by` を指定したら使いません（コマンドラインが優先です）。
 - 真偽値のキーは、`false` と書いても何も起きません（コマンドラインで打ち消すオプションはありません）。
 - 知らないキー、型の違う値、TOML として読めない内容は、どのキーかを示すエラーを標準エラーに出して終了コード 2 で終わります。
 
@@ -440,6 +441,44 @@ unclassified = "その他"
 - 知らないラベルや、1文字以上の文字列でない値は、どのキーかを示すエラーを標準エラーに出して終了コード 2 で終わります。
 - コマンドラインに対応するオプションはありません。`--title` が置き換える1行目の `Issue ダイジェスト` には影響しません。
 
+### `--group-by assignee`
+
+`--group-by assignee` を付けると、分類ごとの見出しの代わりに、担当者ごとの見出しで Issue を並べます。誰が何を抱えているかを見たいときに使います。
+
+- 見出しは `## @alice - 3件` の形です。担当者のログイン名の順（大文字と小文字は区別せずに比べます）に並べ、最後に `## 担当者なし - N件` を出します。
+- 担当者が複数いる Issue は、それぞれの担当者の下に出します。
+- 各担当者の中は Issue 番号の小さい順です。
+- 各 Issue の行末に、その Issue が入る分類の名前を `（着手可能）` の形で付けます。複数の分類に入る Issue は `（作業中, 着手可能）` のように見出しの順にカンマで区切ります。設定ファイルの `[headings]` があれば、その名前を使います。
+- 0件の担当者の見出しは出しません（担当者なしも同じです）。出す Issue が1件もなければ、見出しの代わりに「なし」を出します。
+- `--group-by` に指定できる値は `assignee` だけです。それ以外の値は、エラーを標準エラーに出して終了コード 2 で終わります。`--group-by` の後に値がない場合も終了コード 2 で終わります。
+- Markdown だけで使えます。`--json` または `--csv` と同時に指定すると、エラーを標準エラーに出して終了コード 2 で終わります。設定ファイルの `json = true` は、`--group-by` を指定したら使いません。
+- 担当者は入力の `assignees` から読みます。`assignees` がない入力では、すべて担当者なしになります。
+
+ほかのオプションとの組み合わせは「組み合わせ」の節を見てください。`--group-by` を付けない場合の出力は変わりません。設定ファイルには `group_by` キーはありません。
+
+```
+gh issue list --json number,title,labels,url,assignees | uv run issue-digest --group-by assignee -
+```
+
+出力例:
+
+```
+# Issue ダイジェスト（全 3 件）
+
+## @alice - 2件
+
+- [#1](https://github.com/example/repo/issues/1) 共同の Issue（作業中, 着手可能）
+- [#2](https://github.com/example/repo/issues/2) レビュー中（レビュー待ち）
+
+## @bob - 1件
+
+- [#1](https://github.com/example/repo/issues/1) 共同の Issue（作業中, 着手可能）
+
+## 担当者なし - 1件
+
+- [#3](https://github.com/example/repo/issues/3) 担当者なしで着手可能（着手可能）
+```
+
 ### `--version`
 
 `--version` を付けると、`issue-digest 0.1.0` のようにバージョンを1行で出力し、終了コード 0 で終わります。
@@ -474,5 +513,15 @@ uv run issue-digest --version
 - `--json` または `--csv` と `--max-chars` を同時に指定すると、`エラー: --max-chars は --json、--csv と同時に指定できません（Markdown だけで使えます）` を標準エラーに出して終了コード 2 で終わります。
 - `--stale`、`--show-assignees`、`--show-labels`、`--age` の印が付くときは、`（N日更新なし）（担当: @alice）（ラベル: bug）（作成から12日）` の順です。
 - `--summary` の件数の行は、`--only` や `--hide-empty` に関係なく、常に6つの分類すべての件数を出します。
+- `--group-by assignee` と同時に指定した場合
+  - `--only`、`--exclude`、`--since` は、出す Issue を絞ります。`--only`、`--exclude` では、選んだ分類のどれかに入る Issue だけを出し、行末の分類の名前も選んだ分類だけにします。
+  - 見出しの総件数は、分類ごとのときと同じです（`--since` で絞った後の全件。`--only`、`--exclude` に関係なし）。
+  - `--sort`、`--limit` は各担当者の中で効きます（`--limit` で出さなかった Issue があれば、その担当者の最後に `- ほか N 件`。見出しの件数は全件のまま）。
+  - `--stale`、`--show-assignees`、`--show-labels`、`--age` の印は、分類の名前の後ろに付きます（例: `（作業中, 着手可能）（13日更新なし）（担当: @alice）（ラベル: bug）（作成から12日）`）。
+  - `--summary` は、総件数の次に担当者ごとの件数を1行で出します（例: `@alice 2 / @bob 1 / 担当者なし 1`。順は見出しと同じ）。この行は `--only`、`--exclude` に関係なく、`--since` で絞った後の全件で数えます。出す Issue がなければ「なし」です。
+  - `--hide-empty` は効果がありません（0件の担当者は出さないため）。
+  - `--diff` の `## 前回からの変化` の節は、分類ごとのときと同じです。
+  - `--title`、`--output`、`--config` は分類ごとのときと同じように効きます。
+  - `--json`、`--csv` と同時に指定するとエラーです。
 - `--config` は、ほかのオプションすべてと同時に使えます。設定ファイルの値は、コマンドラインで同じオプションを指定したときは使いません（詳しくは「設定ファイルと `--config <パス>`」）。
 - `--version` は、ほかのオプションやファイルの指定があっても、バージョンだけを出力します。
