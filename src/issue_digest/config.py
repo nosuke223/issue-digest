@@ -46,9 +46,9 @@ def _validate(data: dict[str, Any]) -> dict[str, Any]:
                     f"設定ファイルの stale には0以上の整数を指定してください: {value}"
                 )
         elif key == "sort":
-            if value != "updated":
+            if value not in ("updated", "created"):
                 raise ConfigError(
-                    f'設定ファイルの sort に指定できるのは "updated" だけです: {value}'
+                    f'設定ファイルの sort には "updated" か "created" を指定してください: {value}'
                 )
         elif key == "only":
             if not isinstance(value, list) or not all(isinstance(v, str) for v in value):

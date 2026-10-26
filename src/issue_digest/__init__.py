@@ -45,7 +45,7 @@ USAGE = (
     "次回 issue-digest --diff last.json issues.json\n"
     "  --config で読む設定ファイルを指定する（省略時はカレントディレクトリの .issue-digest.toml。"
     "なければ使わない）。キーは hide_empty、summary、only、stale、sort、show_assignees、json、"
-    "headings で、コマンドラインの指定を優先する"
+    "headings で、コマンドラインの指定を優先する（sort は updated か created）"
     "（only は --only か --exclude を指定したら使わない）\n"
     '    例: hide_empty = true / stale = 7 / only = ["agent:review", "agent:blocked"]\n'
     "    [headings] テーブルで分類の見出しを変えられる"
