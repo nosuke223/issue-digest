@@ -1,6 +1,7 @@
 import csv
 import io
 import json
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from issue_digest.classifier import UNCLASSIFIED
@@ -248,6 +249,7 @@ def format_digest(
     diff: Diff | None = None,
     headings: dict[str, str] | None = None,
     age: bool = False,
+    max_chars: int | None = None,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
@@ -274,43 +276,75 @@ def format_digest(
     分類が変わった Issue の分類の名前にも headings を使う。
     age が True のとき、createdAt がある Issue の行末に `（作成から N 日）` を付ける
     （ラベルの印があればその後ろ）。経過日数は now（省略時は現在時刻）から計算する。
+    max_chars を指定すると、出力全体（末尾の改行を含む。len() で数える）が max_chars 文字を
+    超える間、最後の分類から順に分類の末尾の Issue の行を1行ずつ削り、削った分は
+    `- ほか N 件`（limit で省いた件数と合わせる）にする。見出し、件数、summary の行、diff の節は
+    削らない。すべての Issue の行を削っても収まらないときは、そのまま返す
+    （呼び出し側で長さを確かめる）。
     """
     if (stale_days is not None or age) and now is None:
         now = datetime.now(UTC)
     # 複数の分類に入る Issue を二重に数えないよう、番号で重複を除く
     total = len({issue.number for issues in classified.values() for issue in issues})
     heading_title = "Issue ダイジェスト" if title is None else title
-    lines = [f"# {heading_title}（全 {total} 件）"]
+    header = [f"# {heading_title}（全 {total} 件）"]
     if summary:
         counts = " / ".join(
             f"{_heading_of(category, headings)} {len(issues)}"
             for category, issues in classified.items()
         )
-        lines += ["", counts]
+        header += ["", counts]
+    sections: list[_Section] = []
     for category, issues in _selected_categories(classified, hide_empty, only, sort, exclude):
         category_title = _heading_of(category, headings)
         if category == UNCLASSIFIED:
             heading = f"## {category_title} - {len(issues)}件"
         else:
             heading = f"## {category_title} ({category}) - {len(issues)}件"
-        lines += ["", heading, ""]
-        if issues:
-            shown = issues if limit is None else issues[:limit]
-            for issue in shown:
-                issue_title = _escape_markdown(_shorten_title(issue.title))
-                lines.append(
-                    f"- [#{issue.number}]({issue.url}) {issue_title}"
-                    f"{_stale_mark(issue, stale_days, now)}"
-                    f"{_assignees_mark(issue, show_assignees)}"
-                    f"{_labels_mark(issue, show_labels)}"
-                    f"{_age_mark(issue, age, now)}"
-                )
-            if len(shown) < len(issues):
-                lines.append(f"- ほか {len(issues) - len(shown)} 件")
-        else:
+        shown = issues if limit is None else issues[:limit]
+        rows = []
+        for issue in shown:
+            issue_title = _escape_markdown(_shorten_title(issue.title))
+            rows.append(
+                f"- [#{issue.number}]({issue.url}) {issue_title}"
+                f"{_stale_mark(issue, stale_days, now)}"
+                f"{_assignees_mark(issue, show_assignees)}"
+                f"{_labels_mark(issue, show_labels)}"
+                f"{_age_mark(issue, age, now)}"
+            )
+        sections.append(_Section(heading, rows, len(issues)))
+    footer = _diff_lines(diff, headings) if diff is not None else []
+    digest = _join_digest(header, sections, footer)
+    if max_chars is not None:
+        # 最後の分類から順に、分類の末尾の Issue の行を1行ずつ削る
+        for section in reversed(sections):
+            while section.rows and len(digest) > max_chars:
+                section.rows.pop()
+                digest = _join_digest(header, sections, footer)
+    return digest
+
+
+@dataclass
+class _Section:
+    """Markdown の1つの分類。rows は出力する Issue の行、count は分類の全件数。"""
+
+    heading: str
+    rows: list[str]
+    count: int
+
+
+def _join_digest(header: list[str], sections: list[_Section], footer: list[str]) -> str:
+    """見出し、分類、末尾の節を1つの Markdown にする。出さない Issue は `- ほか N 件` にする。"""
+    lines = list(header)
+    for section in sections:
+        lines += ["", section.heading, ""]
+        if section.count == 0:
             lines.append("なし")
-    if diff is not None:
-        lines += _diff_lines(diff, headings)
+            continue
+        lines += section.rows
+        if len(section.rows) < section.count:
+            lines.append(f"- ほか {section.count - len(section.rows)} 件")
+    lines += footer
     return "\n".join(lines) + "\n"
 
 

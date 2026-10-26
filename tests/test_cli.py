@@ -1019,3 +1019,151 @@ def test_main_since_without_value_shows_usage(capsys):
 def test_main_usage_mentions_since(capsys):
     assert main(["--help"]) == 0
     assert "--since" in capsys.readouterr().out
+
+
+SORT = str(DATA / "sort.json")
+
+
+def _digest(capsys, args: list[str]) -> str:
+    assert main(args, now=NOW) == 0
+    return capsys.readouterr().out
+
+
+def test_main_max_chars_exact_length_keeps_output(capsys):
+    full = _digest(capsys, [SORT])
+    assert main(["--max-chars", str(len(full)), SORT]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == full
+    assert captured.err == ""
+
+
+def test_main_max_chars_trims_last_category_from_end(capsys):
+    full = _digest(capsys, [SORT])
+    assert main(["--max-chars", str(len(full) - 1), SORT]) == 0
+    captured = capsys.readouterr()
+    assert len(captured.out) <= len(full) - 1
+    assert issue_numbers_in_output(captured.out) == [7, 8, 1, 2, 3, 4, 5]
+    assert "- ほか 1 件" in captured.out
+    assert captured.err == ""
+
+
+def test_main_max_chars_result_can_be_exact_length(capsys):
+    # 着手可能を2行まで削った出力は --limit 2 の出力と同じになる
+    expected = _digest(capsys, ["--limit", "2", SORT])
+    assert main(["--max-chars", str(len(expected)), SORT]) == 0
+    assert capsys.readouterr().out == expected
+    assert main(["--max-chars", str(len(expected) - 1), SORT]) == 0
+    out = capsys.readouterr().out
+    assert len(out) <= len(expected) - 1
+    assert issue_numbers_in_output(out) == [7, 8, 1]
+    assert "- ほか 5 件" in out
+
+
+def test_main_max_chars_moves_to_previous_category(capsys):
+    # すべての Issue の行を削った出力に、#7 の行だけを足した長さ
+    base = _digest(capsys, ["--max-chars", "1", SORT])
+    line7 = "- [#7](https://github.com/example/repo/issues/7) 別の分類の新しい Issue\n"
+    max_chars = len(base) + len(line7)
+    assert main(["--max-chars", str(max_chars), SORT]) == 0
+    out = capsys.readouterr().out
+    assert len(out) == max_chars
+    assert issue_numbers_in_output(out) == [7]
+    assert "- ほか 1 件" in out
+    assert "- ほか 6 件" in out
+
+
+def test_main_max_chars_with_limit_merges_omitted_count(capsys):
+    limited = _digest(capsys, ["--limit", "2", SORT])
+    assert main(["--limit", "2", "--max-chars", str(len(limited) - 1), SORT]) == 0
+    out = capsys.readouterr().out
+    assert len(out) <= len(limited) - 1
+    assert issue_numbers_in_output(out) == [7, 8, 1]
+    assert "- ほか 5 件" in out
+    assert out.count("- ほか") == 1
+
+
+def test_main_max_chars_counts_marks(capsys):
+    marked = _digest(capsys, ["--stale", "0", "--show-labels", "--age", SORT])
+    assert (
+        main(
+            ["--stale", "0", "--show-labels", "--age", "--max-chars", str(len(marked)), SORT],
+            now=NOW,
+        )
+        == 0
+    )
+    assert capsys.readouterr().out == marked
+    assert (
+        main(
+            ["--stale", "0", "--show-labels", "--age", "--max-chars", str(len(marked) - 1), SORT],
+            now=NOW,
+        )
+        == 0
+    )
+    out = capsys.readouterr().out
+    assert len(out) <= len(marked) - 1
+    assert issue_numbers_in_output(out) == [7, 8, 1, 2, 3, 4, 5]
+
+
+def test_main_max_chars_cannot_fit_warns_and_keeps_headings(capsys, tmp_path):
+    previous = tmp_path / "previous.json"
+    assert main(["--json", "--output", str(previous), SORT]) == 0
+    assert main(["--summary", "--diff", str(previous), "--max-chars", "1", SORT]) == 0
+    captured = capsys.readouterr()
+    assert issue_numbers_in_output(captured.out) == []
+    assert captured.out.startswith("# Issue ダイジェスト（全 8 件）\n\n判断待ち 0 / ")
+    assert "## 着手可能 (agent:ready) - 6件" in captured.out
+    assert "- ほか 6 件" in captured.out
+    assert "- ほか 2 件" in captured.out
+    assert "## 前回からの変化" in captured.out
+    assert captured.err == (
+        "警告: Issue の行をすべて削っても --max-chars の 1 文字に収まりません"
+        f"（{len(captured.out)} 文字）\n"
+    )
+
+
+def test_main_max_chars_with_output_writes_trimmed(capsys, tmp_path):
+    full = _digest(capsys, [SORT])
+    out_path = tmp_path / "digest.md"
+    assert main(["--max-chars", str(len(full) - 1), "--output", str(out_path), SORT]) == 0
+    assert capsys.readouterr().out == ""
+    text = out_path.read_text(encoding="utf-8")
+    assert len(text) <= len(full) - 1
+    assert "- ほか 1 件" in text
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "abc", "1.5", "", "１"])
+def test_main_max_chars_invalid_value(capsys, value):
+    assert main(["--max-chars", value, SORT]) == 2
+    captured = capsys.readouterr()
+    assert captured.err == f"エラー: --max-chars には1以上の整数を指定してください: {value}\n"
+    assert captured.out == ""
+
+
+def test_main_max_chars_without_value_shows_usage(capsys):
+    assert main([SORT, "--max-chars"]) == 2
+    captured = capsys.readouterr()
+    assert "使い方" in captured.err
+    assert captured.out == ""
+
+
+@pytest.mark.parametrize("flag", ["--json", "--csv"])
+def test_main_max_chars_with_json_or_csv_is_error(capsys, flag):
+    assert main([flag, "--max-chars", "2000", SORT]) == 2
+    captured = capsys.readouterr()
+    assert captured.err == (
+        "エラー: --max-chars は --json、--csv と同時に指定できません（Markdown だけで使えます）\n"
+    )
+    assert captured.out == ""
+
+
+def test_main_max_chars_with_config_json_is_error(capsys, tmp_path):
+    (tmp_path / ".issue-digest.toml").write_text("json = true\n", encoding="utf-8")
+    assert main(["--max-chars", "2000", SORT]) == 2
+    captured = capsys.readouterr()
+    assert "--max-chars" in captured.err
+    assert captured.out == ""
+
+
+def test_main_usage_mentions_max_chars(capsys):
+    assert main(["--help"]) == 0
+    assert "--max-chars" in capsys.readouterr().out
