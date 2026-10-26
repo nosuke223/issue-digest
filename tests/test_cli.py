@@ -1164,6 +1164,13 @@ def test_main_max_chars_with_config_json_is_error(capsys, tmp_path):
     assert captured.out == ""
 
 
+def test_main_max_chars_with_group_by_is_error(capsys):
+    assert main(["--max-chars", "2000", "--group-by", "assignee", SORT]) == 2
+    captured = capsys.readouterr()
+    assert captured.err == "エラー: --max-chars と --group-by は同時に指定できません\n"
+    assert captured.out == ""
+
+
 def test_main_usage_mentions_max_chars(capsys):
     assert main(["--help"]) == 0
     assert "--max-chars" in capsys.readouterr().out
