@@ -379,7 +379,7 @@ uv run issue-digest --config my.toml --stale 3 issues.json
 unclassified = "その他"
 ```
 
-- 書いた分類だけ、Markdown の見出し、`--summary` の行の名前、JSON の各分類の `title` を置き換えます。書かない分類の見出しは変わりません。
+- 書いた分類だけ、Markdown の見出し、`--summary` の行の名前、`--diff` の「分類が変わった Issue」の分類の名前、JSON の各分類の `title` を置き換えます。書かない分類の見出しは変わりません。
   - 例: `## 確認待ち (agent:review) - 2件`、`## その他 - 1件`
 - `(agent:review)` のようなラベルの表示、JSON の `label`、CSV の `label` 列は変わりません。
 - 知らないラベルや、1文字以上の文字列でない値は、どのキーかを示すエラーを標準エラーに出して終了コード 2 で終わります。

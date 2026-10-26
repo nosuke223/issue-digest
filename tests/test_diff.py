@@ -180,6 +180,15 @@ def test_main_diff_compares_all_categories_regardless_of_config(capsys, tmp_path
     assert capsys.readouterr().out.endswith(EXPECTED_MARKDOWN)
 
 
+def test_main_diff_uses_config_headings(capsys, tmp_path):
+    config = tmp_path / "config.toml"
+    config.write_text('[headings]\n"agent:review" = "確認待ち"\n', encoding="utf-8")
+    assert main(["--config", str(config), "--diff", PREVIOUS, CURRENT]) == 0
+    assert capsys.readouterr().out.endswith(
+        f"- [#4]({_url(4)}) 複数の分類の Issue D: 作業中, 着手可能 → 確認待ち\n"
+    )
+
+
 def test_main_without_diff_has_no_diff(capsys):
     assert main(["--json", CURRENT]) == 0
     assert "diff" not in json_out(capsys)
