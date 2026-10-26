@@ -868,6 +868,65 @@ def test_main_json_without_show_labels_has_no_labels(capsys):
     assert '"labels":' not in capsys.readouterr().out
 
 
+def test_main_age(capsys):
+    assert main(["--age", str(DATA / "age.json")], now=NOW) == 0
+    out = capsys.readouterr().out
+    assert "12日前に作られた Issue（作成から12日）\n" in out
+    assert "半日前に作られた Issue（作成から0日）\n" in out
+    assert "11日と23時間前に作られた Issue（作成から11日）\n" in out
+    assert "作成日時がない Issue\n" in out
+
+
+def test_main_age_after_other_marks(capsys):
+    args = [
+        "--age",
+        "--stale",
+        "7",
+        "--show-assignees",
+        "--show-labels",
+        str(DATA / "age.json"),
+    ]
+    assert main(args, now=NOW) == 0
+    out = capsys.readouterr().out
+    assert (
+        "12日前に作られた Issue（13日更新なし）（担当: @alice）（ラベル: docs）（作成から12日）\n"
+        in out
+    )
+
+
+def test_main_without_age_unchanged(capsys):
+    assert main([str(DATA / "age.json")], now=NOW) == 0
+    assert "（作成から" not in capsys.readouterr().out
+
+
+def test_main_json_age(capsys):
+    assert main(["--json", "--age", str(DATA / "age.json")], now=NOW) == 0
+    body = json.loads(capsys.readouterr().out)
+    issues = [i for c in body["categories"] for i in c["issues"]]
+    by_number = {i["number"]: i for i in issues}
+    assert by_number[1]["age_days"] == 12
+    assert by_number[2]["age_days"] == 0
+    assert by_number[3]["age_days"] == 11
+    assert by_number[4]["age_days"] is None
+
+
+def test_main_json_without_age_has_no_age_days(capsys):
+    assert main(["--json", str(DATA / "age.json")], now=NOW) == 0
+    assert "age_days" not in capsys.readouterr().out
+
+
+def test_main_csv_ignores_age(capsys):
+    assert main(["--csv", str(DATA / "age.json")], now=NOW) == 0
+    expected = capsys.readouterr().out
+    assert main(["--csv", "--age", str(DATA / "age.json")], now=NOW) == 0
+    assert capsys.readouterr().out == expected
+
+
+def test_main_usage_mentions_age(capsys):
+    assert main(["--help"]) == 0
+    assert "--age" in capsys.readouterr().out
+
+
 def test_main_usage_mentions_show_labels(capsys):
     assert main(["--help"]) == 0
     assert "--show-labels" in capsys.readouterr().out

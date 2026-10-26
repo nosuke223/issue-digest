@@ -11,7 +11,7 @@ from issue_digest.loader import InvalidUpdatedAtError, load_issues, parse_issues
 
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
-    " [--stale <日数>]"
+    " [--stale <日数>] [--age]"
     " [--json | --csv] [--sort updated|created] [--limit <件数>] [--show-assignees]"
     " [--show-labels] [--title <文字列>] [--output <パス>] [--diff <前回のJSONのパス>]"
     " [--config <パス>]"
@@ -22,13 +22,15 @@ USAGE = (
     "  --exclude で指定した分類を出力しない（複数回指定できる。--only とは同時に指定できない）\n"
     "  --summary で見出しの次に全分類の件数を1行で出力する\n"
     "  --stale で最終更新から指定日数以上たった Issue に印を付ける\n"
+    "  --age で作成日時がある Issue の行末に作成からの日数（作成から12日）を付ける"
+    "（JSON は各 Issue に age_days を加える。createdAt がなければ null）\n"
     "  --sort updated で各分類の中を最終更新の古い順に並べる"
     "（--sort created なら作成日時の古い順）\n"
     "  --limit で各分類の出力を先頭から指定件数までにする（Markdown は最後に「- ほか N 件」、"
     "JSON は各分類に omitted を加える。件数は全件のまま）\n"
     "  --json で Markdown の代わりに JSON を出力する\n"
     "  --csv で Markdown の代わりに CSV（見出し行 label,number,title,url）を出力する"
-    "（--json とは同時に指定できない。--stale、--show-assignees、--show-labels、--summary、"
+    "（--json とは同時に指定できない。--stale、--age、--show-assignees、--show-labels、--summary、"
     "--title は無視する）\n"
     "  --show-assignees で担当者を表示する（Markdown は行末に（担当: @alice）、"
     "JSON は各 Issue に assignees の配列を加える）\n"
@@ -73,6 +75,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--csv", action="store_true")
     parser.add_argument("--show-assignees", action="store_true")
     parser.add_argument("--show-labels", action="store_true")
+    parser.add_argument("--age", action="store_true")
     parser.add_argument("--only", action="append", default=[])
     parser.add_argument("--exclude", action="append", default=[])
     parser.add_argument("--stale")
@@ -87,7 +90,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
-    """now は --stale の経過日数の基準時刻。省略時は現在時刻（テストで固定できる）。"""
+    """now は --stale と --age の経過日数の基準時刻。省略時は現在時刻（テストで固定できる）。"""
     args = sys.argv[1:] if argv is None else argv
     if "--version" in args:
         print(f"issue-digest {version('issue-digest')}")
@@ -224,8 +227,8 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             )
             return 1
     if as_csv:
-        # CSV に列のない --stale、--show-assignees、--show-labels、--summary、--title、--diff は
-        # 無視する
+        # CSV に列のない --stale、--age、--show-assignees、--show-labels、--summary、--title、
+        # --diff は無視する
         digest = format_csv(classified, hide_empty, only_filter, sort, exclude_filter, limit)
     elif as_json:
         # JSON には分類ごとの count があるので、--summary は Markdown のときだけ効く
@@ -243,6 +246,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             title,
             diff,
             headings,
+            opts.age,
         )
     else:
         digest = format_digest(
@@ -260,6 +264,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             title,
             diff,
             headings,
+            opts.age,
         )
     if output is None:
         print(digest, end="")

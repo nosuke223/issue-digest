@@ -1,0 +1,34 @@
+[
+  {
+    "number": 1,
+    "title": "12日前に作られた Issue",
+    "labels": [
+      {"name": "docs", "color": "0075ca"},
+      {"name": "agent:ready", "color": "0e8a16"}
+    ],
+    "url": "https://github.com/example/repo/issues/1",
+    "createdAt": "2026-10-11T12:00:00Z",
+    "updatedAt": "2026-10-10T00:00:00Z",
+    "assignees": [{"login": "alice"}]
+  },
+  {
+    "number": 2,
+    "title": "半日前に作られた Issue",
+    "labels": [{"name": "agent:ready", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/2",
+    "createdAt": "2026-10-23T00:00:00Z"
+  },
+  {
+    "number": 3,
+    "title": "11日と23時間前に作られた Issue",
+    "labels": [{"name": "agent:ready", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/3",
+    "createdAt": "2026-10-11T13:00:00Z"
+  },
+  {
+    "number": 4,
+    "title": "作成日時がない Issue",
+    "labels": [{"name": "agent:ready", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/4"
+  }
+]

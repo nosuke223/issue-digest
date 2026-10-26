@@ -29,6 +29,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--summary` | 総件数の次に、分類ごとの件数を1行で出力する | `uv run issue-digest --summary issues.json` |
 | `--show-assignees` | 担当者がいる Issue に `（担当: @alice）` を付ける | `uv run issue-digest --show-assignees issues.json` |
 | `--show-labels` | `agent:` で始まらないラベルがある Issue に `（ラベル: bug, docs）` を付ける | `uv run issue-digest --show-labels issues.json` |
+| `--age` | 作成日時（`createdAt`）がある Issue に `（作成から12日）` を付ける | `uv run issue-digest --age issues.json` |
 | `--json` | Markdown の代わりに JSON を出力する | `uv run issue-digest --json issues.json` |
 | `--csv` | Markdown の代わりに CSV を出力する | `uv run issue-digest --csv issues.json` |
 | `--title <文字列>` | 見出しの `Issue ダイジェスト` を指定した文字列に置き換える | `uv run issue-digest --title issue-digest issues.json` |
@@ -123,6 +124,16 @@ gh issue list --json number,title,labels,url,assignees | uv run issue-digest --s
 
 ```
 gh issue list --json number,title,labels,url | uv run issue-digest --show-labels -
+```
+
+### `--age`
+
+`--age` を付けると、作成日時（`createdAt`）がある Issue の行の末尾に `（作成から12日）` を付けます。古くから残っている Issue に気づきたいときに使います。
+日数は `--stale` と同じ基準時刻からの経過日数で、1日未満は切り捨てます（作成から1日たっていなければ `（作成から0日）`）。`createdAt` がない Issue には何も付けません。
+`--age` を付けない場合の出力は変わりません。
+
+```
+gh issue list --json number,title,labels,url,createdAt | uv run issue-digest --age -
 ```
 
 ### `--summary`
@@ -398,7 +409,7 @@ uv run issue-digest --version
 ### 組み合わせ
 
 - `--hide-empty`、`--only`、`--stale`、`--sort`、`--limit`、`--title`、`--output`、`--diff` は、どれも同時に使えます（`--csv` との併用は下の項目を参照）。
-- `--diff` の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit` に関係なく全分類の全件で行います。`## 前回からの変化` の節の行には、`--stale`、`--show-assignees`、`--show-labels` の印を付けません。
+- `--diff` の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit` に関係なく全分類の全件で行います。`## 前回からの変化` の節の行には、`--stale`、`--show-assignees`、`--show-labels`、`--age` の印を付けません。
 - `--exclude` は `--only` 以外と同時に使えます。`--only` と同時に指定するとエラーです。
 - `--json` と同時に指定した場合
   - `--hide-empty`、`--only`、`--exclude` は Markdown と同じように効き、出力する分類が変わります。
@@ -407,13 +418,14 @@ uv run issue-digest --version
   - `--summary` は無視します（JSON には分類ごとの `count` があるため）。
   - `--show-assignees` を同時に指定すると、各 Issue に `"assignees": ["alice", "bob"]`（login の配列。担当者がいなければ空の配列）を加えます。`--show-assignees` を付けない JSON には `assignees` を出しません。
   - `--show-labels` を同時に指定すると、各 Issue に `"labels": ["bug"]`（`agent:` で始まらないラベルの配列。なければ空の配列）を加えます。`--show-labels` を付けない JSON には `labels` を出しません。
+  - `--age` を同時に指定すると、各 Issue に `"age_days": 12`（作成からの経過日数の整数。`createdAt` がなければ `null`）を加えます。`--age` を付けない JSON には `age_days` を出しません。
   - `--diff` を同時に指定すると、末尾に `diff`（`added`、`removed`、`moved`）を加えます。`--diff` を付けない JSON には `diff` を出しません。
 - `--json` と `--output <パス>` を同時に指定すると、JSON をファイルに書き出します。
 - `--csv` と同時に指定した場合
   - `--hide-empty`、`--only`、`--exclude`、`--sort`、`--limit`、`--output` は Markdown と同じように効きます（`--limit` は各分類の先頭から指定件数の行にします）。
-  - `--stale`、`--show-assignees`、`--show-labels`、`--summary`、`--title`、`--diff` は、CSV に対応する列や行がないので無視します（エラーにしません。`--diff` の前回の JSON も読みません）。
+  - `--stale`、`--age`、`--show-assignees`、`--show-labels`、`--summary`、`--title`、`--diff` は、CSV に対応する列や行がないので無視します（エラーにしません。`--diff` の前回の JSON も読みません）。
   - `--json` と同時に指定すると、`エラー: --json と --csv は同時に指定できません` を標準エラーに出して終了コード 2 で終わります。
-- `--stale`、`--show-assignees`、`--show-labels` の印が付くときは、`（N日更新なし）（担当: @alice）（ラベル: bug）` の順です。
+- `--stale`、`--show-assignees`、`--show-labels`、`--age` の印が付くときは、`（N日更新なし）（担当: @alice）（ラベル: bug）（作成から12日）` の順です。
 - `--summary` の件数の行は、`--only` や `--hide-empty` に関係なく、常に6つの分類すべての件数を出します。
 - `--config` は、ほかのオプションすべてと同時に使えます。設定ファイルの値は、コマンドラインで同じオプションを指定したときは使いません（詳しくは「設定ファイルと `--config <パス>`」）。
 - `--version` は、ほかのオプションやファイルの指定があっても、バージョンだけを出力します。
