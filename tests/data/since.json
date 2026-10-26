@@ -1,0 +1,29 @@
+[
+  {
+    "number": 1,
+    "title": "前日の23:59:59の Issue",
+    "labels": [{"name": "agent:ready", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/1",
+    "updatedAt": "2026-10-09T23:59:59Z"
+  },
+  {
+    "number": 2,
+    "title": "0時ちょうどの Issue",
+    "labels": [{"name": "agent:ready", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/2",
+    "updatedAt": "2026-10-10T00:00:00Z"
+  },
+  {
+    "number": 3,
+    "title": "新しい Issue",
+    "labels": [{"name": "agent:review", "color": "fbca04"}],
+    "url": "https://github.com/example/repo/issues/3",
+    "updatedAt": "2026-10-20T08:00:00Z"
+  },
+  {
+    "number": 4,
+    "title": "updatedAt がない Issue",
+    "labels": [{"name": "agent:working", "color": "1d76db"}],
+    "url": "https://github.com/example/repo/issues/4"
+  }
+]
