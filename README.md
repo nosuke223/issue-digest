@@ -30,6 +30,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--summary` | 総件数の次に、分類ごとの件数を1行で出力する | `uv run issue-digest --summary issues.json` |
 | `--show-assignees` | 担当者がいる Issue に `（担当: @alice）` を付ける | `uv run issue-digest --show-assignees issues.json` |
 | `--show-labels` | `agent:` で始まらないラベルがある Issue に `（ラベル: bug, docs）` を付ける | `uv run issue-digest --show-labels issues.json` |
+| `--age` | 作成日時（`createdAt`）がある Issue に `（作成から12日）` を付ける | `uv run issue-digest --age issues.json` |
 | `--json` | Markdown の代わりに JSON を出力する | `uv run issue-digest --json issues.json` |
 | `--csv` | Markdown の代わりに CSV を出力する | `uv run issue-digest --csv issues.json` |
 | `--title <文字列>` | 見出しの `Issue ダイジェスト` を指定した文字列に置き換える | `uv run issue-digest --title issue-digest issues.json` |
@@ -141,6 +142,16 @@ gh issue list --json number,title,labels,url,assignees | uv run issue-digest --s
 
 ```
 gh issue list --json number,title,labels,url | uv run issue-digest --show-labels -
+```
+
+### `--age`
+
+`--age` を付けると、作成日時（`createdAt`）がある Issue の行の末尾に `（作成から12日）` を付けます。古くから残っている Issue に気づきたいときに使います。
+日数は `--stale` と同じ基準時刻からの経過日数で、1日未満は切り捨てます（作成から1日たっていなければ `（作成から0日）`）。`createdAt` がない Issue には何も付けません。
+`--age` を付けない場合の出力は変わりません。
+
+```
+gh issue list --json number,title,labels,url,createdAt | uv run issue-digest --age -
 ```
 
 ### `--summary`
@@ -290,7 +301,7 @@ uv run issue-digest --output digest.md issues.json
 どれかに変化があるときは3つの小見出し（`### 新しい Issue - 1件` など）をすべて出し、0件の小見出しには「なし」を出します。各小見出しの中は Issue 番号の小さい順です。
 どれも変化がなければ、節の中に「変化なし」だけを出します。
 
-前回の JSON は、`--only`、`--exclude`、`--hide-empty`、`--limit` を付けず、設定ファイル（`.issue-digest.toml` や `--config`）の `hide_empty`、`only` も使わずに出力したものを前提とします（付けて出力した JSON では、出力されなかった Issue が「なくなった Issue」になります）。
+前回の JSON は、`--only`、`--exclude`、`--hide-empty`、`--limit` を付けず、設定ファイル（`.issue-digest.toml` や `--config`）の `hide_empty`、`only`、`limit` も使わずに出力したものを前提とします（付けて出力した JSON では、出力されなかった Issue が「なくなった Issue」になります）。
 今回の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit` に関係なく、全分類の全件で行います。
 `--title`、`--stale`、`--show-assignees`、`--show-labels`、`--diff` を付けて出力した JSON も、前回の JSON として使えます（増えた項目は読みません）。
 
@@ -353,7 +364,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 `--config <パス>` で読むファイルを指定できます（このとき `.issue-digest.toml` は読みません）。指定したファイルがなければ、`エラー: 設定ファイルが見つかりません: <パス>` を標準エラーに出して終了コード 1 で終わります。
 ホームディレクトリなど、ほかの場所の設定ファイルは探しません。
 
-書けるキーは次の8つです。
+書けるキーは次の11個です。
 
 | キー | 型 | 対応するオプション |
 | --- | --- | --- |
@@ -363,6 +374,9 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 | `stale` | 0以上の整数 | `--stale` |
 | `sort` | `"updated"` か `"created"` | `--sort updated` / `--sort created` |
 | `show_assignees` | 真偽値 | `--show-assignees` |
+| `show_labels` | 真偽値 | `--show-labels` |
+| `title` | 1文字以上の文字列 | `--title` |
+| `limit` | 1以上の整数 | `--limit` |
 | `json` | 真偽値 | `--json` |
 | `headings` | テーブル（`[headings]`）。キーは `--only` と同じ6つのラベル、値は1文字以上の文字列 | なし（下の「分類の見出しを変える」を参照） |
 
@@ -370,6 +384,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 
 - コマンドラインの指定が設定ファイルより優先されます。`--stale 3` は設定の `stale` を上書きします。
 - 設定の `only` は、コマンドラインで `--only` を1つでも指定したら使いません（`--exclude` を指定したときも、`--only` と同時に使えないため使いません）。
+- 設定の `title` と `limit` も、コマンドラインで `--title`、`--limit` を指定したら使いません。
 - 設定の `json = true` は、コマンドラインで `--csv` または `--group-by` を指定したら使いません（コマンドラインが優先です）。
 - 真偽値のキーは、`false` と書いても何も起きません（コマンドラインで打ち消すオプションはありません）。
 - 知らないキー、型の違う値、TOML として読めない内容は、どのキーかを示すエラーを標準エラーに出して終了コード 2 で終わります。
@@ -379,6 +394,9 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 ```toml
 hide_empty = true
 stale = 7
+limit = 5
+title = "issue-digest"
+show_labels = true
 only = ["agent:needs-decision", "agent:blocked", "agent:review"]
 ```
 
@@ -455,7 +473,7 @@ uv run issue-digest --version
 
 - `--hide-empty`、`--only`、`--stale`、`--since`、`--sort`、`--limit`、`--title`、`--output`、`--diff` は、どれも同時に使えます（`--csv` との併用は下の項目を参照）。
 - `--since` で絞るのは出力する Issue です。件数（総件数、分類ごとの件数、`--summary`）は絞った後の Issue で数えます。`--json`、`--csv` でも同じです。
-- `--diff` の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since` に関係なく全分類の全件で行います。`## 前回からの変化` の節の行には、`--stale`、`--show-assignees`、`--show-labels` の印を付けません。
+- `--diff` の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since` に関係なく全分類の全件で行います。`## 前回からの変化` の節の行には、`--stale`、`--show-assignees`、`--show-labels`、`--age` の印を付けません。
 - `--exclude` は `--only` 以外と同時に使えます。`--only` と同時に指定するとエラーです。
 - `--json` と同時に指定した場合
   - `--hide-empty`、`--only`、`--exclude` は Markdown と同じように効き、出力する分類が変わります。
@@ -464,19 +482,20 @@ uv run issue-digest --version
   - `--summary` は無視します（JSON には分類ごとの `count` があるため）。
   - `--show-assignees` を同時に指定すると、各 Issue に `"assignees": ["alice", "bob"]`（login の配列。担当者がいなければ空の配列）を加えます。`--show-assignees` を付けない JSON には `assignees` を出しません。
   - `--show-labels` を同時に指定すると、各 Issue に `"labels": ["bug"]`（`agent:` で始まらないラベルの配列。なければ空の配列）を加えます。`--show-labels` を付けない JSON には `labels` を出しません。
+  - `--age` を同時に指定すると、各 Issue に `"age_days": 12`（作成からの経過日数の整数。`createdAt` がなければ `null`）を加えます。`--age` を付けない JSON には `age_days` を出しません。
   - `--diff` を同時に指定すると、末尾に `diff`（`added`、`removed`、`moved`）を加えます。`--diff` を付けない JSON には `diff` を出しません。
 - `--json` と `--output <パス>` を同時に指定すると、JSON をファイルに書き出します。
 - `--csv` と同時に指定した場合
   - `--hide-empty`、`--only`、`--exclude`、`--since`、`--sort`、`--limit`、`--output` は Markdown と同じように効きます（`--limit` は各分類の先頭から指定件数の行にします）。
-  - `--stale`、`--show-assignees`、`--show-labels`、`--summary`、`--title`、`--diff` は、CSV に対応する列や行がないので無視します（エラーにしません。`--diff` の前回の JSON も読みません）。
+  - `--stale`、`--age`、`--show-assignees`、`--show-labels`、`--summary`、`--title`、`--diff` は、CSV に対応する列や行がないので無視します（エラーにしません。`--diff` の前回の JSON も読みません）。
   - `--json` と同時に指定すると、`エラー: --json と --csv は同時に指定できません` を標準エラーに出して終了コード 2 で終わります。
-- `--stale`、`--show-assignees`、`--show-labels` の印が付くときは、`（N日更新なし）（担当: @alice）（ラベル: bug）` の順です。
+- `--stale`、`--show-assignees`、`--show-labels`、`--age` の印が付くときは、`（N日更新なし）（担当: @alice）（ラベル: bug）（作成から12日）` の順です。
 - `--summary` の件数の行は、`--only` や `--hide-empty` に関係なく、常に6つの分類すべての件数を出します。
 - `--group-by assignee` と同時に指定した場合
   - `--only`、`--exclude`、`--since` は、出す Issue を絞ります。`--only`、`--exclude` では、選んだ分類のどれかに入る Issue だけを出し、行末の分類の名前も選んだ分類だけにします。
   - 見出しの総件数は、分類ごとのときと同じです（`--since` で絞った後の全件。`--only`、`--exclude` に関係なし）。
   - `--sort`、`--limit` は各担当者の中で効きます（`--limit` で出さなかった Issue があれば、その担当者の最後に `- ほか N 件`。見出しの件数は全件のまま）。
-  - `--stale`、`--show-assignees`、`--show-labels` の印は、分類の名前の後ろに付きます（例: `（作業中, 着手可能）（13日更新なし）（担当: @alice）（ラベル: bug）`）。
+  - `--stale`、`--show-assignees`、`--show-labels`、`--age` の印は、分類の名前の後ろに付きます（例: `（作業中, 着手可能）（13日更新なし）（担当: @alice）（ラベル: bug）（作成から12日）`）。
   - `--summary` は、総件数の次に担当者ごとの件数を1行で出します（例: `@alice 2 / @bob 1 / 担当者なし 1`。順は見出しと同じ）。この行は `--only`、`--exclude` に関係なく、`--since` で絞った後の全件で数えます。出す Issue がなければ「なし」です。
   - `--hide-empty` は効果がありません（0件の担当者は出さないため）。
   - `--diff` の `## 前回からの変化` の節は、分類ごとのときと同じです。
