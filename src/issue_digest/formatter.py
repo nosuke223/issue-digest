@@ -370,6 +370,7 @@ def format_digest_by_assignee(
     title: str | None = None,
     diff: Diff | None = None,
     headings: dict[str, str] | None = None,
+    age: bool = False,
 ) -> str:
     """分類結果を、担当者ごとの見出しで並べた Markdown のダイジェストにする。
 
@@ -382,7 +383,7 @@ def format_digest_by_assignee(
     全件で数える。出す Issue が1件もなければ、見出しの代わりに「なし」を出す。
     ほかの引数の意味は format_digest と同じ。
     """
-    if stale_days is not None and now is None:
+    if (stale_days is not None or age) and now is None:
         now = datetime.now(UTC)
     total = len({issue.number for issues in classified.values() for issue in issues})
     heading_title = "Issue ダイジェスト" if title is None else title
@@ -411,6 +412,7 @@ def format_digest_by_assignee(
                 f"{_stale_mark(issue, stale_days, now)}"
                 f"{_assignees_mark(issue, show_assignees)}"
                 f"{_labels_mark(issue, show_labels)}"
+                f"{_age_mark(issue, age, now)}"
             )
         if len(shown) < len(issues):
             lines.append(f"- ほか {len(issues) - len(shown)} 件")

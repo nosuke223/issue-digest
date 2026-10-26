@@ -151,6 +151,19 @@ def test_group_by_assignee_marks_follow_category_names(capsys):
     assert sections["## 担当者なし - 2件"][1] == f"- [#6]({URL}/6) 担当者なしの判断待ち（判断待ち）"
 
 
+def test_group_by_assignee_age_follows_other_marks(capsys):
+    args = ["--group-by", "assignee", "--age", "--stale", "7", "--show-labels"]
+    assert main([*args, str(DATA / "age.json")], now=NOW) == 0
+    out = capsys.readouterr().out
+    assert (
+        "12日前に作られた Issue（着手可能）（13日更新なし）（ラベル: docs）（作成から12日）\n"
+        in out
+    )
+    assert "半日前に作られた Issue（着手可能）（作成から0日）\n" in out
+    # createdAt がない Issue には付かない
+    assert "作成日時がない Issue（着手可能）\n" in out
+
+
 def test_group_by_assignee_summary(capsys):
     assert main(["--group-by", "assignee", "--summary", GROUP_BY]) == 0
     out = capsys.readouterr().out

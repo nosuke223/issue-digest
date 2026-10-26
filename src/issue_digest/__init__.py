@@ -321,6 +321,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             title,
             diff,
             headings,
+            opts.age,
         )
     else:
         digest = format_digest(
