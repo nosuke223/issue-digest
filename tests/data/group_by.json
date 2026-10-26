@@ -1,0 +1,51 @@
+[
+  {
+    "number": 1,
+    "title": "共同の Issue",
+    "labels": [{"name": "agent:working"}, {"name": "agent:ready"}, {"name": "bug"}],
+    "url": "https://github.com/example/repo/issues/1",
+    "updatedAt": "2026-10-01T00:00:00Z",
+    "createdAt": "2026-09-01T00:00:00Z",
+    "assignees": [{"login": "bob"}, {"login": "alice"}]
+  },
+  {
+    "number": 2,
+    "title": "レビュー中",
+    "labels": [{"name": "agent:review"}],
+    "url": "https://github.com/example/repo/issues/2",
+    "updatedAt": "2026-10-20T00:00:00Z",
+    "createdAt": "2026-08-01T00:00:00Z",
+    "assignees": [{"login": "alice"}]
+  },
+  {
+    "number": 3,
+    "title": "担当者なしで着手可能",
+    "labels": [{"name": "agent:ready"}],
+    "url": "https://github.com/example/repo/issues/3",
+    "updatedAt": "2026-10-15T00:00:00Z",
+    "assignees": []
+  },
+  {
+    "number": 4,
+    "title": "未分類の Issue",
+    "labels": [],
+    "url": "https://github.com/example/repo/issues/4",
+    "updatedAt": "2026-10-22T00:00:00Z",
+    "assignees": [{"login": "Carol"}]
+  },
+  {
+    "number": 5,
+    "title": "判断待ち",
+    "labels": [{"name": "agent:needs-decision"}],
+    "url": "https://github.com/example/repo/issues/5",
+    "updatedAt": "2026-10-05T00:00:00Z",
+    "createdAt": "2026-10-01T00:00:00Z",
+    "assignees": [{"login": "alice"}]
+  },
+  {
+    "number": 6,
+    "title": "担当者なしの判断待ち",
+    "labels": [{"name": "agent:needs-decision"}],
+    "url": "https://github.com/example/repo/issues/6"
+  }
+]
