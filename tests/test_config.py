@@ -46,6 +46,12 @@ def test_config_sort_orders_oldest_first(in_tmp_dir, capsys):
     assert issue_numbers_in_output(capsys.readouterr().out) == [8, 7, 6, 3, 4, 1, 2, 5]
 
 
+def test_config_sort_created_orders_oldest_first(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, 'sort = "created"\n')
+    assert main([str(DATA / "sort_created.json")]) == 0
+    assert issue_numbers_in_output(capsys.readouterr().out) == [7, 8, 3, 4, 1, 6, 2, 5]
+
+
 def test_config_show_assignees(in_tmp_dir, capsys):
     write_config(in_tmp_dir, "show_assignees = true\n")
     assert main([str(DATA / "assignees.json")]) == 0
@@ -98,6 +104,12 @@ def test_command_line_sort_takes_precedence(in_tmp_dir, capsys):
     assert issue_numbers_in_output(capsys.readouterr().out) == [7, 8, 3, 4, 1, 6, 2, 5]
 
 
+def test_command_line_sort_updated_takes_precedence_over_config_created(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, 'sort = "created"\n')
+    assert main(["--sort", "updated", str(DATA / "sort.json")]) == 0
+    assert issue_numbers_in_output(capsys.readouterr().out) == [8, 7, 6, 3, 4, 1, 2, 5]
+
+
 def test_command_line_csv_takes_precedence_over_config_json(in_tmp_dir, capsys):
     write_config(in_tmp_dir, "json = true\n")
     assert main(["--csv", ISSUES]) == 0
@@ -119,7 +131,8 @@ def test_command_line_csv_takes_precedence_over_config_json(in_tmp_dir, capsys):
         ('stale = "7"\n', "stale"),
         ("stale = true\n", "stale"),
         ("stale = 1.5\n", "stale"),
-        ('sort = "created"\n', "sort"),
+        ('sort = "name"\n', "sort"),
+        ("sort = 1\n", "sort"),
         ('headings = "x"\n', "headings"),
         ('[headings]\n"agent:nothing" = "x"\n', "agent:nothing"),
         ('[headings]\n"agent:review" = 1\n', "agent:review"),

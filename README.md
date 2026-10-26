@@ -343,7 +343,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 | `summary` | 真偽値 | `--summary` |
 | `only` | 文字列の配列（`--only` と同じ6つのラベル） | `--only` |
 | `stale` | 0以上の整数 | `--stale` |
-| `sort` | `"updated"` | `--sort updated` |
+| `sort` | `"updated"` か `"created"` | `--sort updated` / `--sort created` |
 | `show_assignees` | 真偽値 | `--show-assignees` |
 | `json` | 真偽値 | `--json` |
 | `headings` | テーブル（`[headings]`）。キーは `--only` と同じ6つのラベル、値は1文字以上の文字列 | なし（下の「分類の見出しを変える」を参照） |
