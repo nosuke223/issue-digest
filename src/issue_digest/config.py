@@ -6,8 +6,8 @@ from issue_digest.classifier import CATEGORIES
 
 DEFAULT_CONFIG_PATH = ".issue-digest.toml"
 
-_BOOL_KEYS = ("hide_empty", "summary", "show_assignees", "json")
-_KEYS = (*_BOOL_KEYS, "only", "stale", "sort", "headings")
+_BOOL_KEYS = ("hide_empty", "summary", "show_assignees", "json", "show_labels")
+_KEYS = (*_BOOL_KEYS, "only", "stale", "sort", "headings", "title", "limit")
 
 
 class ConfigError(Exception):
@@ -45,6 +45,14 @@ def _validate(data: dict[str, Any]) -> dict[str, Any]:
                 raise ConfigError(
                     f"設定ファイルの stale には0以上の整数を指定してください: {value}"
                 )
+        elif key == "limit":
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise ConfigError(
+                    f"設定ファイルの limit には1以上の整数を指定してください: {value}"
+                )
+        elif key == "title":
+            if not isinstance(value, str) or value == "":
+                raise ConfigError("設定ファイルの title には1文字以上の文字列を指定してください")
         elif key == "sort":
             if value not in ("updated", "created"):
                 raise ConfigError(

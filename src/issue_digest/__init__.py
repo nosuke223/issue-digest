@@ -44,14 +44,15 @@ USAGE = (
     "  --diff で前回の --json の出力と比べ、新しい Issue、なくなった Issue、分類が変わった Issue を"
     "出す（Markdown は末尾に「## 前回からの変化」、JSON は diff を加える。--csv では無視する。"
     "前回の JSON は --only、--exclude、--hide-empty、--limit を付けず、"
-    "設定ファイルの hide_empty、only も使わずに出力したもの）\n"
+    "設定ファイルの hide_empty、only、limit も使わずに出力したもの）\n"
     "    例: issue-digest --json --output last.json issues.json で保存し、"
     "次回 issue-digest --diff last.json issues.json\n"
     "  --config で読む設定ファイルを指定する（省略時はカレントディレクトリの .issue-digest.toml。"
-    "なければ使わない）。キーは hide_empty、summary、only、stale、sort、show_assignees、json、"
-    "headings で、コマンドラインの指定を優先する（sort は updated か created）"
+    "なければ使わない）。キーは hide_empty、summary、only、stale、sort、show_assignees、"
+    "show_labels、title、limit、json、headings で、コマンドラインの指定を優先する"
+    "（sort は updated か created、limit は1以上の整数、title は1文字以上の文字列）"
     "（only は --only か --exclude を指定したら使わない）\n"
-    '    例: hide_empty = true / stale = 7 / only = ["agent:review", "agent:blocked"]\n'
+    '    例: hide_empty = true / stale = 7 / limit = 5 / only = ["agent:review", "agent:blocked"]\n'
     "    [headings] テーブルで分類の見出しを変えられる"
     '（例: [headings] の下に "agent:review" = "確認待ち"）\n'
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
@@ -146,7 +147,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         # コマンドラインで --only も --exclude も指定しないときだけ、設定の only を使う
         only = config.get("only", [])
     show_assignees = opts.show_assignees or config.get("show_assignees", False)
-    show_labels = opts.show_labels
+    show_labels = opts.show_labels or config.get("show_labels", False)
     output: str | None = opts.output
     stale_days: int | None = config.get("stale")
     if opts.stale is not None:
@@ -164,7 +165,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             file=sys.stderr,
         )
         return 2
-    limit: int | None = None
+    limit: int | None = config.get("limit")
     if opts.limit is not None:
         if not (opts.limit.isascii() and opts.limit.isdigit()) or int(opts.limit) < 1:
             print(
@@ -183,7 +184,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             )
             return 2
     headings: dict[str, str] | None = config.get("headings")
-    title: str | None = opts.title
+    title: str | None = opts.title if opts.title is not None else config.get("title")
     if title == "":
         print("エラー: --title には1文字以上を指定してください", file=sys.stderr)
         return 2

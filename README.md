@@ -300,7 +300,7 @@ uv run issue-digest --output digest.md issues.json
 どれかに変化があるときは3つの小見出し（`### 新しい Issue - 1件` など）をすべて出し、0件の小見出しには「なし」を出します。各小見出しの中は Issue 番号の小さい順です。
 どれも変化がなければ、節の中に「変化なし」だけを出します。
 
-前回の JSON は、`--only`、`--exclude`、`--hide-empty`、`--limit` を付けず、設定ファイル（`.issue-digest.toml` や `--config`）の `hide_empty`、`only` も使わずに出力したものを前提とします（付けて出力した JSON では、出力されなかった Issue が「なくなった Issue」になります）。
+前回の JSON は、`--only`、`--exclude`、`--hide-empty`、`--limit` を付けず、設定ファイル（`.issue-digest.toml` や `--config`）の `hide_empty`、`only`、`limit` も使わずに出力したものを前提とします（付けて出力した JSON では、出力されなかった Issue が「なくなった Issue」になります）。
 今回の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit` に関係なく、全分類の全件で行います。
 `--title`、`--stale`、`--show-assignees`、`--show-labels`、`--diff` を付けて出力した JSON も、前回の JSON として使えます（増えた項目は読みません）。
 
@@ -363,7 +363,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 `--config <パス>` で読むファイルを指定できます（このとき `.issue-digest.toml` は読みません）。指定したファイルがなければ、`エラー: 設定ファイルが見つかりません: <パス>` を標準エラーに出して終了コード 1 で終わります。
 ホームディレクトリなど、ほかの場所の設定ファイルは探しません。
 
-書けるキーは次の8つです。
+書けるキーは次の11個です。
 
 | キー | 型 | 対応するオプション |
 | --- | --- | --- |
@@ -373,6 +373,9 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 | `stale` | 0以上の整数 | `--stale` |
 | `sort` | `"updated"` か `"created"` | `--sort updated` / `--sort created` |
 | `show_assignees` | 真偽値 | `--show-assignees` |
+| `show_labels` | 真偽値 | `--show-labels` |
+| `title` | 1文字以上の文字列 | `--title` |
+| `limit` | 1以上の整数 | `--limit` |
 | `json` | 真偽値 | `--json` |
 | `headings` | テーブル（`[headings]`）。キーは `--only` と同じ6つのラベル、値は1文字以上の文字列 | なし（下の「分類の見出しを変える」を参照） |
 
@@ -380,6 +383,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 
 - コマンドラインの指定が設定ファイルより優先されます。`--stale 3` は設定の `stale` を上書きします。
 - 設定の `only` は、コマンドラインで `--only` を1つでも指定したら使いません（`--exclude` を指定したときも、`--only` と同時に使えないため使いません）。
+- 設定の `title` と `limit` も、コマンドラインで `--title`、`--limit` を指定したら使いません。
 - 設定の `json = true` は、コマンドラインで `--csv` を指定したら使いません（`--csv` が優先です）。
 - 真偽値のキーは、`false` と書いても何も起きません（コマンドラインで打ち消すオプションはありません）。
 - 知らないキー、型の違う値、TOML として読めない内容は、どのキーかを示すエラーを標準エラーに出して終了コード 2 で終わります。
@@ -389,6 +393,9 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 ```toml
 hide_empty = true
 stale = 7
+limit = 5
+title = "issue-digest"
+show_labels = true
 only = ["agent:needs-decision", "agent:blocked", "agent:review"]
 ```
 
