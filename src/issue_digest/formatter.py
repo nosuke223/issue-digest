@@ -42,6 +42,18 @@ def _stale_mark(issue: Issue, stale_days: int | None, now: datetime | None) -> s
     return "" if days is None else f"（{days}日更新なし）"
 
 
+def _age_days_of(issue: Issue, now: datetime | None) -> int | None:
+    """作成からの経過日数を返す。createdAt がないときは None。"""
+    if now is None or issue.created_at is None:
+        return None
+    return _elapsed_days(now - issue.created_at)
+
+
+def _age_mark(issue: Issue, age: bool, now: datetime | None) -> str:
+    days = _age_days_of(issue, now) if age else None
+    return "" if days is None else f"（作成から{days}日）"
+
+
 def format_json(
     classified: dict[str, list[Issue]],
     hide_empty: bool = False,
@@ -56,6 +68,7 @@ def format_json(
     title: str | None = None,
     diff: Diff | None = None,
     headings: dict[str, str] | None = None,
+    age: bool = False,
 ) -> str:
     """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
 
@@ -70,8 +83,10 @@ def format_json(
     `added` と `removed` の各要素は `number`、`title`、`url`、`categories`（今回・前回の分類）、
     `moved` の各要素は `number`、`title`、`url`、`from`、`to`（前回・今回の分類）。
     headings に書かれた分類は、各分類の `title` をその文字列に置き換える。
+    age が True のとき、各 Issue に `age_days`（作成からの経過日数。createdAt がなければ null）
+    を加える。
     """
-    if stale_days is not None and now is None:
+    if (stale_days is not None or age) and now is None:
         now = datetime.now(UTC)
     total = len({issue.number for issues in classified.values() for issue in issues})
     categories = []
@@ -91,6 +106,8 @@ def format_json(
                 item["assignees"] = list(issue.assignees)
             if show_labels:
                 item["labels"] = _other_labels(issue)
+            if age:
+                item["age_days"] = _age_days_of(issue, now)
             items.append(item)
         entry: dict[str, object] = {
             "label": category,
@@ -230,6 +247,7 @@ def format_digest(
     title: str | None = None,
     diff: Diff | None = None,
     headings: dict[str, str] | None = None,
+    age: bool = False,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
@@ -254,8 +272,10 @@ def format_digest(
     （エスケープは省略した後のタイトルに行う。JSON のタイトルは省略しない）。
     diff を指定すると、末尾に `## 前回からの変化` の節を加える（_diff_lines を参照）。
     分類が変わった Issue の分類の名前にも headings を使う。
+    age が True のとき、createdAt がある Issue の行末に `（作成から N 日）` を付ける
+    （ラベルの印があればその後ろ）。経過日数は now（省略時は現在時刻）から計算する。
     """
-    if stale_days is not None and now is None:
+    if (stale_days is not None or age) and now is None:
         now = datetime.now(UTC)
     # 複数の分類に入る Issue を二重に数えないよう、番号で重複を除く
     total = len({issue.number for issues in classified.values() for issue in issues})
@@ -283,6 +303,7 @@ def format_digest(
                     f"{_stale_mark(issue, stale_days, now)}"
                     f"{_assignees_mark(issue, show_assignees)}"
                     f"{_labels_mark(issue, show_labels)}"
+                    f"{_age_mark(issue, age, now)}"
                 )
             if len(shown) < len(issues):
                 lines.append(f"- ほか {len(issues) - len(shown)} 件")
