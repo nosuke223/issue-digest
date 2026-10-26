@@ -173,6 +173,13 @@ def test_main_diff_compares_all_categories_regardless_of_only(capsys):
     assert capsys.readouterr().out.endswith(EXPECTED_MARKDOWN)
 
 
+def test_main_diff_compares_all_categories_regardless_of_config(capsys, tmp_path):
+    config = tmp_path / "config.toml"
+    config.write_text('hide_empty = true\nonly = ["agent:ready"]\n', encoding="utf-8")
+    assert main(["--config", str(config), "--diff", PREVIOUS, CURRENT]) == 0
+    assert capsys.readouterr().out.endswith(EXPECTED_MARKDOWN)
+
+
 def test_main_without_diff_has_no_diff(capsys):
     assert main(["--json", CURRENT]) == 0
     assert "diff" not in json_out(capsys)
