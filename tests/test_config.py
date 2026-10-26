@@ -120,6 +120,11 @@ def test_command_line_csv_takes_precedence_over_config_json(in_tmp_dir, capsys):
         ("stale = true\n", "stale"),
         ("stale = 1.5\n", "stale"),
         ('sort = "created"\n', "sort"),
+        ('headings = "x"\n', "headings"),
+        ('[headings]\n"agent:nothing" = "x"\n', "agent:nothing"),
+        ('[headings]\n"agent:review" = 1\n', "agent:review"),
+        ('[headings]\n"agent:review" = ""\n', "agent:review"),
+        ('[headings]\nunclassified = ["x"]\n', "unclassified"),
     ],
 )
 def test_invalid_config_exits_2_with_key(in_tmp_dir, capsys, text, key):
@@ -128,6 +133,32 @@ def test_invalid_config_exits_2_with_key(in_tmp_dir, capsys, text, key):
     err = capsys.readouterr().err
     assert err.startswith("エラー: ")
     assert key in err
+
+
+HEADINGS_CONFIG = '[headings]\n"agent:review" = "確認待ち"\nunclassified = "その他"\n'
+
+
+def test_config_headings_in_markdown_and_summary(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, "summary = true\n" + HEADINGS_CONFIG)
+    assert main([ISSUES]) == 0
+    out = capsys.readouterr().out
+    assert "## 確認待ち (agent:review) - " in out
+    assert "## その他 - " in out
+    assert "レビュー待ち" not in out
+    assert "未分類" not in out
+    assert "判断待ち 0 / 中断 0 / 確認待ち 0 / 作業中 0 / 着手可能 1 / その他 1\n" in out
+    # 設定しない分類の見出しは変わらない
+    assert "## 作業中 (agent:working) - " in out
+
+
+def test_config_headings_in_json_title(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, "json = true\n" + HEADINGS_CONFIG)
+    assert main([ISSUES]) == 0
+    titles = {c["label"]: c["title"] for c in json.loads(capsys.readouterr().out)["categories"]}
+    assert titles["agent:review"] == "確認待ち"
+    assert titles["unclassified"] == "その他"
+    assert titles["agent:working"] == "作業中"
+    assert titles["agent:blocked"] == "中断"
 
 
 def test_broken_toml_exits_2(in_tmp_dir, capsys):

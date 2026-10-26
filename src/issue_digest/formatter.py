@@ -16,6 +16,13 @@ HEADINGS = {
 }
 
 
+def _heading_of(category: str, headings: dict[str, str] | None) -> str:
+    """分類の見出しを返す。headings に書かれていれば、それを優先する。"""
+    if headings is not None and category in headings:
+        return headings[category]
+    return HEADINGS[category]
+
+
 def _elapsed_days(elapsed: timedelta) -> int:
     """経過時間を日数に直す（1日未満は切り捨て）。"""
     return elapsed.days
@@ -46,6 +53,7 @@ def format_json(
     limit: int | None = None,
     show_labels: bool = False,
     title: str | None = None,
+    headings: dict[str, str] | None = None,
 ) -> str:
     """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
 
@@ -56,6 +64,7 @@ def format_json(
     出力しなかった件数を `omitted` に入れる。show_labels が True のとき、各 Issue に
     `labels`（`agent:` で始まらないラベルの配列。なければ空の配列）を加える。
     title を指定したとき、JSON の先頭に `title` を加える。
+    headings に書かれた分類は、各分類の `title` をその文字列に置き換える。
     """
     if stale_days is not None and now is None:
         now = datetime.now(UTC)
@@ -80,7 +89,7 @@ def format_json(
             items.append(item)
         entry: dict[str, object] = {
             "label": category,
-            "title": HEADINGS[category],
+            "title": _heading_of(category, headings),
             "count": len(issues),
             "issues": items,
         }
@@ -202,6 +211,7 @@ def format_digest(
     limit: int | None = None,
     show_labels: bool = False,
     title: str | None = None,
+    headings: dict[str, str] | None = None,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
@@ -221,6 +231,7 @@ def format_digest(
     show_labels が True のとき、`agent:` で始まらないラベルがある Issue の行末に
     `（ラベル: bug, docs）` を付ける（担当者の印があればその後ろ）。
     title を指定すると、1行目の `Issue ダイジェスト` をその文字列に置き換える。
+    headings に書かれた分類は、分類の見出しと summary の行の名前をその文字列に置き換える。
     Issue のタイトルが40文字を超えるときは、40文字までにして末尾に `…` を付ける
     （エスケープは省略した後のタイトルに行う。JSON のタイトルは省略しない）。
     """
@@ -232,11 +243,12 @@ def format_digest(
     lines = [f"# {heading_title}（全 {total} 件）"]
     if summary:
         counts = " / ".join(
-            f"{HEADINGS[category]} {len(issues)}" for category, issues in classified.items()
+            f"{_heading_of(category, headings)} {len(issues)}"
+            for category, issues in classified.items()
         )
         lines += ["", counts]
     for category, issues in _selected_categories(classified, hide_empty, only, sort, exclude):
-        category_title = HEADINGS[category]
+        category_title = _heading_of(category, headings)
         if category == UNCLASSIFIED:
             heading = f"## {category_title} - {len(issues)}件"
         else:

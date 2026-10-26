@@ -36,9 +36,12 @@ USAGE = (
     "（JSON は先頭に title を加える）\n"
     "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
     "  --config で読む設定ファイルを指定する（省略時はカレントディレクトリの .issue-digest.toml。"
-    "なければ使わない）。キーは hide_empty、summary、only、stale、sort、show_assignees、json で、"
-    "コマンドラインの指定を優先する（only は --only か --exclude を指定したら使わない）\n"
+    "なければ使わない）。キーは hide_empty、summary、only、stale、sort、show_assignees、json、"
+    "headings で、コマンドラインの指定を優先する"
+    "（only は --only か --exclude を指定したら使わない）\n"
     '    例: hide_empty = true / stale = 7 / only = ["agent:review", "agent:blocked"]\n'
+    "    [headings] テーブルで分類の見出しを変えられる"
+    '（例: [headings] の下に "agent:review" = "確認待ち"）\n'
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -142,6 +145,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             )
             return 2
         limit = int(opts.limit)
+    headings: dict[str, str] | None = config.get("headings")
     title: str | None = opts.title
     if title == "":
         print("エラー: --title には1文字以上を指定してください", file=sys.stderr)
@@ -207,6 +211,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             limit,
             show_labels,
             title,
+            headings,
         )
     else:
         digest = format_digest(
@@ -222,6 +227,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             limit,
             show_labels,
             title,
+            headings,
         )
     if output is None:
         print(digest, end="")
