@@ -335,7 +335,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 `--config <パス>` で読むファイルを指定できます（このとき `.issue-digest.toml` は読みません）。指定したファイルがなければ、`エラー: 設定ファイルが見つかりません: <パス>` を標準エラーに出して終了コード 1 で終わります。
 ホームディレクトリなど、ほかの場所の設定ファイルは探しません。
 
-書けるキーは次の7つです。
+書けるキーは次の8つです。
 
 | キー | 型 | 対応するオプション |
 | --- | --- | --- |
@@ -346,6 +346,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 | `sort` | `"updated"` | `--sort updated` |
 | `show_assignees` | 真偽値 | `--show-assignees` |
 | `json` | 真偽値 | `--json` |
+| `headings` | テーブル（`[headings]`）。キーは `--only` と同じ6つのラベル、値は1文字以上の文字列 | なし（下の「分類の見出しを変える」を参照） |
 
 `--output`、`--version` など、上に挙げていないオプションは設定できません。
 
@@ -367,6 +368,22 @@ only = ["agent:needs-decision", "agent:blocked", "agent:review"]
 uv run issue-digest issues.json
 uv run issue-digest --config my.toml --stale 3 issues.json
 ```
+
+#### 分類の見出しを変える（`[headings]`）
+
+設定ファイルに `[headings]` テーブルを書くと、分類の見出し（「判断待ち」など）をチームの呼び方に変えられます。キーは分類のラベル（`agent:needs-decision`、`agent:blocked`、`agent:review`、`agent:working`、`agent:ready`、`unclassified`）、値は見出しの文字列です。
+
+```toml
+[headings]
+"agent:review" = "確認待ち"
+unclassified = "その他"
+```
+
+- 書いた分類だけ、Markdown の見出し、`--summary` の行の名前、JSON の各分類の `title` を置き換えます。書かない分類の見出しは変わりません。
+  - 例: `## 確認待ち (agent:review) - 2件`、`## その他 - 1件`
+- `(agent:review)` のようなラベルの表示、JSON の `label`、CSV の `label` 列は変わりません。
+- 知らないラベルや、1文字以上の文字列でない値は、どのキーかを示すエラーを標準エラーに出して終了コード 2 で終わります。
+- コマンドラインに対応するオプションはありません。`--title` が置き換える1行目の `Issue ダイジェスト` には影響しません。
 
 ### `--version`
 

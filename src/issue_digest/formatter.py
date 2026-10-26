@@ -17,6 +17,13 @@ HEADINGS = {
 }
 
 
+def _heading_of(category: str, headings: dict[str, str] | None) -> str:
+    """分類の見出しを返す。headings に書かれていれば、それを優先する。"""
+    if headings is not None and category in headings:
+        return headings[category]
+    return HEADINGS[category]
+
+
 def _elapsed_days(elapsed: timedelta) -> int:
     """経過時間を日数に直す（1日未満は切り捨て）。"""
     return elapsed.days
@@ -48,6 +55,7 @@ def format_json(
     show_labels: bool = False,
     title: str | None = None,
     diff: Diff | None = None,
+    headings: dict[str, str] | None = None,
 ) -> str:
     """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
 
@@ -61,6 +69,7 @@ def format_json(
     diff を指定したとき、末尾に `diff`（`added`、`removed`、`moved` の配列）を加える。
     `added` と `removed` の各要素は `number`、`title`、`url`、`categories`（今回・前回の分類）、
     `moved` の各要素は `number`、`title`、`url`、`from`、`to`（前回・今回の分類）。
+    headings に書かれた分類は、各分類の `title` をその文字列に置き換える。
     """
     if stale_days is not None and now is None:
         now = datetime.now(UTC)
@@ -85,7 +94,7 @@ def format_json(
             items.append(item)
         entry: dict[str, object] = {
             "label": category,
-            "title": HEADINGS[category],
+            "title": _heading_of(category, headings),
             "count": len(issues),
             "issues": items,
         }
@@ -220,6 +229,7 @@ def format_digest(
     show_labels: bool = False,
     title: str | None = None,
     diff: Diff | None = None,
+    headings: dict[str, str] | None = None,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
@@ -239,9 +249,11 @@ def format_digest(
     show_labels が True のとき、`agent:` で始まらないラベルがある Issue の行末に
     `（ラベル: bug, docs）` を付ける（担当者の印があればその後ろ）。
     title を指定すると、1行目の `Issue ダイジェスト` をその文字列に置き換える。
+    headings に書かれた分類は、分類の見出しと summary の行の名前をその文字列に置き換える。
     Issue のタイトルが40文字を超えるときは、40文字までにして末尾に `…` を付ける
     （エスケープは省略した後のタイトルに行う。JSON のタイトルは省略しない）。
     diff を指定すると、末尾に `## 前回からの変化` の節を加える（_diff_lines を参照）。
+    分類が変わった Issue の分類の名前にも headings を使う。
     """
     if stale_days is not None and now is None:
         now = datetime.now(UTC)
@@ -251,11 +263,12 @@ def format_digest(
     lines = [f"# {heading_title}（全 {total} 件）"]
     if summary:
         counts = " / ".join(
-            f"{HEADINGS[category]} {len(issues)}" for category, issues in classified.items()
+            f"{_heading_of(category, headings)} {len(issues)}"
+            for category, issues in classified.items()
         )
         lines += ["", counts]
     for category, issues in _selected_categories(classified, hide_empty, only, sort, exclude):
-        category_title = HEADINGS[category]
+        category_title = _heading_of(category, headings)
         if category == UNCLASSIFIED:
             heading = f"## {category_title} - {len(issues)}件"
         else:
@@ -276,11 +289,11 @@ def format_digest(
         else:
             lines.append("なし")
     if diff is not None:
-        lines += _diff_lines(diff)
+        lines += _diff_lines(diff, headings)
     return "\n".join(lines) + "\n"
 
 
-def _diff_lines(diff: Diff) -> list[str]:
+def _diff_lines(diff: Diff, headings: dict[str, str] | None = None) -> list[str]:
     """`## 前回からの変化` の節の行。変化がなければ「変化なし」だけを出す。
 
     変化があるときは、新しい Issue、なくなった Issue、分類が変わった Issue の小見出しを
@@ -305,10 +318,12 @@ def _diff_lines(diff: Diff) -> list[str]:
                 f"- [#{entry.number}]({entry.url}) {_escape_markdown(_shorten_title(entry.title))}"
             )
             if show_move:
-                line += f": {_category_names(entry.before)} → {_category_names(entry.after)}"
+                before = _category_names(entry.before, headings)
+                after = _category_names(entry.after, headings)
+                line += f": {before} → {after}"
             lines.append(line)
     return lines
 
 
-def _category_names(categories: tuple[str, ...]) -> str:
-    return ", ".join(HEADINGS[c] for c in categories)
+def _category_names(categories: tuple[str, ...], headings: dict[str, str] | None) -> str:
+    return ", ".join(_heading_of(c, headings) for c in categories)

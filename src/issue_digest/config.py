@@ -7,7 +7,7 @@ from issue_digest.classifier import CATEGORIES
 DEFAULT_CONFIG_PATH = ".issue-digest.toml"
 
 _BOOL_KEYS = ("hide_empty", "summary", "show_assignees", "json")
-_KEYS = (*_BOOL_KEYS, "only", "stale", "sort")
+_KEYS = (*_BOOL_KEYS, "only", "stale", "sort", "headings")
 
 
 class ConfigError(Exception):
@@ -58,5 +58,20 @@ def _validate(data: dict[str, Any]) -> dict[str, Any]:
                     raise ConfigError(
                         f"設定ファイルの only に指定できないラベルです: {label}\n"
                         f"指定できるラベル: {', '.join(CATEGORIES)}"
+                    )
+        elif key == "headings":
+            if not isinstance(value, dict):
+                raise ConfigError(
+                    "設定ファイルの headings はテーブル（[headings]）で指定してください"
+                )
+            for label, heading in value.items():
+                if label not in CATEGORIES:
+                    raise ConfigError(
+                        f"設定ファイルの headings に指定できないラベルです: {label}\n"
+                        f"指定できるラベル: {', '.join(CATEGORIES)}"
+                    )
+                if not isinstance(heading, str) or heading == "":
+                    raise ConfigError(
+                        f"設定ファイルの headings.{label} には1文字以上の文字列を指定してください"
                     )
     return data
