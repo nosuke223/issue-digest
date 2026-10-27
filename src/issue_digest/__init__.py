@@ -17,7 +17,8 @@ from issue_digest.loader import InvalidUpdatedAtError, load_issues, parse_issues
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
     " [--stale <日数>] [--age] [--since <YYYY-MM-DD>]"
-    " [--json | --csv] [--sort updated|created] [--limit <件数>] [--show-assignees]"
+    " [--json | --csv] [--sort updated|created] [--limit <件数>] [--max-chars <文字数>]"
+    " [--show-assignees]"
     " [--show-labels] [--title <文字列>] [--output <パス>] [--diff <前回のJSONのパス>]"
     " [--config <パス>] [--group-by assignee]"
     " <JSONファイルのパス | ->\n"
@@ -35,6 +36,11 @@ USAGE = (
     "（--sort created なら作成日時の古い順）\n"
     "  --limit で各分類の出力を先頭から指定件数までにする（Markdown は最後に「- ほか N 件」、"
     "JSON は各分類に omitted を加える。件数は全件のまま）\n"
+    "  --max-chars で Markdown の出力全体（末尾の改行を含む）を指定文字数以内にする"
+    "（最後の分類から順に末尾の Issue の行を削り、「- ほか N 件」にする。"
+    "見出し、件数、--summary の行、--diff の節は削らない。"
+    "収まらなければそのまま出し、標準エラーに警告を出す。--json、--csv、--group-by とは"
+    "同時に指定できない）\n"
     "  --json で Markdown の代わりに JSON を出力する\n"
     "  --csv で Markdown の代わりに CSV（見出し行 label,number,title,url）を出力する"
     "（--json とは同時に指定できない。--stale、--age、--show-assignees、--show-labels、--summary、"
@@ -62,7 +68,7 @@ USAGE = (
     '（例: [headings] の下に "agent:review" = "確認待ち"）\n'
     "  --group-by assignee で分類ごとの代わりに担当者ごとの見出し（## @alice - 3件、最後に"
     "## 担当者なし - N件）で並べ、各 Issue の行末に分類の名前を（作業中, 着手可能）の形で付ける"
-    "（Markdown だけで使える。--json、--csv とは同時に指定できない。"
+    "（Markdown だけで使える。--json、--csv、--max-chars とは同時に指定できない。"
     "--sort、--limit は各担当者の中で効く。--summary は担当者ごとの件数を出す。"
     "--hide-empty は効果がない）\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
@@ -94,6 +100,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--stale")
     parser.add_argument("--sort")
     parser.add_argument("--limit")
+    parser.add_argument("--max-chars")
     parser.add_argument("--since")
     parser.add_argument("--output")
     parser.add_argument("--title")
@@ -187,6 +194,15 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             )
             return 2
         limit = int(opts.limit)
+    max_chars: int | None = None
+    if opts.max_chars is not None:
+        if not (opts.max_chars.isascii() and opts.max_chars.isdigit()) or int(opts.max_chars) < 1:
+            print(
+                f"エラー: --max-chars には1以上の整数を指定してください: {opts.max_chars}",
+                file=sys.stderr,
+            )
+            return 2
+        max_chars = int(opts.max_chars)
     since: datetime | None = None
     if opts.since is not None:
         since = _parse_since(opts.since)
@@ -220,6 +236,17 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             "（--group-by は Markdown だけで使えます）",
             file=sys.stderr,
         )
+        return 2
+    # 設定ファイルの json = true でも JSON を出すので、--json と同じくエラーにする
+    if max_chars is not None and (as_json or as_csv):
+        print(
+            "エラー: --max-chars は --json、--csv と同時に指定できません"
+            "（Markdown だけで使えます）",
+            file=sys.stderr,
+        )
+        return 2
+    if max_chars is not None and group_by is not None:
+        print("エラー: --max-chars と --group-by は同時に指定できません", file=sys.stderr)
         return 2
     if only and exclude:
         print("エラー: --only と --exclude は同時に指定できません", file=sys.stderr)
@@ -340,7 +367,14 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             diff,
             headings,
             opts.age,
+            max_chars,
         )
+        if max_chars is not None and len(digest) > max_chars:
+            print(
+                f"警告: Issue の行をすべて削っても --max-chars の {max_chars} 文字に収まりません"
+                f"（{len(digest)} 文字）",
+                file=sys.stderr,
+            )
     if output is None:
         print(digest, end="")
         return 0
