@@ -38,6 +38,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--title <文字列>` | 見出しの `Issue ダイジェスト` を指定した文字列に置き換える | `uv run issue-digest --title issue-digest issues.json` |
 | `--output <パス>` | 標準出力ではなく、指定したファイルに書き出す | `uv run issue-digest --output digest.md issues.json` |
 | `--diff <前回のJSONのパス>` | 前回の `--json` の出力と比べ、変化した Issue を末尾に出す | `uv run issue-digest --diff last.json issues.json` |
+| `--fail-if-any <ラベル>` | 指定したラベルの分類に Issue が1件以上あるとき、終了コード 3 で終わる（複数回指定できる） | `uv run issue-digest --fail-if-any agent:blocked issues.json` |
 | `--config <パス>` | 読む設定ファイルを指定する（省略時はカレントディレクトリの `.issue-digest.toml`） | `uv run issue-digest --config my.toml issues.json` |
 | `--group-by assignee` | 分類ごとの代わりに、担当者ごとの見出しで並べる（Markdown だけ） | `uv run issue-digest --group-by assignee issues.json` |
 
@@ -500,6 +501,21 @@ gh issue list --json number,title,labels,url,assignees | uv run issue-digest --g
 - [#3](https://github.com/example/repo/issues/3) 担当者なしで着手可能（着手可能）
 ```
 
+### `--fail-if-any <ラベル>`
+
+`--fail-if-any <ラベル>` を付けると、指定した分類に Issue が1件以上あるとき、終了コード 3 で終わります。cron でダイジェストを保存しながら、判断待ち（`agent:needs-decision`）や中断（`agent:blocked`）があるときだけ通知したい、といった使い方を想定しています。
+複数回指定でき、どれか1つの分類に1件以上あれば終了コード 3 です。どの分類にもなければ、終了コード 0 で終わります。
+
+- ダイジェストはいつもどおり出力します。`--output` があるときは、ファイルに書き出してから終了コード 3 で終わります。
+- 判定に使う件数は、`--since` で絞った後の件数です。`--only`、`--exclude`、`--hide-empty`、`--limit`、`--max-chars` には左右されないので、出力に出ていない分類でも判定します。
+- 指定できるラベルは `--only` と同じ6つ（`agent:ready`、`agent:working`、`agent:review`、`agent:needs-decision`、`agent:blocked`、`unclassified`）です。それ以外を指定すると、エラーを標準エラーに出して終了コード 2 で終わります。`--fail-if-any` の後に値がない場合も終了コード 2 です。
+- エラー（終了コード 1、2）になるときは、今までと同じ終了コードで終わります（3 にはなりません）。ファイルに書き出せないときも終了コード 1 です。
+- Markdown、`--json`、`--csv`、`--group-by` のどれでも効きます。設定ファイルにキーはありません。
+
+```
+uv run issue-digest --fail-if-any agent:needs-decision --fail-if-any agent:blocked --output digest.md issues.json
+```
+
 ### `--version`
 
 `--version` を付けると、`issue-digest 0.1.0` のようにバージョンを1行で出力し、終了コード 0 で終わります。
@@ -546,5 +562,7 @@ uv run issue-digest --version
   - `--title`、`--output`、`--config` は分類ごとのときと同じように効きます。
   - `--json`、`--csv` と同時に指定するとエラーです。
   - `--max-chars` は、最後の担当者の見出し（`## 担当者なし` があればそれ）から順に、各担当者の末尾の Issue の行を1行ずつ削ります。最後の担当者の Issue の行がなくなったら、1つ前の担当者を削ります。削った担当者の最後に `- ほか N 件` を出し、`--limit` で省いた件数とまとめて1行にします。見出し、件数、`--summary` の行、`--diff` の節は削りません。行末の分類の名前と印を含めた行で数えます。すべて削っても収まらないときの警告は、分類ごとのときと同じです。
+- `--fail-if-any` は、ほかのオプションすべてと同時に使えます。終了コードの判定は `--since` で絞った後の件数で行い、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--max-chars` には左右されません。`--json`、`--csv`、`--group-by`、`--output` のどれと同時でも、出力してから終了コード 3 で終わります。
+- 終了コードは、正常が 0、実行時のエラー（ファイルが読めない、書き出せないなど）が 1、オプションの指定のエラーが 2、`--fail-if-any` で指定した分類に Issue があるときが 3 です。エラーのときは 1 か 2 を優先します。
 - `--config` は、ほかのオプションすべてと同時に使えます。設定ファイルの値は、コマンドラインで同じオプションを指定したときは使いません（詳しくは「設定ファイルと `--config <パス>`」）。
 - `--version` は、ほかのオプションやファイルの指定があっても、バージョンだけを出力します。
