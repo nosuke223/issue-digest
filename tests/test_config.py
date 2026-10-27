@@ -234,3 +234,132 @@ def test_usage_mentions_config(capsys):
     assert capsys.readouterr().out.strip() == USAGE
     assert "--config" in USAGE
     assert ".issue-digest.toml" in USAGE
+
+
+AGE = str(DATA / "age.json")
+GROUP_BY = str(DATA / "group_by.json")
+SORT = str(DATA / "sort.json")
+
+
+def _out(capsys, args):
+    code = main(args, now=NOW)
+    return code, capsys.readouterr()
+
+
+def test_config_age_matches_command_line(in_tmp_dir, capsys):
+    _, expected = _out(capsys, ["--age", AGE])
+    write_config(in_tmp_dir, "age = true\n")
+    code, got = _out(capsys, [AGE])
+    assert code == 0
+    assert got.out == expected.out
+    assert "（作成から12日）" in got.out
+
+
+def test_config_age_in_json(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, "age = true\njson = true\n")
+    assert main([AGE], now=NOW) == 0
+    assert '"age_days": 12' in capsys.readouterr().out
+
+
+def test_config_max_chars_matches_command_line(in_tmp_dir, capsys):
+    _, full = _out(capsys, [SORT])
+    limit = len(full.out) - 1
+    _, expected = _out(capsys, ["--max-chars", str(limit), SORT])
+    write_config(in_tmp_dir, f"max_chars = {limit}\n")
+    code, got = _out(capsys, [SORT])
+    assert code == 0
+    assert got.out == expected.out
+    assert got.out != full.out
+
+
+def test_command_line_max_chars_takes_precedence(in_tmp_dir, capsys):
+    _, full = _out(capsys, [SORT])
+    write_config(in_tmp_dir, "max_chars = 1\n")
+    _, got = _out(capsys, ["--max-chars", str(len(full.out)), SORT])
+    assert got.out == full.out
+    assert got.err == ""
+
+
+def test_config_group_by_matches_command_line(in_tmp_dir, capsys):
+    _, expected = _out(capsys, ["--group-by", "assignee", GROUP_BY])
+    write_config(in_tmp_dir, 'group_by = "assignee"\n')
+    code, got = _out(capsys, [GROUP_BY])
+    assert code == 0
+    assert got.out == expected.out
+    assert "## 担当者なし" in got.out
+
+
+def test_command_line_group_by_takes_precedence_over_config_json(in_tmp_dir, capsys):
+    _, expected = _out(capsys, ["--group-by", "assignee", GROUP_BY])
+    write_config(in_tmp_dir, "json = true\n")
+    _, got = _out(capsys, ["--group-by", "assignee", GROUP_BY])
+    assert got.out == expected.out
+
+
+@pytest.mark.parametrize("option", ["--json", "--csv"])
+def test_command_line_format_ignores_config_group_by_and_max_chars(in_tmp_dir, capsys, option):
+    _, expected = _out(capsys, [option, GROUP_BY])
+    write_config(in_tmp_dir, 'group_by = "assignee"\nmax_chars = 1\n')
+    code, got = _out(capsys, [option, GROUP_BY])
+    assert code == 0
+    assert got.out == expected.out
+    assert got.err == ""
+
+
+def test_config_max_chars_with_command_line_group_by(in_tmp_dir, capsys):
+    _, expected = _out(capsys, ["--group-by", "assignee", "--max-chars", "200", GROUP_BY])
+    write_config(in_tmp_dir, "max_chars = 200\njson = true\n")
+    code, got = _out(capsys, ["--group-by", "assignee", GROUP_BY])
+    assert code == 0
+    assert got.out == expected.out
+
+
+@pytest.mark.parametrize(
+    ("text", "message"),
+    [
+        (
+            'json = true\ngroup_by = "assignee"\n',
+            "エラー: --group-by と --json は同時に指定できません"
+            "（--group-by は Markdown だけで使えます）\n",
+        ),
+        (
+            "json = true\nmax_chars = 100\n",
+            "エラー: --max-chars は --json、--csv と同時に指定できません"
+            "（Markdown だけで使えます）\n",
+        ),
+    ],
+)
+def test_config_conflict_exits_2_like_command_line(in_tmp_dir, capsys, text, message):
+    write_config(in_tmp_dir, text)
+    code, got = _out(capsys, [GROUP_BY])
+    assert code == 2
+    assert got.err == message
+    assert got.out == ""
+
+
+@pytest.mark.parametrize(
+    ("text", "key"),
+    [
+        ('age = "yes"\n', "age"),
+        ("age = 1\n", "age"),
+        ("max_chars = 0\n", "max_chars"),
+        ("max_chars = -1\n", "max_chars"),
+        ('max_chars = "100"\n', "max_chars"),
+        ("max_chars = true\n", "max_chars"),
+        ("max_chars = 1.5\n", "max_chars"),
+        ('group_by = "label"\n', "group_by"),
+        ("group_by = 1\n", "group_by"),
+        ("group_by = true\n", "group_by"),
+    ],
+)
+def test_invalid_new_config_values_exit_2_with_key(in_tmp_dir, capsys, text, key):
+    write_config(in_tmp_dir, text)
+    assert main([ISSUES]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("エラー: ")
+    assert key in err
+
+
+def test_usage_mentions_new_config_keys():
+    for key in ("age", "max_chars", "group_by"):
+        assert key in USAGE.split("--config で読む設定ファイル")[1]

@@ -70,11 +70,16 @@ USAGE = (
     "次回 issue-digest --diff last.json issues.json\n"
     "  --config で読む設定ファイルを指定する（省略時はカレントディレクトリの .issue-digest.toml。"
     "なければ使わない）。キーは hide_empty、summary、only、stale、sort、show_assignees、"
-    "show_labels、title、limit、json、headings で、コマンドラインの指定を優先する"
-    "（sort は updated か created、limit は1以上の整数、title は1文字以上の文字列）"
+    "show_labels、age、title、limit、max_chars、group_by、json、headings で、"
+    "コマンドラインの指定を優先する"
+    "（sort は updated か created、limit と max_chars は1以上の整数、"
+    'group_by は "assignee"、title は1文字以上の文字列）'
     "（only は --only か --exclude を指定したら使わない。"
-    "json = true は --csv、--group-by、--max-chars を指定したら使わない）\n"
-    '    例: hide_empty = true / stale = 7 / limit = 5 / only = ["agent:review", "agent:blocked"]\n'
+    "json = true は --csv、--group-by、--max-chars を指定したら使わない。"
+    "group_by と max_chars は --json か --csv を指定したら使わず、"
+    "設定の json = true と一緒に書くとエラー）\n"
+    '    例: hide_empty = true / stale = 7 / limit = 5 / only = ["agent:review", "agent:blocked"]'
+    ' / age = true / max_chars = 2000 / group_by = "assignee"\n'
     "    [headings] テーブルで分類の見出しを変えられる"
     '（例: [headings] の下に "agent:review" = "確認待ち"）\n'
     "  --group-by assignee で分類ごとの代わりに担当者ごとの見出し（## @alice - 3件、最後に"
@@ -178,11 +183,19 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     hide_empty = opts.hide_empty or config.get("hide_empty", False)
     summary = opts.summary or config.get("summary", False)
     as_csv = opts.csv
+    # コマンドラインで --json か --csv を指定したら、設定の group_by と max_chars は使わない
+    cli_format = opts.json or as_csv
     group_by: str | None = opts.group_by
+    if group_by is None and not cli_format:
+        group_by = config.get("group_by")
+    age = opts.age or config.get("age", False)
     # 設定の json は、コマンドラインの --csv、--group-by、--max-chars があれば使わない
     # （コマンドラインを優先する）
     as_json = opts.json or (
-        config.get("json", False) and not as_csv and group_by is None and opts.max_chars is None
+        config.get("json", False)
+        and not as_csv
+        and opts.group_by is None
+        and opts.max_chars is None
     )
     only: list[str] = opts.only
     exclude: list[str] = opts.exclude
@@ -217,7 +230,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             )
             return 2
         limit = int(opts.limit)
-    max_chars: int | None = None
+    max_chars: int | None = None if cli_format else config.get("max_chars")
     if opts.max_chars is not None:
         if not (opts.max_chars.isascii() and opts.max_chars.isdigit()) or int(opts.max_chars) < 1:
             print(
@@ -356,7 +369,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             title,
             diff,
             headings,
-            opts.age,
+            age,
             opts.show_milestone,
             opts.reverse,
         )
@@ -376,7 +389,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             title,
             diff,
             headings,
-            opts.age,
+            age,
             opts.reverse,
             max_chars,
             opts.show_milestone,
@@ -397,7 +410,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             title,
             diff,
             headings,
-            opts.age,
+            age,
             max_chars,
             opts.show_milestone,
             opts.reverse,

@@ -6,8 +6,18 @@ from issue_digest.classifier import CATEGORIES
 
 DEFAULT_CONFIG_PATH = ".issue-digest.toml"
 
-_BOOL_KEYS = ("hide_empty", "summary", "show_assignees", "json", "show_labels")
-_KEYS = (*_BOOL_KEYS, "only", "stale", "sort", "headings", "title", "limit")
+_BOOL_KEYS = ("hide_empty", "summary", "show_assignees", "json", "show_labels", "age")
+_KEYS = (
+    *_BOOL_KEYS,
+    "only",
+    "stale",
+    "sort",
+    "headings",
+    "title",
+    "limit",
+    "max_chars",
+    "group_by",
+)
 
 
 class ConfigError(Exception):
@@ -49,6 +59,16 @@ def _validate(data: dict[str, Any]) -> dict[str, Any]:
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
                 raise ConfigError(
                     f"設定ファイルの limit には1以上の整数を指定してください: {value}"
+                )
+        elif key == "max_chars":
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+                raise ConfigError(
+                    f"設定ファイルの max_chars には1以上の整数を指定してください: {value}"
+                )
+        elif key == "group_by":
+            if value != "assignee":
+                raise ConfigError(
+                    f'設定ファイルの group_by には "assignee" を指定してください: {value}'
                 )
         elif key == "title":
             if not isinstance(value, str) or value == "":
