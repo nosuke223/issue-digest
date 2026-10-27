@@ -17,11 +17,12 @@ from issue_digest.loader import InvalidUpdatedAtError, load_issues, parse_issues
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
     " [--stale <日数>] [--age] [--since <YYYY-MM-DD>]"
-    " [--json | --csv] [--sort updated|created] [--limit <件数>] [--max-chars <文字数>]"
+    " [--json | --csv] [--sort updated|created] [--reverse] [--limit <件数>]"
+    " [--max-chars <文字数>]"
     " [--show-assignees]"
     " [--show-labels] [--show-milestone] [--title <文字列>] [--output <パス>]"
     " [--diff <前回のJSONのパス>]"
-    " [--config <パス>] [--group-by assignee]"
+    " [--config <パス>] [--group-by assignee] [--fail-if-any <ラベル>]..."
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
@@ -35,6 +36,9 @@ USAGE = (
     "（updatedAt がない Issue は出さない。件数も絞った後の数。--diff の比較は全件で行う）\n"
     "  --sort updated で各分類の中を最終更新の古い順に並べる"
     "（--sort created なら作成日時の古い順）\n"
+    "  --reverse で各分類（--group-by assignee のときは各担当者）の中の並びを逆にする"
+    "（--sort がなければ番号の大きい順、--sort があれば新しい順。--limit と --max-chars は"
+    "逆にした後の並びに効く。--diff の節の並びは変わらない）\n"
     "  --limit で各分類の出力を先頭から指定件数までにする（Markdown は最後に「- ほか N 件」、"
     "JSON は各分類に omitted を加える。件数は全件のまま）\n"
     "  --max-chars で Markdown の出力全体（末尾の改行を含む）を指定文字数以内にする"
@@ -76,9 +80,15 @@ USAGE = (
     "  --group-by assignee で分類ごとの代わりに担当者ごとの見出し（## @alice - 3件、最後に"
     "## 担当者なし - N件）で並べ、各 Issue の行末に分類の名前を（作業中, 着手可能）の形で付ける"
     "（Markdown だけで使える。--json、--csv とは同時に指定できない。"
-    "--sort、--limit は各担当者の中で効く。--max-chars は最後の担当者から順に Issue の行を削る。"
+    "--sort、--reverse、--limit は各担当者の中で効く。"
+    "--max-chars は最後の担当者から順に Issue の行を削る。"
     "--summary は担当者ごとの件数を出す。"
     "--hide-empty は効果がない）\n"
+    "  --fail-if-any で指定した分類に Issue が1件以上あるとき、ダイジェストをいつもどおり出力"
+    "（--output ならファイルに書き出して）してから終了コード 3 で終わる"
+    "（複数回指定でき、どれか1つにあれば 3。判定は --since で絞った後の件数で、"
+    "--only、--exclude、--hide-empty、--limit、--max-chars には左右されない。"
+    "エラー（終了コード 1、2）のときはそちらを優先する）\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -104,8 +114,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--show-labels", action="store_true")
     parser.add_argument("--age", action="store_true")
     parser.add_argument("--show-milestone", action="store_true")
+    parser.add_argument("--reverse", action="store_true")
     parser.add_argument("--only", action="append", default=[])
     parser.add_argument("--exclude", action="append", default=[])
+    parser.add_argument("--fail-if-any", action="append", default=[])
     parser.add_argument("--stale")
     parser.add_argument("--sort")
     parser.add_argument("--limit")
@@ -258,7 +270,12 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     if only and exclude:
         print("エラー: --only と --exclude は同時に指定できません", file=sys.stderr)
         return 2
-    for option, labels in (("--only", only), ("--exclude", exclude)):
+    fail_if_any: list[str] = opts.fail_if_any
+    for option, labels in (
+        ("--only", only),
+        ("--exclude", exclude),
+        ("--fail-if-any", fail_if_any),
+    ):
         for label in labels:
             if label not in CATEGORIES:
                 print(
@@ -320,7 +337,9 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     if as_csv:
         # CSV に列のない --stale、--age、--show-assignees、--show-labels、--show-milestone、
         # --summary、--title、--diff は無視する
-        digest = format_csv(classified, hide_empty, only_filter, sort, exclude_filter, limit)
+        digest = format_csv(
+            classified, hide_empty, only_filter, sort, exclude_filter, limit, opts.reverse
+        )
     elif as_json:
         # JSON には分類ごとの count があるので、--summary は Markdown のときだけ効く
         digest = format_json(
@@ -339,6 +358,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             headings,
             opts.age,
             opts.show_milestone,
+            opts.reverse,
         )
     elif group_by == "assignee":
         # 0件の担当者の見出しは出さないので、--hide-empty は効果がない
@@ -357,6 +377,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             diff,
             headings,
             opts.age,
+            opts.reverse,
             max_chars,
             opts.show_milestone,
         )
@@ -379,6 +400,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             opts.age,
             max_chars,
             opts.show_milestone,
+            opts.reverse,
         )
     if max_chars is not None and len(digest) > max_chars:
         print(
@@ -386,13 +408,15 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             f"（{len(digest)} 文字）",
             file=sys.stderr,
         )
+    # 判定は --since で絞った後の件数で行い、--only などの出力の絞り込みには左右されない
+    exit_code = 3 if any(classified[label] for label in fail_if_any) else 0
     if output is None:
         print(digest, end="")
-        return 0
+        return exit_code
     try:
         with open(output, "w", encoding="utf-8", newline="") as f:
             f.write(digest)
     except OSError as e:
         print(f"エラー: ファイルに書き出せません: {output} ({type(e).__name__})", file=sys.stderr)
         return 1
-    return 0
+    return exit_code
