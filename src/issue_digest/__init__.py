@@ -19,7 +19,8 @@ USAGE = (
     " [--stale <日数>] [--age] [--since <YYYY-MM-DD>]"
     " [--json | --csv] [--sort updated|created] [--limit <件数>] [--max-chars <文字数>]"
     " [--show-assignees]"
-    " [--show-labels] [--title <文字列>] [--output <パス>] [--diff <前回のJSONのパス>]"
+    " [--show-labels] [--show-milestone] [--title <文字列>] [--output <パス>]"
+    " [--diff <前回のJSONのパス>]"
     " [--config <パス>] [--group-by assignee]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
@@ -43,12 +44,15 @@ USAGE = (
     "最後の担当者から順に削る。--json、--csv とは同時に指定できない）\n"
     "  --json で Markdown の代わりに JSON を出力する\n"
     "  --csv で Markdown の代わりに CSV（見出し行 label,number,title,url）を出力する"
-    "（--json とは同時に指定できない。--stale、--age、--show-assignees、--show-labels、--summary、"
-    "--title は無視する）\n"
+    "（--json とは同時に指定できない。--stale、--age、--show-assignees、--show-labels、"
+    "--show-milestone、--summary、--title は無視する）\n"
     "  --show-assignees で担当者を表示する（Markdown は行末に（担当: @alice）、"
     "JSON は各 Issue に assignees の配列を加える）\n"
     "  --show-labels で agent: で始まらないラベルを表示する"
     "（Markdown は行末に（ラベル: bug, docs）、JSON は各 Issue に labels の配列を加える）\n"
+    "  --show-milestone でマイルストーンを表示する（Markdown は行末に（マイルストーン: v1.0）、"
+    "JSON は各 Issue に milestone を加える。なければ null。"
+    "入力は gh issue list --json の milestone）\n"
     "  --title で見出しの「Issue ダイジェスト」を指定した文字列に置き換える"
     "（JSON は先頭に title を加える）\n"
     "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
@@ -99,6 +103,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--show-assignees", action="store_true")
     parser.add_argument("--show-labels", action="store_true")
     parser.add_argument("--age", action="store_true")
+    parser.add_argument("--show-milestone", action="store_true")
     parser.add_argument("--only", action="append", default=[])
     parser.add_argument("--exclude", action="append", default=[])
     parser.add_argument("--stale")
@@ -313,8 +318,8 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             )
             return 1
     if as_csv:
-        # CSV に列のない --stale、--age、--show-assignees、--show-labels、--summary、--title、
-        # --diff は無視する
+        # CSV に列のない --stale、--age、--show-assignees、--show-labels、--show-milestone、
+        # --summary、--title、--diff は無視する
         digest = format_csv(classified, hide_empty, only_filter, sort, exclude_filter, limit)
     elif as_json:
         # JSON には分類ごとの count があるので、--summary は Markdown のときだけ効く
@@ -333,6 +338,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             diff,
             headings,
             opts.age,
+            opts.show_milestone,
         )
     elif group_by == "assignee":
         # 0件の担当者の見出しは出さないので、--hide-empty は効果がない
@@ -352,6 +358,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             headings,
             opts.age,
             max_chars,
+            opts.show_milestone,
         )
     else:
         digest = format_digest(
@@ -371,6 +378,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             headings,
             opts.age,
             max_chars,
+            opts.show_milestone,
         )
     if max_chars is not None and len(digest) > max_chars:
         print(

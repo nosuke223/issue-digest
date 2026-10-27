@@ -70,6 +70,7 @@ def format_json(
     diff: Diff | None = None,
     headings: dict[str, str] | None = None,
     age: bool = False,
+    show_milestone: bool = False,
 ) -> str:
     """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
 
@@ -85,7 +86,8 @@ def format_json(
     `moved` の各要素は `number`、`title`、`url`、`from`、`to`（前回・今回の分類）。
     headings に書かれた分類は、各分類の `title` をその文字列に置き換える。
     age が True のとき、各 Issue に `age_days`（作成からの経過日数。createdAt がなければ null）
-    を加える。
+    を加える。show_milestone が True のとき、各 Issue に `milestone`（マイルストーンの名前。
+    なければ null）を加える。
     """
     if (stale_days is not None or age) and now is None:
         now = datetime.now(UTC)
@@ -109,6 +111,8 @@ def format_json(
                 item["labels"] = _other_labels(issue)
             if age:
                 item["age_days"] = _age_days_of(issue, now)
+            if show_milestone:
+                item["milestone"] = issue.milestone or None
             items.append(item)
         entry: dict[str, object] = {
             "label": category,
@@ -188,6 +192,12 @@ def _assignees_mark(issue: Issue, show_assignees: bool) -> str:
     return "（担当: " + ", ".join(f"@{login}" for login in issue.assignees) + "）"
 
 
+def _milestone_mark(issue: Issue, show_milestone: bool) -> str:
+    if not show_milestone or not issue.milestone:
+        return ""
+    return f"（マイルストーン: {issue.milestone}）"
+
+
 def _other_labels(issue: Issue) -> list[str]:
     """`agent:` で始まらないラベルを入力の順に返す。"""
     return [label for label in issue.labels if not label.startswith("agent:")]
@@ -250,6 +260,7 @@ def format_digest(
     headings: dict[str, str] | None = None,
     age: bool = False,
     max_chars: int | None = None,
+    show_milestone: bool = False,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
@@ -281,6 +292,8 @@ def format_digest(
     `- ほか N 件`（limit で省いた件数と合わせる）にする。見出し、件数、summary の行、diff の節は
     削らない。すべての Issue の行を削っても収まらないときは、そのまま返す
     （呼び出し側で長さを確かめる）。
+    show_milestone が True のとき、マイルストーンがある Issue の行末に
+    `（マイルストーン: v1.0）` を付ける（年齢の印があればその後ろ）。
     """
     if (stale_days is not None or age) and now is None:
         now = datetime.now(UTC)
@@ -311,6 +324,7 @@ def format_digest(
                 f"{_assignees_mark(issue, show_assignees)}"
                 f"{_labels_mark(issue, show_labels)}"
                 f"{_age_mark(issue, age, now)}"
+                f"{_milestone_mark(issue, show_milestone)}"
             )
         sections.append(_Section(heading, rows, len(issues)))
     footer = _diff_lines(diff, headings) if diff is not None else []
@@ -415,6 +429,7 @@ def format_digest_by_assignee(
     headings: dict[str, str] | None = None,
     age: bool = False,
     max_chars: int | None = None,
+    show_milestone: bool = False,
 ) -> str:
     """分類結果を、担当者ごとの見出しで並べた Markdown のダイジェストにする。
 
@@ -461,6 +476,7 @@ def format_digest_by_assignee(
                 f"{_assignees_mark(issue, show_assignees)}"
                 f"{_labels_mark(issue, show_labels)}"
                 f"{_age_mark(issue, age, now)}"
+                f"{_milestone_mark(issue, show_milestone)}"
             )
         sections.append(_Section(heading, rows, len(issues)))
     footer = _diff_lines(diff, headings) if diff is not None else []
