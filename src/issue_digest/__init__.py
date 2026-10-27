@@ -1,6 +1,7 @@
 import argparse
+import re
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from importlib.metadata import version
 
 from issue_digest.classifier import CATEGORIES, classify_issues
@@ -16,7 +17,7 @@ from issue_digest.loader import InvalidUpdatedAtError, load_issues, parse_issues
 
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
-    " [--stale <日数>] [--age] [--since <YYYY-MM-DD>]"
+    " [--stale <日数>] [--age] [--since <YYYY-MM-DD | Nd>]"
     " [--json | --csv] [--sort updated|created] [--reverse] [--limit <件数>]"
     " [--max-chars <文字数>]"
     " [--show-assignees]"
@@ -33,7 +34,8 @@ USAGE = (
     "  --age で作成日時がある Issue の行末に作成からの日数（作成から12日）を付ける"
     "（JSON は各 Issue に age_days を加える。createdAt がなければ null）\n"
     "  --since で最終更新（updatedAt）が指定日（YYYY-MM-DD、UTC の0時）以降の Issue だけを出す"
-    "（updatedAt がない Issue は出さない。件数も絞った後の数。--diff の比較は全件で行う）\n"
+    "（7d のように日数を指定すると、基準時刻の7日前以降。基準時刻は --stale、--age と同じ。"
+    "updatedAt がない Issue は出さない。件数も絞った後の数。--diff の比較は全件で行う）\n"
     "  --sort updated で各分類の中を最終更新の古い順に並べる"
     "（--sort created なら作成日時の古い順）\n"
     "  --reverse で各分類（--group-by assignee のときは各担当者）の中の並びを逆にする"
@@ -150,12 +152,39 @@ def _parse_since(value: str) -> datetime | None:
         return None
 
 
+def _parse_since_days(value: str) -> int | None:
+    """7d のような `<整数>d`（半角数字と小文字の d だけ）を日数にする。形が不正なら None。"""
+    number = value[:-1]
+    if value.endswith("d") and number.isascii() and number.isdigit():
+        return int(number)
+    return None
+
+
+def _join_since_value(args: list[str]) -> list[str]:
+    """`--since -1d` を `--since=-1d` にする。argparse が -1d をオプションと見なして
+    使い方を出さずに、値の検査のエラーを出すため。`--` で始まる値（別のオプション）は変えない。"""
+    joined: list[str] = []
+    i = 0
+    while i < len(args):
+        if args[i] == "--since" and i + 1 < len(args) and re.fullmatch(r"-[^-].*", args[i + 1]):
+            joined.append(f"--since={args[i + 1]}")
+            i += 2
+        else:
+            joined.append(args[i])
+            i += 1
+    return joined
+
+
 def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
-    """now は --stale と --age の経過日数の基準時刻。省略時は現在時刻（テストで固定できる）。"""
+    """now は --stale、--age、--since Nd の基準時刻。省略時は現在時刻（テストで固定できる）。"""
     args = sys.argv[1:] if argv is None else argv
+    # 実行の最初に1回だけ決め、--since、--stale、--age のすべてがこの時刻を使う
+    if now is None:
+        now = datetime.now(UTC)
     if "--version" in args:
         print(f"issue-digest {version('issue-digest')}")
         return 0
+    args = _join_since_value(args)
     try:
         opts = _build_parser().parse_args(args)
     except _UsageError:
@@ -244,8 +273,16 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     if opts.since is not None:
         since = _parse_since(opts.since)
         if since is None:
+            days = _parse_since_days(opts.since)
+            if days is not None:
+                try:
+                    since = now - timedelta(days=days)
+                except OverflowError:
+                    since = None
+        if since is None:
             print(
-                f"エラー: --since には YYYY-MM-DD の形の日付を指定してください: {opts.since}",
+                "エラー: --since には YYYY-MM-DD の形の日付か、7d のような日数を指定してください:"
+                f" {opts.since}",
                 file=sys.stderr,
             )
             return 2

@@ -933,6 +933,9 @@ def test_main_usage_mentions_show_labels(capsys):
 
 
 SINCE = str(DATA / "since.json")
+SINCE_ERROR = (
+    "エラー: --since には YYYY-MM-DD の形の日付か、7d のような日数を指定してください: {value}\n"
+)
 
 
 def test_main_since_includes_boundary_and_excludes_older_and_missing(capsys):
@@ -1003,9 +1006,65 @@ def test_main_since_with_diff_compares_all_issues(capsys, tmp_path):
 def test_main_since_invalid_value(capsys, value):
     assert main(["--since", value, SINCE]) == 2
     captured = capsys.readouterr()
-    assert (
-        captured.err == f"エラー: --since には YYYY-MM-DD の形の日付を指定してください: {value}\n"
-    )
+    assert captured.err == SINCE_ERROR.format(value=value)
+    assert captured.out == ""
+
+
+SINCE_NOW = datetime(2026, 10, 17, tzinfo=UTC)
+
+
+def test_main_since_days_includes_boundary(capsys):
+    # 基準時刻の7日前は 2026-10-10 0時。ちょうどの #2 は出て、前日の #1 は出ない
+    assert main(["--since", "7d", SINCE], now=SINCE_NOW) == 0
+    out = capsys.readouterr().out
+    assert sorted(issue_numbers_in_output(out)) == [2, 3]
+    assert out.startswith("# Issue ダイジェスト（全 2 件）\n")
+
+
+def test_main_since_days_excludes_just_after_boundary(capsys):
+    assert main(["--since", "6d", SINCE], now=SINCE_NOW) == 0
+    assert issue_numbers_in_output(capsys.readouterr().out) == [3]
+
+
+def test_main_since_zero_days(capsys):
+    assert main(["--since", "0d", SINCE], now=SINCE_NOW) == 0
+    # 基準時刻（2026-10-17）以降に更新された #3 だけ
+    assert issue_numbers_in_output(capsys.readouterr().out) == [3]
+
+
+def test_main_since_days_same_base_time_as_stale(capsys):
+    assert main(["--since", "7d", "--stale", "7", SINCE], now=SINCE_NOW) == 0
+    out = capsys.readouterr().out
+    assert sorted(issue_numbers_in_output(out)) == [2, 3]
+    # #2 は基準時刻から7日更新なし（同じ基準時刻で計算されている）
+    assert "7日更新なし" in out
+
+
+def test_main_since_days_same_base_time_as_age(capsys):
+    assert main(["--json", "--since", "7d", "--age", "--stale", "7", SINCE], now=SINCE_NOW) == 0
+    body = json_out(capsys)
+    assert body["total"] == 2
+
+
+def test_main_since_days_json_csv_group_by_fail_if_any(capsys):
+    assert main(["--json", "--since", "7d", SINCE], now=SINCE_NOW) == 0
+    assert json_out(capsys)["total"] == 2
+    assert main(["--csv", "--since", "7d", SINCE], now=SINCE_NOW) == 0
+    assert len(capsys.readouterr().out.splitlines()) == 3
+    assert main(["--group-by", "assignee", "--since", "7d", SINCE], now=SINCE_NOW) == 0
+    assert sorted(issue_numbers_in_output(capsys.readouterr().out)) == [2, 3]
+    # #1 は agent:review で、7d で絞ると出ない。#2 の分類は判定の対象
+    assert main(["--since", "7d", "--fail-if-any", "agent:ready", SINCE], now=SINCE_NOW) == 3
+    capsys.readouterr()
+
+
+@pytest.mark.parametrize(
+    "value", ["7D", "7days", "-1d", "1.5d", "d", "1w", "7", "７d", " 7d", "7d "]
+)
+def test_main_since_days_invalid_value(capsys, value):
+    assert main(["--since", value, SINCE], now=SINCE_NOW) == 2
+    captured = capsys.readouterr()
+    assert captured.err == SINCE_ERROR.format(value=value)
     assert captured.out == ""
 
 
