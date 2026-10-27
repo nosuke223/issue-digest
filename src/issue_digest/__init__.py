@@ -20,7 +20,7 @@ USAGE = (
     " [--json | --csv] [--sort updated|created] [--limit <件数>] [--max-chars <文字数>]"
     " [--show-assignees]"
     " [--show-labels] [--title <文字列>] [--output <パス>] [--diff <前回のJSONのパス>]"
-    " [--config <パス>] [--group-by assignee]"
+    " [--config <パス>] [--group-by assignee] [--quiet]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
@@ -74,6 +74,7 @@ USAGE = (
     "（Markdown だけで使える。--json、--csv、--max-chars とは同時に指定できない。"
     "--sort、--limit は各担当者の中で効く。--summary は担当者ごとの件数を出す。"
     "--hide-empty は効果がない）\n"
+    "  --quiet で --max-chars の警告を標準エラーに出さない\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -110,6 +111,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--diff")
     parser.add_argument("--config")
     parser.add_argument("--group-by")
+    parser.add_argument("--quiet", action="store_true")
     parser.add_argument("paths", nargs="*")
     return parser
 
@@ -373,7 +375,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             opts.age,
             max_chars,
         )
-        if max_chars is not None and len(digest) > max_chars:
+        if max_chars is not None and len(digest) > max_chars and not opts.quiet:
             print(
                 f"警告: Issue の行をすべて削っても --max-chars の {max_chars} 文字に収まりません"
                 f"（{len(digest)} 文字）",

@@ -1194,3 +1194,20 @@ def test_main_max_chars_with_group_by_is_error(capsys):
 def test_main_usage_mentions_max_chars(capsys):
     assert main(["--help"]) == 0
     assert "--max-chars" in capsys.readouterr().out
+
+
+def test_main_quiet_hides_max_chars_warning(capsys):
+    assert main(["--max-chars", "10", "--quiet", str(DATA / "issues.json")]) == 0
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert captured.out.startswith("# Issue ダイジェスト")
+
+
+def test_main_without_quiet_shows_max_chars_warning(capsys):
+    assert main(["--max-chars", "10", str(DATA / "issues.json")]) == 0
+    assert "警告" in capsys.readouterr().err
+
+
+def test_main_quiet_keeps_errors(capsys):
+    assert main(["--quiet", "--max-chars", "0", str(DATA / "issues.json")]) == 2
+    assert "エラー" in capsys.readouterr().err

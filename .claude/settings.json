@@ -31,7 +31,8 @@
       "Bash(uv run pytest)",
       "Bash(uv run pytest *)",
       "Bash(uv run ruff *)",
-      "Bash(uv run issue-digest *)"
+      "Bash(uv run issue-digest *)",
+      "Bash(curl *)"
     ],
     "deny": [
       "Read(./.env)",

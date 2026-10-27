@@ -36,6 +36,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--csv` | Markdown の代わりに CSV を出力する | `uv run issue-digest --csv issues.json` |
 | `--title <文字列>` | 見出しの `Issue ダイジェスト` を指定した文字列に置き換える | `uv run issue-digest --title issue-digest issues.json` |
 | `--output <パス>` | 標準出力ではなく、指定したファイルに書き出す | `uv run issue-digest --output digest.md issues.json` |
+| `--quiet` | `--max-chars` に収まらないときの警告を出さない | `uv run issue-digest --max-chars 2000 --quiet issues.json` |
 | `--diff <前回のJSONのパス>` | 前回の `--json` の出力と比べ、変化した Issue を末尾に出す | `uv run issue-digest --diff last.json issues.json` |
 | `--config <パス>` | 読む設定ファイルを指定する（省略時はカレントディレクトリの `.issue-digest.toml`） | `uv run issue-digest --config my.toml issues.json` |
 | `--group-by assignee` | 分類ごとの代わりに、担当者ごとの見出しで並べる（Markdown だけ） | `uv run issue-digest --group-by assignee issues.json` |
@@ -309,6 +310,15 @@ uv run issue-digest --title issue-digest issues.json
 
 ```
 uv run issue-digest --output digest.md issues.json
+```
+
+### `--quiet`
+
+`--quiet` を付けると、`--max-chars` の文字数に収まらなかったときの警告を標準エラーに出しません。cron などで、標準エラーの出力があるとメールが届く環境で使います。
+出力の内容と終了コードは変わりません。エラー（終了コード 1、2）のメッセージは、`--quiet` を付けても出します。
+
+```
+uv run issue-digest --max-chars 2000 --quiet issues.json
 ```
 
 ### `--diff <前回のJSONのパス>`
