@@ -26,6 +26,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--since <日付>` | 最終更新が指定日（`YYYY-MM-DD`、UTC の0時）以降の Issue だけを出力する | `uv run issue-digest --since 2026-10-01 issues.json` |
 | `--sort updated` | 各分類の中を最終更新の古い順に並べる | `uv run issue-digest --sort updated issues.json` |
 | `--sort created` | 各分類の中を作成日時の古い順に並べる | `uv run issue-digest --sort created issues.json` |
+| `--reverse` | 各分類の中の並びを逆にする（`--sort` がなければ番号の大きい順、あれば新しい順） | `uv run issue-digest --reverse issues.json` |
 | `--limit <件数>` | 各分類で、先頭から指定件数だけ Issue を出力する | `uv run issue-digest --limit 5 issues.json` |
 | `--max-chars <文字数>` | Markdown の出力全体を指定文字数以内に収める（収まらない分の Issue の行を `- ほか N 件` にする） | `uv run issue-digest --max-chars 2000 issues.json` |
 | `--summary` | 総件数の次に、分類ごとの件数を1行で出力する | `uv run issue-digest --summary issues.json` |
@@ -189,6 +190,24 @@ gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --s
 
 ```
 gh issue list --json number,title,labels,url,createdAt | uv run issue-digest --sort created -
+```
+
+### `--reverse`
+
+`--reverse` を付けると、各分類の中の Issue の並びを逆にします。新しい Issue から順に見たいときに使います。`--group-by assignee` のときは、各担当者の中の並びを逆にします。分類や担当者の順番は変わりません。
+
+- `--sort` がなければ、番号の大きい順になります。
+- `--sort updated` / `--sort created` と一緒なら、`--sort` で並べた結果をそのまま逆にするので、新しい順になります（同じ日時の Issue は番号の大きい順。`updatedAt`・`createdAt` がない Issue は、逆にするので分類の先頭に番号の大きい順で並びます）。
+- `--limit` は逆にした後の先頭から数えます（`--reverse --limit 5` で、新しい5件）。
+- `--max-chars` で削るのは、逆にした後の末尾の行です。
+- `--json`、`--csv` でも同じように並びが変わります。
+- `--diff` の `## 前回からの変化` の節の並び（番号の小さい順）は変わりません。
+- 設定ファイルに `reverse` キーはありません。
+
+`--reverse` を付けない場合の出力は変わりません。
+
+```
+uv run issue-digest --reverse --limit 5 issues.json
 ```
 
 ### `--limit <件数>`
@@ -493,7 +512,8 @@ uv run issue-digest --version
 
 ### 組み合わせ
 
-- `--hide-empty`、`--only`、`--stale`、`--since`、`--sort`、`--limit`、`--title`、`--output`、`--diff` は、どれも同時に使えます（`--csv` との併用は下の項目を参照）。
+- `--hide-empty`、`--only`、`--stale`、`--since`、`--sort`、`--reverse`、`--limit`、`--title`、`--output`、`--diff` は、どれも同時に使えます（`--csv` との併用は下の項目を参照）。
+- `--reverse` は `--sort` の後に並びを逆にし、そのあとで `--limit` と `--max-chars` が効きます（`--limit` は逆にした後の先頭から、`--max-chars` は逆にした後の末尾の行から）。
 - `--since` で絞るのは出力する Issue です。件数（総件数、分類ごとの件数、`--summary`）は絞った後の Issue で数えます。`--json`、`--csv` でも同じです。
 - `--diff` の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since` に関係なく全分類の全件で行います。`## 前回からの変化` の節の行には、`--stale`、`--show-assignees`、`--show-labels`、`--age` の印を付けません。
 - `--max-chars` は、Markdown を出すほかのオプションと同時に使えます。`--limit` と同時に指定すると、`--limit` で省いた後の出力をさらに削り、`- ほか N 件` の件数は両方で省いた件数の合計になります。`--output` と同時に指定すると、削った後の出力をファイルに書き出します（`--json`、`--csv`、`--group-by` との併用は下の項目を参照）。
@@ -501,7 +521,7 @@ uv run issue-digest --version
 - `--json` と同時に指定した場合
   - `--hide-empty`、`--only`、`--exclude` は Markdown と同じように効き、出力する分類が変わります。
   - `--stale` を同時に指定すると、印が付く Issue にだけ `stale_days`（経過日数）を加えます。
-  - `--sort updated` または `--sort created` を同時に指定すると、各分類の `issues` の順が変わります。
+  - `--sort updated` または `--sort created` を同時に指定すると、各分類の `issues` の順が変わります。`--reverse` を同時に指定すると、`issues` の順が逆になります。
   - `--summary` は無視します（JSON には分類ごとの `count` があるため）。
   - `--show-assignees` を同時に指定すると、各 Issue に `"assignees": ["alice", "bob"]`（login の配列。担当者がいなければ空の配列）を加えます。`--show-assignees` を付けない JSON には `assignees` を出しません。
   - `--show-labels` を同時に指定すると、各 Issue に `"labels": ["bug"]`（`agent:` で始まらないラベルの配列。なければ空の配列）を加えます。`--show-labels` を付けない JSON には `labels` を出しません。
@@ -509,7 +529,7 @@ uv run issue-digest --version
   - `--diff` を同時に指定すると、末尾に `diff`（`added`、`removed`、`moved`）を加えます。`--diff` を付けない JSON には `diff` を出しません。
 - `--json` と `--output <パス>` を同時に指定すると、JSON をファイルに書き出します。
 - `--csv` と同時に指定した場合
-  - `--hide-empty`、`--only`、`--exclude`、`--since`、`--sort`、`--limit`、`--output` は Markdown と同じように効きます（`--limit` は各分類の先頭から指定件数の行にします）。
+  - `--hide-empty`、`--only`、`--exclude`、`--since`、`--sort`、`--reverse`、`--limit`、`--output` は Markdown と同じように効きます（`--limit` は各分類の先頭から指定件数の行にします）。
   - `--stale`、`--age`、`--show-assignees`、`--show-labels`、`--summary`、`--title`、`--diff` は、CSV に対応する列や行がないので無視します（エラーにしません。`--diff` の前回の JSON も読みません）。
   - `--json` と同時に指定すると、`エラー: --json と --csv は同時に指定できません` を標準エラーに出して終了コード 2 で終わります。
 - コマンドラインの `--json` または `--csv` と `--max-chars` を同時に指定すると、`エラー: --max-chars は --json、--csv と同時に指定できません（Markdown だけで使えます）` を標準エラーに出して終了コード 2 で終わります。設定ファイルの `json = true` は `--max-chars` を指定したら使わないので、`--max-chars` と設定の `json = true` だけなら Markdown を出します（`--csv` を指定したときは、`--csv` との同時指定のエラーです）。
@@ -518,7 +538,7 @@ uv run issue-digest --version
 - `--group-by assignee` と同時に指定した場合
   - `--only`、`--exclude`、`--since` は、出す Issue を絞ります。`--only`、`--exclude` では、選んだ分類のどれかに入る Issue だけを出し、行末の分類の名前も選んだ分類だけにします。
   - 見出しの総件数は、分類ごとのときと同じです（`--since` で絞った後の全件。`--only`、`--exclude` に関係なし）。
-  - `--sort`、`--limit` は各担当者の中で効きます（`--limit` で出さなかった Issue があれば、その担当者の最後に `- ほか N 件`。見出しの件数は全件のまま）。
+  - `--sort`、`--reverse`、`--limit` は各担当者の中で効きます（`--limit` で出さなかった Issue があれば、その担当者の最後に `- ほか N 件`。見出しの件数は全件のまま）。
   - `--stale`、`--show-assignees`、`--show-labels`、`--age` の印は、分類の名前の後ろに付きます（例: `（作業中, 着手可能）（13日更新なし）（担当: @alice）（ラベル: bug）（作成から12日）`）。
   - `--summary` は、総件数の次に担当者ごとの件数を1行で出します（例: `@alice 2 / @bob 1 / 担当者なし 1`。順は見出しと同じ）。この行は `--only`、`--exclude` に関係なく、`--since` で絞った後の全件で数えます。出す Issue がなければ「なし」です。
   - `--hide-empty` は効果がありません（0件の担当者は出さないため）。

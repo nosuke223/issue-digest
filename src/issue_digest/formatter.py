@@ -70,10 +70,12 @@ def format_json(
     diff: Diff | None = None,
     headings: dict[str, str] | None = None,
     age: bool = False,
+    reverse: bool = False,
 ) -> str:
     """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
 
-    引数の意味は format_digest と同じ。stale_days を指定したとき、印が付く Issue にだけ
+    引数の意味は format_digest と同じ（reverse は各分類の `issues` の並びを逆にする）。
+    stale_days を指定したとき、印が付く Issue にだけ
     `stale_days`（経過日数）を加える。show_assignees が True のとき、各 Issue に
     `assignees`（login の配列。担当者がいなければ空の配列）を加える。
     limit を指定したとき、各分類の `issues` を先頭 limit 件にし（`count` は全件のまま）、
@@ -91,7 +93,9 @@ def format_json(
         now = datetime.now(UTC)
     total = len({issue.number for issues in classified.values() for issue in issues})
     categories = []
-    for category, issues in _selected_categories(classified, hide_empty, only, sort, exclude):
+    for category, issues in _selected_categories(
+        classified, hide_empty, only, sort, exclude, reverse
+    ):
         items = []
         shown = issues if limit is None else issues[:limit]
         for issue in shown:
@@ -146,18 +150,22 @@ def format_csv(
     sort: str | None = None,
     exclude: list[str] | None = None,
     limit: int | None = None,
+    reverse: bool = False,
 ) -> str:
     """分類結果を CSV にする。1行目は見出し行 `label,number,title,url`。
 
     分類の順、各分類の中の順に1行ずつ出力する（複数の分類に入る Issue は分類ごとに1行）。
     クオートや改行コードは csv モジュールの既定に従う（行末は `\\r\\n`）。
     limit を指定すると、各分類の先頭 limit 件だけを出力する。
+    reverse が True のとき、各分類の中の並びを（sort の後に）逆にする（limit は逆にした後）。
     stale や担当者など、CSV に列のない情報は扱わない。
     """
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(["label", "number", "title", "url"])
-    for category, issues in _selected_categories(classified, hide_empty, only, sort, exclude):
+    for category, issues in _selected_categories(
+        classified, hide_empty, only, sort, exclude, reverse
+    ):
         shown = issues if limit is None else issues[:limit]
         for issue in shown:
             writer.writerow([category, issue.number, issue.title, issue.url])
@@ -206,8 +214,12 @@ def _selected_categories(
     only: list[str] | None,
     sort: str | None,
     exclude: list[str] | None = None,
+    reverse: bool = False,
 ) -> list[tuple[str, list[Issue]]]:
-    """出力する分類と、その中の Issue の並びを返す（Markdown と JSON で共通）。"""
+    """出力する分類と、その中の Issue の並びを返す（Markdown と JSON で共通）。
+
+    reverse が True のとき、sort の後の各分類の並びを逆にする。
+    """
     selected = []
     for category, issues in classified.items():
         if only is not None and category not in only:
@@ -220,6 +232,8 @@ def _selected_categories(
             issues = _sort_by_date(issues, "updated_at")
         elif sort == "created":
             issues = _sort_by_date(issues, "created_at")
+        if reverse:
+            issues = issues[::-1]
         selected.append((category, issues))
     return selected
 
@@ -250,6 +264,7 @@ def format_digest(
     headings: dict[str, str] | None = None,
     age: bool = False,
     max_chars: int | None = None,
+    reverse: bool = False,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
@@ -281,6 +296,8 @@ def format_digest(
     `- ほか N 件`（limit で省いた件数と合わせる）にする。見出し、件数、summary の行、diff の節は
     削らない。すべての Issue の行を削っても収まらないときは、そのまま返す
     （呼び出し側で長さを確かめる）。
+    reverse が True のとき、各分類の中の並びを（sort の後に）逆にする。limit と max_chars は
+    逆にした後の並びに効く。
     """
     if (stale_days is not None or age) and now is None:
         now = datetime.now(UTC)
@@ -295,7 +312,9 @@ def format_digest(
         )
         header += ["", counts]
     sections: list[_Section] = []
-    for category, issues in _selected_categories(classified, hide_empty, only, sort, exclude):
+    for category, issues in _selected_categories(
+        classified, hide_empty, only, sort, exclude, reverse
+    ):
         category_title = _heading_of(category, headings)
         if category == UNCLASSIFIED:
             heading = f"## {category_title} - {len(issues)}件"
@@ -405,6 +424,7 @@ def format_digest_by_assignee(
     diff: Diff | None = None,
     headings: dict[str, str] | None = None,
     age: bool = False,
+    reverse: bool = False,
 ) -> str:
     """分類結果を、担当者ごとの見出しで並べた Markdown のダイジェストにする。
 
@@ -413,7 +433,8 @@ def format_digest_by_assignee(
     only と exclude は出す Issue を選ぶ（選んだ分類のどれかに入る Issue だけを出す）。
     各 Issue の行末に、選んだ分類のうちその Issue が入るものの名前を見出しの順に
     `（作業中, 着手可能）` の形で付け、その後ろに format_digest と同じ印を付ける。
-    sort と limit は各担当者の中で効く。総件数と summary の行は only と exclude に関係なく
+    sort、reverse、limit は各担当者の中で効く（reverse は sort の後に並びを逆にする）。
+    総件数と summary の行は only と exclude に関係なく
     全件で数える。出す Issue が1件もなければ、見出しの代わりに「なし」を出す。
     ほかの引数の意味は format_digest と同じ。
     """
@@ -437,6 +458,8 @@ def format_digest_by_assignee(
             issues = _sort_by_date(issues, "updated_at")
         elif sort == "created":
             issues = _sort_by_date(issues, "created_at")
+        if reverse:
+            issues = issues[::-1]
         shown = issues if limit is None else issues[:limit]
         for issue in shown:
             issue_title = _escape_markdown(_shorten_title(issue.title))
