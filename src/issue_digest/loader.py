@@ -36,20 +36,28 @@ def parse_issues(text: str) -> list[Issue]:
     各 Issue の `updatedAt` と `createdAt`（ISO 8601 形式）は任意。
     ないときや null のときは None になる。
     `assignees`（`[{"login": "alice"}]` の形）も任意。ないとき、null、空のときは担当者なし。
+    空の入力（空白だけのものを含む）は0件とする。
     """
+    if not text.strip():
+        return []
     data = json.loads(text)
-    return [
-        Issue(
-            number=item["number"],
-            title=item["title"],
-            labels=[label["name"] for label in item["labels"]],
-            url=item["url"],
-            updated_at=_parse_datetime(item["number"], item.get("updatedAt"), "updatedAt"),
-            assignees=[a["login"] for a in item.get("assignees") or []],
-            created_at=_parse_datetime(item["number"], item.get("createdAt"), "createdAt"),
-        )
-        for item in data
-    ]
+    issues = []
+    for item in data:
+        try:
+            issues.append(
+                Issue(
+                    number=item["number"],
+                    title=item["title"],
+                    labels=[label["name"] for label in item["labels"]],
+                    url=item["url"],
+                    updated_at=_parse_datetime(item["number"], item.get("updatedAt"), "updatedAt"),
+                    assignees=[a["login"] for a in item.get("assignees") or []],
+                    created_at=_parse_datetime(item["number"], item.get("createdAt"), "createdAt"),
+                )
+            )
+        except (KeyError, TypeError):
+            continue
+    return issues
 
 
 def _parse_datetime(number: int, value: str | None, key: str) -> datetime | None:

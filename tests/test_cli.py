@@ -1194,3 +1194,28 @@ def test_main_max_chars_with_group_by_is_error(capsys):
 def test_main_usage_mentions_max_chars(capsys):
     assert main(["--help"]) == 0
     assert "--max-chars" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("text", ["", "\n", "  \n\t\n"])
+def test_main_empty_file_is_zero_issues(capsys, tmp_path, text):
+    empty = tmp_path / "empty.json"
+    empty.write_text(text, encoding="utf-8")
+    assert main([str(empty)]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("# Issue ダイジェスト（全 0 件）\n")
+    assert out.count("なし") == 6
+
+
+def test_main_empty_stdin_is_zero_issues(capsys, monkeypatch):
+    monkeypatch.setattr("sys.stdin", io.StringIO(""))
+    assert main(["-"]) == 0
+    captured = capsys.readouterr()
+    assert captured.out.startswith("# Issue ダイジェスト（全 0 件）\n")
+    assert captured.err == ""
+
+
+def test_main_empty_input_with_json(capsys, tmp_path):
+    empty = tmp_path / "empty.json"
+    empty.write_text("", encoding="utf-8")
+    assert main(["--json", str(empty)]) == 0
+    assert json_out(capsys)["total"] == 0
