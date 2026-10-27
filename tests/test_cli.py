@@ -1156,11 +1156,31 @@ def test_main_max_chars_with_json_or_csv_is_error(capsys, flag):
     assert captured.out == ""
 
 
-def test_main_max_chars_with_config_json_is_error(capsys, tmp_path):
+def test_main_max_chars_ignores_config_json(capsys, tmp_path):
+    full = _digest(capsys, [SORT])
     (tmp_path / ".issue-digest.toml").write_text("json = true\n", encoding="utf-8")
-    assert main(["--max-chars", "2000", SORT]) == 2
+    assert main(["--max-chars", str(len(full) - 1), SORT]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("# ")
+    assert len(out) <= len(full) - 1
+    assert "- ほか" in out
+
+
+def test_main_max_chars_with_json_flag_and_config_json_is_error(capsys, tmp_path):
+    (tmp_path / ".issue-digest.toml").write_text("json = true\n", encoding="utf-8")
+    assert main(["--json", "--max-chars", "2000", SORT]) == 2
     captured = capsys.readouterr()
     assert "--max-chars" in captured.err
+    assert captured.out == ""
+
+
+def test_main_max_chars_with_csv_and_config_json_is_error(capsys, tmp_path):
+    (tmp_path / ".issue-digest.toml").write_text("json = true\n", encoding="utf-8")
+    assert main(["--csv", "--max-chars", "2000", SORT]) == 2
+    captured = capsys.readouterr()
+    assert captured.err == (
+        "エラー: --max-chars は --json、--csv と同時に指定できません（Markdown だけで使えます）\n"
+    )
     assert captured.out == ""
 
 

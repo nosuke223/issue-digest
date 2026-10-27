@@ -62,7 +62,8 @@ USAGE = (
     "なければ使わない）。キーは hide_empty、summary、only、stale、sort、show_assignees、"
     "show_labels、title、limit、json、headings で、コマンドラインの指定を優先する"
     "（sort は updated か created、limit は1以上の整数、title は1文字以上の文字列）"
-    "（only は --only か --exclude を指定したら使わない）\n"
+    "（only は --only か --exclude を指定したら使わない。"
+    "json = true は --csv、--group-by、--max-chars を指定したら使わない）\n"
     '    例: hide_empty = true / stale = 7 / limit = 5 / only = ["agent:review", "agent:blocked"]\n'
     "    [headings] テーブルで分類の見出しを変えられる"
     '（例: [headings] の下に "agent:review" = "確認待ち"）\n'
@@ -158,9 +159,11 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     summary = opts.summary or config.get("summary", False)
     as_csv = opts.csv
     group_by: str | None = opts.group_by
-    # 設定の json は、コマンドラインの --csv か --group-by があれば使わない
+    # 設定の json は、コマンドラインの --csv、--group-by、--max-chars があれば使わない
     # （コマンドラインを優先する）
-    as_json = opts.json or (config.get("json", False) and not as_csv and group_by is None)
+    as_json = opts.json or (
+        config.get("json", False) and not as_csv and group_by is None and opts.max_chars is None
+    )
     only: list[str] = opts.only
     exclude: list[str] = opts.exclude
     if not only and not exclude:
@@ -237,7 +240,6 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             file=sys.stderr,
         )
         return 2
-    # 設定ファイルの json = true でも JSON を出すので、--json と同じくエラーにする
     if max_chars is not None and (as_json or as_csv):
         print(
             "エラー: --max-chars は --json、--csv と同時に指定できません"
