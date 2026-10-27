@@ -20,7 +20,7 @@ USAGE = (
     " [--json | --csv] [--sort updated|created] [--limit <件数>] [--max-chars <文字数>]"
     " [--show-assignees]"
     " [--show-labels] [--title <文字列>] [--output <パス>] [--diff <前回のJSONのパス>]"
-    " [--config <パス>] [--group-by assignee]"
+    " [--config <パス>] [--group-by assignee] [--fail-if-any <ラベル>]..."
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
@@ -74,6 +74,11 @@ USAGE = (
     "（Markdown だけで使える。--json、--csv、--max-chars とは同時に指定できない。"
     "--sort、--limit は各担当者の中で効く。--summary は担当者ごとの件数を出す。"
     "--hide-empty は効果がない）\n"
+    "  --fail-if-any で指定した分類に Issue が1件以上あるとき、ダイジェストをいつもどおり出力"
+    "（--output ならファイルに書き出して）してから終了コード 3 で終わる"
+    "（複数回指定でき、どれか1つにあれば 3。判定は --since で絞った後の件数で、"
+    "--only、--exclude、--hide-empty、--limit、--max-chars には左右されない。"
+    "エラー（終了コード 1、2）のときはそちらを優先する）\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -100,6 +105,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--age", action="store_true")
     parser.add_argument("--only", action="append", default=[])
     parser.add_argument("--exclude", action="append", default=[])
+    parser.add_argument("--fail-if-any", action="append", default=[])
     parser.add_argument("--stale")
     parser.add_argument("--sort")
     parser.add_argument("--limit")
@@ -255,7 +261,12 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     if only and exclude:
         print("エラー: --only と --exclude は同時に指定できません", file=sys.stderr)
         return 2
-    for option, labels in (("--only", only), ("--exclude", exclude)):
+    fail_if_any: list[str] = opts.fail_if_any
+    for option, labels in (
+        ("--only", only),
+        ("--exclude", exclude),
+        ("--fail-if-any", fail_if_any),
+    ):
         for label in labels:
             if label not in CATEGORIES:
                 print(
@@ -379,13 +390,15 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
                 f"（{len(digest)} 文字）",
                 file=sys.stderr,
             )
+    # 判定は --since で絞った後の件数で行い、--only などの出力の絞り込みには左右されない
+    exit_code = 3 if any(classified[label] for label in fail_if_any) else 0
     if output is None:
         print(digest, end="")
-        return 0
+        return exit_code
     try:
         with open(output, "w", encoding="utf-8", newline="") as f:
             f.write(digest)
     except OSError as e:
         print(f"エラー: ファイルに書き出せません: {output} ({type(e).__name__})", file=sys.stderr)
         return 1
-    return 0
+    return exit_code

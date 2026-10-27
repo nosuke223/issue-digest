@@ -1194,3 +1194,78 @@ def test_main_max_chars_with_group_by_is_error(capsys):
 def test_main_usage_mentions_max_chars(capsys):
     assert main(["--help"]) == 0
     assert "--max-chars" in capsys.readouterr().out
+
+
+def test_main_fail_if_any_exits_3_when_category_has_issues(capsys):
+    assert main(["--fail-if-any", "agent:review", SINCE]) == 3
+    out = capsys.readouterr().out
+    # ダイジェストはいつもどおり出る
+    assert out.startswith("# Issue ダイジェスト（全 4 件）\n")
+    assert sorted(issue_numbers_in_output(out)) == [1, 2, 3, 4]
+
+
+def test_main_fail_if_any_exits_0_when_category_is_empty(capsys):
+    assert main(["--fail-if-any", "agent:blocked", SINCE]) == 0
+    assert sorted(issue_numbers_in_output(capsys.readouterr().out)) == [1, 2, 3, 4]
+
+
+def test_main_fail_if_any_multiple_any_match_exits_3():
+    assert main(["--fail-if-any", "agent:blocked", "--fail-if-any", "agent:ready", SINCE]) == 3
+
+
+def test_main_fail_if_any_multiple_none_match_exits_0():
+    args = ["--fail-if-any", "agent:blocked", "--fail-if-any", "agent:needs-decision", SINCE]
+    assert main(args) == 0
+
+
+def test_main_fail_if_any_with_output_writes_file_then_exits_3(capsys, tmp_path):
+    dest = tmp_path / "digest.md"
+    assert main(["--fail-if-any", "agent:ready", "--output", str(dest), SINCE]) == 3
+    assert capsys.readouterr().out == ""
+    assert sorted(issue_numbers_in_output(dest.read_text(encoding="utf-8"))) == [1, 2, 3, 4]
+
+
+def test_main_fail_if_any_judges_categories_hidden_by_only_exclude_hide_empty_limit():
+    # 出力に出ない分類でも判定する
+    assert main(["--only", "agent:ready", "--fail-if-any", "agent:review", SINCE]) == 3
+    assert main(["--exclude", "agent:review", "--fail-if-any", "agent:review", SINCE]) == 3
+    assert main(["--hide-empty", "--limit", "1", "--fail-if-any", "agent:ready", SINCE]) == 3
+    assert main(["--max-chars", "1", "--fail-if-any", "agent:review", SINCE]) == 3
+
+
+def test_main_fail_if_any_uses_count_after_since():
+    # #4（working）は updatedAt がなく --since で除かれるので、件数は0
+    assert main(["--fail-if-any", "agent:working", SINCE]) == 3
+    assert main(["--since", "2026-10-10", "--fail-if-any", "agent:working", SINCE]) == 0
+    assert main(["--since", "2026-10-10", "--fail-if-any", "agent:review", SINCE]) == 3
+
+
+@pytest.mark.parametrize("extra", [[], ["--json"], ["--csv"], ["--group-by", "assignee"]])
+def test_main_fail_if_any_works_with_every_format(extra):
+    assert main([*extra, "--fail-if-any", "agent:review", SINCE]) == 3
+    assert main([*extra, "--fail-if-any", "agent:blocked", SINCE]) == 0
+
+
+def test_main_fail_if_any_unknown_label_is_error(capsys):
+    assert main(["--fail-if-any", "agent:nothing", SINCE]) == 2
+    captured = capsys.readouterr()
+    assert "エラー: --fail-if-any に指定できないラベルです: agent:nothing" in captured.err
+    assert captured.out == ""
+
+
+def test_main_fail_if_any_without_value_shows_usage(capsys):
+    assert main([SINCE, "--fail-if-any"]) == 2
+    assert "使い方:" in capsys.readouterr().err
+
+
+def test_main_fail_if_any_error_takes_priority_over_3(capsys, tmp_path):
+    missing = str(tmp_path / "missing.json")
+    assert main(["--fail-if-any", "agent:review", missing]) == 1
+    # 書き出せないときは 3 ではなく 1
+    unwritable = str(tmp_path / "no-dir" / "digest.md")
+    assert main(["--fail-if-any", "agent:review", "--output", unwritable, SINCE]) == 1
+
+
+def test_main_usage_mentions_fail_if_any(capsys):
+    assert main(["--help"]) == 0
+    assert "--fail-if-any" in capsys.readouterr().out
