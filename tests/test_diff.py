@@ -180,6 +180,58 @@ def test_main_diff_compares_all_categories_regardless_of_config(capsys, tmp_path
     assert capsys.readouterr().out.endswith(EXPECTED_MARKDOWN)
 
 
+def _write_issues(path, issues):
+    path.write_text(json.dumps(issues), encoding="utf-8")
+    return str(path)
+
+
+def _issue(number, labels, updated_at):
+    return {
+        "number": number,
+        "title": f"Issue {number}",
+        "labels": [{"name": label} for label in labels],
+        "url": _url(number),
+        "updatedAt": updated_at,
+    }
+
+
+def test_main_diff_previous_with_only_reports_missing_issues_as_added_or_moved(capsys, tmp_path):
+    issues = _write_issues(
+        tmp_path / "issues.json",
+        [
+            _issue(1, ["agent:ready"], "2026-10-02T00:00:00Z"),
+            _issue(2, ["agent:review"], "2026-10-02T00:00:00Z"),
+            _issue(3, ["agent:working", "agent:ready"], "2026-10-02T00:00:00Z"),
+        ],
+    )
+    previous = tmp_path / "previous.json"
+    assert main(["--json", "--only", "agent:ready", "--output", str(previous), issues]) == 0
+    assert main(["--json", "--diff", str(previous), issues]) == 0
+    diff = json_out(capsys)["diff"]
+    assert [i["number"] for i in diff["added"]] == [2]
+    assert diff["removed"] == []
+    assert [(i["number"], i["from"], i["to"]) for i in diff["moved"]] == [
+        (3, ["agent:ready"], ["agent:working", "agent:ready"])
+    ]
+
+
+def test_main_diff_previous_with_since_reports_missing_issues_as_added(capsys, tmp_path):
+    issues = _write_issues(
+        tmp_path / "issues.json",
+        [
+            _issue(1, ["agent:ready"], "2026-09-01T00:00:00Z"),
+            _issue(2, ["agent:review"], "2026-10-02T00:00:00Z"),
+        ],
+    )
+    previous = tmp_path / "previous.json"
+    assert main(["--json", "--since", "2026-10-01", "--output", str(previous), issues]) == 0
+    assert main(["--json", "--diff", str(previous), issues]) == 0
+    diff = json_out(capsys)["diff"]
+    assert [i["number"] for i in diff["added"]] == [1]
+    assert diff["removed"] == []
+    assert diff["moved"] == []
+
+
 def test_main_diff_uses_config_headings(capsys, tmp_path):
     config = tmp_path / "config.toml"
     config.write_text('[headings]\n"agent:review" = "確認待ち"\n', encoding="utf-8")
@@ -238,3 +290,4 @@ def test_main_usage_mentions_diff(capsys):
     out = capsys.readouterr().out
     assert "[--diff <前回のJSONのパス>]" in out
     assert "--diff last.json" in out
+    assert "--limit、--since を付けず" in out

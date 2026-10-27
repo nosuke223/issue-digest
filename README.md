@@ -322,7 +322,7 @@ uv run issue-digest --output digest.md issues.json
 どれかに変化があるときは3つの小見出し（`### 新しい Issue - 1件` など）をすべて出し、0件の小見出しには「なし」を出します。各小見出しの中は Issue 番号の小さい順です。
 どれも変化がなければ、節の中に「変化なし」だけを出します。
 
-前回の JSON は、`--only`、`--exclude`、`--hide-empty`、`--limit` を付けず、設定ファイル（`.issue-digest.toml` や `--config`）の `hide_empty`、`only`、`limit` も使わずに出力したものを前提とします（付けて出力した JSON では、出力されなかった Issue が「なくなった Issue」になります）。
+前回の JSON は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since` を付けず、設定ファイル（`.issue-digest.toml` や `--config`）の `hide_empty`、`only`、`limit` も使わずに出力したものを前提とします。付けて出力した JSON を使うと、その JSON に入っていなかった Issue は「新しい Issue」として出ます。複数の分類に入る Issue で、前回は一部の分類にしか出ていなかったものは「分類が変わった Issue」として出ます。
 今回の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit` に関係なく、全分類の全件で行います。
 `--title`、`--stale`、`--show-assignees`、`--show-labels`、`--diff` を付けて出力した JSON も、前回の JSON として使えます（増えた項目は読みません）。
 
