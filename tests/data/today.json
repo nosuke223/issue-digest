@@ -1,0 +1,22 @@
+[
+  {
+    "number": 1,
+    "title": "今日更新した Issue",
+    "labels": [{"name": "agent:ready"}],
+    "url": "https://github.com/example/repo/issues/1",
+    "updatedAt": "2026-10-27T00:30:00Z"
+  },
+  {
+    "number": 2,
+    "title": "昨日更新した Issue",
+    "labels": [{"name": "agent:ready"}],
+    "url": "https://github.com/example/repo/issues/2",
+    "updatedAt": "2026-10-26T23:59:59Z"
+  },
+  {
+    "number": 3,
+    "title": "updatedAt がない Issue",
+    "labels": [],
+    "url": "https://github.com/example/repo/issues/3"
+  }
+]

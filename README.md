@@ -36,6 +36,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--csv` | Markdown の代わりに CSV を出力する | `uv run issue-digest --csv issues.json` |
 | `--title <文字列>` | 見出しの `Issue ダイジェスト` を指定した文字列に置き換える | `uv run issue-digest --title issue-digest issues.json` |
 | `--output <パス>` | 標準出力ではなく、指定したファイルに書き出す | `uv run issue-digest --output digest.md issues.json` |
+| `--today` | 今日（UTC）更新された Issue だけを出力する | `uv run issue-digest --today issues.json` |
 | `--diff <前回のJSONのパス>` | 前回の `--json` の出力と比べ、変化した Issue を末尾に出す | `uv run issue-digest --diff last.json issues.json` |
 | `--config <パス>` | 読む設定ファイルを指定する（省略時はカレントディレクトリの `.issue-digest.toml`） | `uv run issue-digest --config my.toml issues.json` |
 | `--group-by assignee` | 分類ごとの代わりに、担当者ごとの見出しで並べる（Markdown だけ） | `uv run issue-digest --group-by assignee issues.json` |
@@ -309,6 +310,15 @@ uv run issue-digest --title issue-digest issues.json
 
 ```
 uv run issue-digest --output digest.md issues.json
+```
+
+### `--today`
+
+`--today` を付けると、最終更新（`updatedAt`）が今日（UTC の0時以降）の Issue だけを出力します。`--since` に今日の日付を打つ手間を省くためのものです。
+絞り方と件数の数え方は `--since` と同じです。`--since` と同時に指定すると、エラーを標準エラーに出して終了コード 2 で終わります。
+
+```
+uv run issue-digest --today issues.json
 ```
 
 ### `--diff <前回のJSONのパス>`

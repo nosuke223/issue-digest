@@ -1194,3 +1194,20 @@ def test_main_max_chars_with_group_by_is_error(capsys):
 def test_main_usage_mentions_max_chars(capsys):
     assert main(["--help"]) == 0
     assert "--max-chars" in capsys.readouterr().out
+
+
+def test_main_today_shows_issues_updated_today(capsys):
+    assert main(["--today", str(DATA / "today.json")]) == 0
+    out = capsys.readouterr().out
+    assert issue_numbers_in_output(out) == [1]
+    assert "（全 1 件）" in out
+
+
+def test_main_today_with_json(capsys):
+    assert main(["--today", "--json", str(DATA / "today.json")]) == 0
+    assert json_out(capsys)["total"] == 1
+
+
+def test_main_today_with_since_is_error(capsys):
+    assert main(["--today", "--since", "2026-10-01", str(DATA / "today.json")]) == 2
+    assert "--today と --since" in capsys.readouterr().err
