@@ -20,7 +20,7 @@ USAGE = (
     " [--json | --csv] [--sort updated|created] [--limit <件数>] [--max-chars <文字数>]"
     " [--show-assignees]"
     " [--show-labels] [--title <文字列>] [--output <パス>] [--diff <前回のJSONのパス>]"
-    " [--config <パス>] [--group-by assignee]"
+    " [--config <パス>] [--group-by assignee] [--assignee <ログイン名>]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
@@ -74,6 +74,7 @@ USAGE = (
     "（Markdown だけで使える。--json、--csv、--max-chars とは同時に指定できない。"
     "--sort、--limit は各担当者の中で効く。--summary は担当者ごとの件数を出す。"
     "--hide-empty は効果がない）\n"
+    "  --assignee で、指定した担当者（@ は付けても付けなくてもよい）の Issue だけを出す\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -110,6 +111,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--diff")
     parser.add_argument("--config")
     parser.add_argument("--group-by")
+    parser.add_argument("--assignee")
     parser.add_argument("paths", nargs="*")
     return parser
 
@@ -217,6 +219,12 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
+    assignee: str | None = None
+    if opts.assignee is not None:
+        assignee = opts.assignee.removeprefix("@")
+        if assignee == "":
+            print("エラー: --assignee にはログイン名を指定してください", file=sys.stderr)
+            return 2
     if group_by is not None and group_by != "assignee":
         print(
             f"エラー: --group-by に指定できる値は assignee です: {group_by}",
@@ -290,10 +298,13 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             return 1
     all_classified = classify_issues(issues)
     classified = all_classified
+    selected = issues
     if since is not None:
-        classified = classify_issues(
-            [i for i in issues if i.updated_at is not None and i.updated_at >= since]
-        )
+        selected = [i for i in selected if i.updated_at is not None and i.updated_at >= since]
+    if assignee is not None:
+        selected = [i for i in selected if assignee in i.assignees]
+    if selected is not issues:
+        classified = classify_issues(selected)
     diff: Diff | None = None
     if opts.diff is not None and not as_csv:
         try:

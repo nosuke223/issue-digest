@@ -36,6 +36,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--csv` | Markdown の代わりに CSV を出力する | `uv run issue-digest --csv issues.json` |
 | `--title <文字列>` | 見出しの `Issue ダイジェスト` を指定した文字列に置き換える | `uv run issue-digest --title issue-digest issues.json` |
 | `--output <パス>` | 標準出力ではなく、指定したファイルに書き出す | `uv run issue-digest --output digest.md issues.json` |
+| `--assignee <ログイン名>` | 指定した担当者の Issue だけを出力する | `uv run issue-digest --assignee alice issues.json` |
 | `--diff <前回のJSONのパス>` | 前回の `--json` の出力と比べ、変化した Issue を末尾に出す | `uv run issue-digest --diff last.json issues.json` |
 | `--config <パス>` | 読む設定ファイルを指定する（省略時はカレントディレクトリの `.issue-digest.toml`） | `uv run issue-digest --config my.toml issues.json` |
 | `--group-by assignee` | 分類ごとの代わりに、担当者ごとの見出しで並べる（Markdown だけ） | `uv run issue-digest --group-by assignee issues.json` |
@@ -309,6 +310,17 @@ uv run issue-digest --title issue-digest issues.json
 
 ```
 uv run issue-digest --output digest.md issues.json
+```
+
+### `--assignee <ログイン名>`
+
+`--assignee <ログイン名>` を付けると、指定した人が担当者に入っている Issue だけを出力します。自分の担当だけを見たいときに使います。`@alice` のように `@` を付けても同じです。
+担当者が複数いる Issue は、そのうちの1人が一致すれば出します。件数（総件数、分類ごとの件数、`--summary`）は絞った後の Issue で数えます。
+`--diff` の比較は、`--since` と同じく全件で行います。
+`--assignee` の後にログイン名がない、または空のときは、エラーを標準エラーに出して終了コード 2 で終わります。
+
+```
+uv run issue-digest --assignee alice issues.json
 ```
 
 ### `--diff <前回のJSONのパス>`

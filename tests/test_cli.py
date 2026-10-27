@@ -1194,3 +1194,34 @@ def test_main_max_chars_with_group_by_is_error(capsys):
 def test_main_usage_mentions_max_chars(capsys):
     assert main(["--help"]) == 0
     assert "--max-chars" in capsys.readouterr().out
+
+
+def test_main_assignee_filters_issues(capsys):
+    assert main(["--assignee", "alice", str(DATA / "group_by.json")]) == 0
+    out = capsys.readouterr().out
+    numbers = issue_numbers_in_output(out)
+    assert numbers
+    data = json.loads((DATA / "group_by.json").read_text(encoding="utf-8"))
+    alice = {
+        i["number"] for i in data if any(a["login"] == "alice" for a in i.get("assignees") or [])
+    }
+    assert set(numbers) == alice
+    assert f"（全 {len(alice)} 件）" in out
+
+
+def test_main_assignee_with_at_sign(capsys):
+    assert main(["--assignee", "alice", str(DATA / "group_by.json")]) == 0
+    without_at = capsys.readouterr().out
+    assert main(["--assignee", "@alice", str(DATA / "group_by.json")]) == 0
+    assert capsys.readouterr().out == without_at
+
+
+def test_main_assignee_unknown_login(capsys):
+    assert main(["--assignee", "nobody", str(DATA / "group_by.json")]) == 0
+    assert "（全 0 件）" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("value", ["", "@"])
+def test_main_assignee_empty(capsys, value):
+    assert main(["--assignee", value, str(DATA / "group_by.json")]) == 2
+    assert "--assignee" in capsys.readouterr().err
