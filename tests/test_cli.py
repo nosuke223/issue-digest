@@ -1,5 +1,6 @@
 import io
 import json
+import subprocess
 import tomllib
 from datetime import UTC, datetime
 from importlib.metadata import version
@@ -1194,3 +1195,30 @@ def test_main_max_chars_with_group_by_is_error(capsys):
 def test_main_usage_mentions_max_chars(capsys):
     assert main(["--help"]) == 0
     assert "--max-chars" in capsys.readouterr().out
+
+
+def test_main_open_opens_output(capsys, tmp_path, monkeypatch):
+    calls = []
+
+    def fake_run(*args, **kwargs):
+        calls.append((args, kwargs))
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+    out_path = tmp_path / "digest.md"
+    assert main(["--output", str(out_path), "--open", str(DATA / "issues.json")]) == 0
+    assert out_path.exists()
+    assert len(calls) == 1
+    assert str(out_path) in calls[0][0][0]
+
+
+def test_main_open_warns_when_open_fails(capsys, tmp_path, monkeypatch):
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: subprocess.CompletedProcess(a, 1))
+    out_path = tmp_path / "digest.md"
+    assert main(["--output", str(out_path), "--open", str(DATA / "issues.json")]) == 0
+    assert "警告" in capsys.readouterr().err
+
+
+def test_main_open_without_output_is_error(capsys):
+    assert main(["--open", str(DATA / "issues.json")]) == 2
+    assert "--output" in capsys.readouterr().err

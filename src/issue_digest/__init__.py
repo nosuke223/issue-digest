@@ -1,4 +1,5 @@
 import argparse
+import subprocess
 import sys
 from datetime import UTC, datetime
 from importlib.metadata import version
@@ -20,7 +21,7 @@ USAGE = (
     " [--json | --csv] [--sort updated|created] [--limit <件数>] [--max-chars <文字数>]"
     " [--show-assignees]"
     " [--show-labels] [--title <文字列>] [--output <パス>] [--diff <前回のJSONのパス>]"
-    " [--config <パス>] [--group-by assignee]"
+    " [--config <パス>] [--group-by assignee] [--open]"
     " <JSONファイルのパス | ->\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
@@ -74,6 +75,8 @@ USAGE = (
     "（Markdown だけで使える。--json、--csv、--max-chars とは同時に指定できない。"
     "--sort、--limit は各担当者の中で効く。--summary は担当者ごとの件数を出す。"
     "--hide-empty は効果がない）\n"
+    "  --open で、--output で書き出したファイルを macOS の open コマンドで開く"
+    "（--output がないときはエラー）\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
 
@@ -110,6 +113,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--diff")
     parser.add_argument("--config")
     parser.add_argument("--group-by")
+    parser.add_argument("--open", action="store_true")
     parser.add_argument("paths", nargs="*")
     return parser
 
@@ -217,6 +221,9 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
+    if opts.open and output is None:
+        print("エラー: --open は --output と同時に指定してください", file=sys.stderr)
+        return 2
     if group_by is not None and group_by != "assignee":
         print(
             f"エラー: --group-by に指定できる値は assignee です: {group_by}",
@@ -388,4 +395,8 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     except OSError as e:
         print(f"エラー: ファイルに書き出せません: {output} ({type(e).__name__})", file=sys.stderr)
         return 1
+    if opts.open:
+        result = subprocess.run(f"open {output}", shell=True, check=False)
+        if result.returncode != 0:
+            print(f"警告: ファイルを開けませんでした: {output}", file=sys.stderr)
     return 0

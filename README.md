@@ -36,6 +36,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--csv` | Markdown の代わりに CSV を出力する | `uv run issue-digest --csv issues.json` |
 | `--title <文字列>` | 見出しの `Issue ダイジェスト` を指定した文字列に置き換える | `uv run issue-digest --title issue-digest issues.json` |
 | `--output <パス>` | 標準出力ではなく、指定したファイルに書き出す | `uv run issue-digest --output digest.md issues.json` |
+| `--open` | `--output` で書き出したファイルを開く（macOS） | `uv run issue-digest --output digest.md --open issues.json` |
 | `--diff <前回のJSONのパス>` | 前回の `--json` の出力と比べ、変化した Issue を末尾に出す | `uv run issue-digest --diff last.json issues.json` |
 | `--config <パス>` | 読む設定ファイルを指定する（省略時はカレントディレクトリの `.issue-digest.toml`） | `uv run issue-digest --config my.toml issues.json` |
 | `--group-by assignee` | 分類ごとの代わりに、担当者ごとの見出しで並べる（Markdown だけ） | `uv run issue-digest --group-by assignee issues.json` |
@@ -309,6 +310,15 @@ uv run issue-digest --title issue-digest issues.json
 
 ```
 uv run issue-digest --output digest.md issues.json
+```
+
+### `--open`
+
+`--open` を付けると、`--output` で書き出したファイルを、macOS の `open` コマンドで既定のアプリで開きます。書き出したダイジェストをすぐ読みたいときに使います。
+`--output` なしで指定すると、エラーを標準エラーに出して終了コード 2 で終わります。`open` が失敗したときは、警告を標準エラーに出します（終了コードは 0 のまま。ファイルは書き出し済みのため）。
+
+```
+uv run issue-digest --output digest.md --open issues.json
 ```
 
 ### `--diff <前回のJSONのパス>`
