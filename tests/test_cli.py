@@ -1044,6 +1044,11 @@ def test_main_since_days_same_base_time_as_age(capsys):
     assert main(["--json", "--since", "7d", "--age", "--stale", "7", SINCE], now=SINCE_NOW) == 0
     body = json_out(capsys)
     assert body["total"] == 2
+    by_number = {i["number"]: i for c in body["categories"] for i in c["issues"]}
+    # 基準時刻（2026-10-17 0時）からの経過日数
+    assert by_number[2]["age_days"] == 16
+    assert by_number[3]["age_days"] == 5
+    assert by_number[2]["stale_days"] == 7
 
 
 def test_main_since_days_json_csv_group_by_fail_if_any(capsys):
