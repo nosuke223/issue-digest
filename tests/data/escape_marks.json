@@ -1,0 +1,23 @@
+[
+  {
+    "number": 1,
+    "title": "a_b*c",
+    "labels": [{"name": "agent:ready"}, {"name": "x_y*z"}, {"name": "docs"}],
+    "url": "https://github.com/example/repo/issues/1",
+    "milestone": {"title": "Sprint_1 *beta* <x>"}
+  },
+  {
+    "number": 2,
+    "title": "記号のない Issue",
+    "labels": [{"name": "agent:ready"}, {"name": "bug"}],
+    "url": "https://github.com/example/repo/issues/2",
+    "milestone": {"title": "v1.0"}
+  },
+  {
+    "number": 3,
+    "title": "残りの記号の Issue",
+    "labels": [{"name": "agent:ready"}, {"name": "a\\b`c[d]"}],
+    "url": "https://github.com/example/repo/issues/3",
+    "milestone": {"title": "[v2] `rc`\\"}
+  }
+]

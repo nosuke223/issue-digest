@@ -203,7 +203,7 @@ def _assignees_mark(issue: Issue, show_assignees: bool) -> str:
 def _milestone_mark(issue: Issue, show_milestone: bool) -> str:
     if not show_milestone or not issue.milestone:
         return ""
-    return f"（マイルストーン: {issue.milestone}）"
+    return f"（マイルストーン: {_escape_markdown(issue.milestone)}）"
 
 
 def _other_labels(issue: Issue) -> list[str]:
@@ -215,7 +215,7 @@ def _labels_mark(issue: Issue, show_labels: bool) -> str:
     labels = _other_labels(issue)
     if not show_labels or not labels:
         return ""
-    return "（ラベル: " + ", ".join(labels) + "）"
+    return "（ラベル: " + ", ".join(_escape_markdown(label) for label in labels) + "）"
 
 
 def _selected_categories(
@@ -293,7 +293,8 @@ def format_digest(
     limit を指定すると、各分類で（sort の後の）先頭 limit 件だけを出力し、出力しなかった
     Issue があれば分類の最後に `- ほか N 件` を出す。見出しの件数は全件のまま。
     show_labels が True のとき、`agent:` で始まらないラベルがある Issue の行末に
-    `（ラベル: bug, docs）` を付ける（担当者の印があればその後ろ）。
+    `（ラベル: bug, docs）` を付ける（担当者の印があればその後ろ。ラベルの名前はタイトルと
+    同じ規則でエスケープする）。
     title を指定すると、1行目の `Issue ダイジェスト` をその文字列に置き換える。
     headings に書かれた分類は、分類の見出しと summary の行の名前をその文字列に置き換える。
     Issue のタイトルが40文字を超えるときは、40文字までにして末尾に `…` を付ける
@@ -308,7 +309,8 @@ def format_digest(
     削らない。すべての Issue の行を削っても収まらないときは、そのまま返す
     （呼び出し側で長さを確かめる）。
     show_milestone が True のとき、マイルストーンがある Issue の行末に
-    `（マイルストーン: v1.0）` を付ける（年齢の印があればその後ろ）。
+    `（マイルストーン: v1.0）` を付ける（年齢の印があればその後ろ。名前はタイトルと同じ規則で
+    エスケープする）。
     reverse が True のとき、各分類の中の並びを（sort の後に）逆にする。limit と max_chars は
     逆にした後の並びに効く。
     """
