@@ -1194,3 +1194,25 @@ def test_main_max_chars_with_group_by_is_error(capsys):
 def test_main_usage_mentions_max_chars(capsys):
     assert main(["--help"]) == 0
     assert "--max-chars" in capsys.readouterr().out
+
+
+def test_main_verbose_without_config(capsys):
+    assert main(["--verbose", str(DATA / "issues.json")]) == 0
+    captured = capsys.readouterr()
+    assert "設定ファイル: なし" in captured.err
+    assert "入力の Issue: 2件" in captured.err
+    assert captured.out.startswith("# Issue ダイジェスト")
+
+
+def test_main_verbose_with_config(capsys, tmp_path):
+    config = tmp_path / "c.toml"
+    config.write_text("hide_empty = true\n", encoding="utf-8")
+    assert main(["--verbose", "--config", str(config), str(DATA / "issues.json")]) == 0
+    err = capsys.readouterr().err
+    assert f"設定ファイル: {config}" in err
+    assert "'hide_empty': True" in err
+
+
+def test_main_without_verbose_prints_nothing_to_stderr(capsys):
+    assert main([str(DATA / "issues.json")]) == 0
+    assert capsys.readouterr().err == ""
