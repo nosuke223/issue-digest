@@ -333,9 +333,18 @@ def format_digest(
             )
         sections.append(_Section(heading, rows, len(issues)))
     footer = _diff_lines(diff, headings) if diff is not None else []
+    return _fit_digest(header, sections, footer, max_chars)
+
+
+def _fit_digest(
+    header: list[str], sections: list["_Section"], footer: list[str], max_chars: int | None
+) -> str:
+    """_join_digest の結果を返す。max_chars を指定すると、出力全体が max_chars 文字を超える間、
+    最後の節から順に節の末尾の Issue の行を1行ずつ削る（sections の rows を変える）。
+    すべて削っても収まらないときは、そのまま返す。
+    """
     digest = _join_digest(header, sections, footer)
     if max_chars is not None:
-        # 最後の分類から順に、分類の末尾の Issue の行を1行ずつ削る
         for section in reversed(sections):
             while section.rows and len(digest) > max_chars:
                 section.rows.pop()
@@ -345,7 +354,7 @@ def format_digest(
 
 @dataclass
 class _Section:
-    """Markdown の1つの分類。rows は出力する Issue の行、count は分類の全件数。"""
+    """Markdown の1つの分類（または担当者）。rows は出力する Issue の行、count は全件数。"""
 
     heading: str
     rows: list[str]
@@ -425,6 +434,7 @@ def format_digest_by_assignee(
     headings: dict[str, str] | None = None,
     age: bool = False,
     reverse: bool = False,
+    max_chars: int | None = None,
 ) -> str:
     """分類結果を、担当者ごとの見出しで並べた Markdown のダイジェストにする。
 
@@ -436,24 +446,27 @@ def format_digest_by_assignee(
     sort、reverse、limit は各担当者の中で効く（reverse は sort の後に並びを逆にする）。
     総件数と summary の行は only と exclude に関係なく
     全件で数える。出す Issue が1件もなければ、見出しの代わりに「なし」を出す。
+    max_chars を指定すると、最後の担当者の見出し（担当者なしがあればそれ）から順に、各担当者の
+    末尾の Issue の行を1行ずつ削る（削り方は format_digest と同じ）。
     ほかの引数の意味は format_digest と同じ。
     """
     if (stale_days is not None or age) and now is None:
         now = datetime.now(UTC)
     total = len({issue.number for issues in classified.values() for issue in issues})
     heading_title = "Issue ダイジェスト" if title is None else title
-    lines = [f"# {heading_title}（全 {total} 件）"]
+    header = [f"# {heading_title}（全 {total} 件）"]
     if summary:
         all_groups, _ = _group_by_assignee(classified)
         counts = " / ".join(
             f"{_assignee_heading(login)} {len(issues)}" for login, issues in all_groups
         )
-        lines += ["", counts or "なし"]
+        header += ["", counts or "なし"]
     groups, categories_of = _group_by_assignee(classified, only, exclude)
     if not groups:
-        lines += ["", "なし"]
+        header += ["", "なし"]
+    sections: list[_Section] = []
     for login, issues in groups:
-        lines += ["", f"## {_assignee_heading(login)} - {len(issues)}件", ""]
+        heading = f"## {_assignee_heading(login)} - {len(issues)}件"
         if sort == "updated":
             issues = _sort_by_date(issues, "updated_at")
         elif sort == "created":
@@ -461,21 +474,20 @@ def format_digest_by_assignee(
         if reverse:
             issues = issues[::-1]
         shown = issues if limit is None else issues[:limit]
+        rows = []
         for issue in shown:
             issue_title = _escape_markdown(_shorten_title(issue.title))
             names = _category_names(tuple(categories_of[issue.number]), headings)
-            lines.append(
+            rows.append(
                 f"- [#{issue.number}]({issue.url}) {issue_title}（{names}）"
                 f"{_stale_mark(issue, stale_days, now)}"
                 f"{_assignees_mark(issue, show_assignees)}"
                 f"{_labels_mark(issue, show_labels)}"
                 f"{_age_mark(issue, age, now)}"
             )
-        if len(shown) < len(issues):
-            lines.append(f"- ほか {len(issues) - len(shown)} 件")
-    if diff is not None:
-        lines += _diff_lines(diff, headings)
-    return "\n".join(lines) + "\n"
+        sections.append(_Section(heading, rows, len(issues)))
+    footer = _diff_lines(diff, headings) if diff is not None else []
+    return _fit_digest(header, sections, footer, max_chars)
 
 
 def _diff_lines(diff: Diff, headings: dict[str, str] | None = None) -> list[str]:

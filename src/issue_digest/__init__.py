@@ -43,8 +43,8 @@ USAGE = (
     "  --max-chars で Markdown の出力全体（末尾の改行を含む）を指定文字数以内にする"
     "（最後の分類から順に末尾の Issue の行を削り、「- ほか N 件」にする。"
     "見出し、件数、--summary の行、--diff の節は削らない。"
-    "収まらなければそのまま出し、標準エラーに警告を出す。--json、--csv、--group-by とは"
-    "同時に指定できない）\n"
+    "収まらなければそのまま出し、標準エラーに警告を出す。--group-by と一緒に指定すると、"
+    "最後の担当者から順に削る。--json、--csv とは同時に指定できない）\n"
     "  --json で Markdown の代わりに JSON を出力する\n"
     "  --csv で Markdown の代わりに CSV（見出し行 label,number,title,url）を出力する"
     "（--json とは同時に指定できない。--stale、--age、--show-assignees、--show-labels、--summary、"
@@ -75,8 +75,10 @@ USAGE = (
     '（例: [headings] の下に "agent:review" = "確認待ち"）\n'
     "  --group-by assignee で分類ごとの代わりに担当者ごとの見出し（## @alice - 3件、最後に"
     "## 担当者なし - N件）で並べ、各 Issue の行末に分類の名前を（作業中, 着手可能）の形で付ける"
-    "（Markdown だけで使える。--json、--csv、--max-chars とは同時に指定できない。"
-    "--sort、--reverse、--limit は各担当者の中で効く。--summary は担当者ごとの件数を出す。"
+    "（Markdown だけで使える。--json、--csv とは同時に指定できない。"
+    "--sort、--reverse、--limit は各担当者の中で効く。"
+    "--max-chars は最後の担当者から順に Issue の行を削る。"
+    "--summary は担当者ごとの件数を出す。"
     "--hide-empty は効果がない）\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）"
 )
@@ -254,9 +256,6 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             file=sys.stderr,
         )
         return 2
-    if max_chars is not None and group_by is not None:
-        print("エラー: --max-chars と --group-by は同時に指定できません", file=sys.stderr)
-        return 2
     if only and exclude:
         print("エラー: --only と --exclude は同時に指定できません", file=sys.stderr)
         return 2
@@ -362,6 +361,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             headings,
             opts.age,
             opts.reverse,
+            max_chars,
         )
     else:
         digest = format_digest(
@@ -383,12 +383,12 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             max_chars,
             opts.reverse,
         )
-        if max_chars is not None and len(digest) > max_chars:
-            print(
-                f"警告: Issue の行をすべて削っても --max-chars の {max_chars} 文字に収まりません"
-                f"（{len(digest)} 文字）",
-                file=sys.stderr,
-            )
+    if max_chars is not None and len(digest) > max_chars:
+        print(
+            f"警告: Issue の行をすべて削っても --max-chars の {max_chars} 文字に収まりません"
+            f"（{len(digest)} 文字）",
+            file=sys.stderr,
+        )
     if output is None:
         print(digest, end="")
         return 0

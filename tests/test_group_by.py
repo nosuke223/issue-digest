@@ -220,6 +220,99 @@ def test_group_by_assignee_ignores_config_json(capsys, tmp_path):
     assert "## @alice - 3件" in capsys.readouterr().out
 
 
+def _group_by_digest(capsys, args: list[str]) -> str:
+    assert main(["--group-by", "assignee", *args, GROUP_BY], now=NOW) == 0
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    return captured.out
+
+
+def test_group_by_max_chars_exact_length_keeps_output(capsys):
+    full = _group_by_digest(capsys, [])
+    assert _group_by_digest(capsys, ["--max-chars", str(len(full))]) == full
+
+
+def test_group_by_max_chars_trims_unassigned_from_end(capsys):
+    full = _group_by_digest(capsys, [])
+    out = _group_by_digest(capsys, ["--max-chars", str(len(full) - 1)])
+    assert len(out) <= len(full) - 1
+    assert _sections(out)["## 担当者なし - 2件"] == [
+        f"- [#3]({URL}/3) 担当者なしで着手可能（着手可能）",
+        "- ほか 1 件",
+    ]
+    assert issue_numbers_in_output(out) == [1, 2, 5, 1, 4, 3]
+
+
+def test_group_by_max_chars_moves_to_previous_assignee(capsys):
+    full = _group_by_digest(capsys, [])
+    # 担当者なしの Issue の行をすべて削った出力
+    expected = full.replace(
+        f"- [#3]({URL}/3) 担当者なしで着手可能（着手可能）\n"
+        f"- [#6]({URL}/6) 担当者なしの判断待ち（判断待ち）\n",
+        "- ほか 2 件\n",
+    )
+    assert _group_by_digest(capsys, ["--max-chars", str(len(expected))]) == expected
+    out = _group_by_digest(capsys, ["--max-chars", str(len(expected) - 1)])
+    assert len(out) <= len(expected) - 1
+    sections = _sections(out)
+    assert sections["## @Carol - 1件"] == ["- ほか 1 件"]
+    assert sections["## 担当者なし - 2件"] == ["- ほか 2 件"]
+    assert issue_numbers_in_output(out) == [1, 2, 5, 1]
+
+
+def test_group_by_max_chars_with_limit_merges_omitted_count(capsys):
+    limited = _group_by_digest(capsys, ["--limit", "1"])
+    out = _group_by_digest(capsys, ["--limit", "1", "--max-chars", str(len(limited) - 1)])
+    assert len(out) <= len(limited) - 1
+    sections = _sections(out)
+    assert sections["## 担当者なし - 2件"] == ["- ほか 2 件"]
+    # 削っていない担当者は --limit の分だけ
+    assert sections["## @alice - 3件"] == [
+        f"- [#1]({URL}/1) 共同の Issue（作業中, 着手可能）",
+        "- ほか 2 件",
+    ]
+
+
+def test_group_by_max_chars_counts_marks(capsys):
+    marks = ["--stale", "0", "--show-assignees", "--show-labels", "--age"]
+    marked = _group_by_digest(capsys, marks)
+    assert _group_by_digest(capsys, [*marks, "--max-chars", str(len(marked))]) == marked
+    out = _group_by_digest(capsys, [*marks, "--max-chars", str(len(marked) - 1)])
+    assert len(out) <= len(marked) - 1
+    assert issue_numbers_in_output(out) == [1, 2, 5, 1, 4, 3]
+
+
+def test_group_by_max_chars_cannot_fit_warns_and_keeps_headings(capsys, tmp_path):
+    previous = tmp_path / "previous.json"
+    assert main(["--json", "--output", str(previous), GROUP_BY]) == 0
+    args = ["--group-by", "assignee", "--summary", "--diff", str(previous), "--max-chars", "1"]
+    assert main([*args, GROUP_BY]) == 0
+    captured = capsys.readouterr()
+    assert issue_numbers_in_output(captured.out) == []
+    assert captured.out.startswith(
+        "# Issue ダイジェスト（全 6 件）\n\n@alice 3 / @bob 1 / @Carol 1 / 担当者なし 2\n"
+    )
+    assert _sections(captured.out) == {
+        "## @alice - 3件": ["- ほか 3 件"],
+        "## @bob - 1件": ["- ほか 1 件"],
+        "## @Carol - 1件": ["- ほか 1 件"],
+        "## 担当者なし - 2件": ["- ほか 2 件"],
+    }
+    assert captured.out.endswith("\n\n## 前回からの変化\n\n変化なし\n")
+    assert captured.err == (
+        "警告: Issue の行をすべて削っても --max-chars の 1 文字に収まりません"
+        f"（{len(captured.out)} 文字）\n"
+    )
+
+
+@pytest.mark.parametrize("option", ["--json", "--csv"])
+def test_group_by_max_chars_with_json_or_csv_is_error(capsys, option):
+    assert main(["--group-by", "assignee", "--max-chars", "2000", option, GROUP_BY]) == 2
+    captured = capsys.readouterr()
+    assert captured.err.startswith("エラー: ")
+    assert captured.out == ""
+
+
 def test_without_group_by_unchanged(capsys):
     assert main([GROUP_BY]) == 0
     out = capsys.readouterr().out
