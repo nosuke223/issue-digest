@@ -162,7 +162,7 @@ gh issue list --json number,title,labels,url,createdAt | uv run issue-digest --a
 
 `--show-milestone` を付けると、マイルストーンがある Issue の行の末尾に `（マイルストーン: v1.0）` を付けます。どのマイルストーンの Issue かを見たいときに使います。
 入力は `gh issue list --json ...,milestone` の `milestone`（`{"title": "v1.0", ...}` の形）で、`title` を表示します。`milestone` がない、または `null` の Issue には何も付けません。
-`--show-milestone` を付けない場合の出力は変わりません。
+`--show-milestone` を付けない場合の出力は変わりません。設定ファイルの `show_milestone = true` でも指定できます。
 
 ```
 gh issue list --json number,title,labels,url,milestone | uv run issue-digest --show-milestone -
@@ -355,7 +355,7 @@ uv run issue-digest --output digest.md issues.json
 
 前回の JSON は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since` を付けず、設定ファイル（`.issue-digest.toml` や `--config`）の `hide_empty`、`only`、`limit` も使わずに出力したものを前提とします。付けて出力した JSON を使うと、その JSON に入っていなかった Issue は「新しい Issue」として出ます。複数の分類に入る Issue で、前回は一部の分類にしか出ていなかったものは「分類が変わった Issue」として出ます。
 今回の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit` に関係なく、全分類の全件で行います。
-`--title`、`--stale`、`--show-assignees`、`--show-labels`、`--diff` を付けて出力した JSON も、前回の JSON として使えます（増えた項目は読みません）。
+`--title`、`--stale`、`--show-assignees`、`--show-labels`、`--age`、`--show-milestone`、`--summary`、`--sort`、`--reverse`、`--diff` を付けて出力した JSON も、前回の JSON として使えます（増えた項目は読みません。`--sort` と `--reverse` は並びだけが変わります）。
 
 前回の JSON が見つからない、JSON として読めない、または `--json` の出力の形でない（`total` と `categories` がない、分類の `label` が見出しのラベルでない、Issue に `number`、`title`、`url` がないなど）ときは、エラーを標準エラーに出して終了コード 1 で終わります。
 `--diff` の後にパスがない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
@@ -416,7 +416,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 `--config <パス>` で読むファイルを指定できます（このとき `.issue-digest.toml` は読みません）。指定したファイルがなければ、`エラー: 設定ファイルが見つかりません: <パス>` を標準エラーに出して終了コード 1 で終わります。
 ホームディレクトリなど、ほかの場所の設定ファイルは探しません。
 
-書けるキーは次の14個です。
+書けるキーは次の15個です。
 
 | キー | 型 | 対応するオプション |
 | --- | --- | --- |
@@ -427,6 +427,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 | `sort` | `"updated"` か `"created"` | `--sort updated` / `--sort created` |
 | `show_assignees` | 真偽値 | `--show-assignees` |
 | `show_labels` | 真偽値 | `--show-labels` |
+| `show_milestone` | 真偽値 | `--show-milestone` |
 | `age` | 真偽値 | `--age` |
 | `title` | 1文字以上の文字列 | `--title` |
 | `limit` | 1以上の整数 | `--limit` |
@@ -454,6 +455,7 @@ stale = 7
 limit = 5
 title = "issue-digest"
 show_labels = true
+show_milestone = true
 age = true
 max_chars = 2000
 group_by = "assignee"

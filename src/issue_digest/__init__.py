@@ -70,7 +70,7 @@ USAGE = (
     "次回 issue-digest --diff last.json issues.json\n"
     "  --config で読む設定ファイルを指定する（省略時はカレントディレクトリの .issue-digest.toml。"
     "なければ使わない）。キーは hide_empty、summary、only、stale、sort、show_assignees、"
-    "show_labels、age、title、limit、max_chars、group_by、json、headings で、"
+    "show_labels、show_milestone、age、title、limit、max_chars、group_by、json、headings で、"
     "コマンドラインの指定を優先する"
     "（sort は updated か created、limit と max_chars は1以上の整数、"
     'group_by は "assignee"、title は1文字以上の文字列）'
@@ -79,7 +79,7 @@ USAGE = (
     "group_by と max_chars は --json か --csv を指定したら使わず、"
     "設定の json = true と一緒に書くとエラー）\n"
     '    例: hide_empty = true / stale = 7 / limit = 5 / only = ["agent:review", "agent:blocked"]'
-    ' / age = true / max_chars = 2000 / group_by = "assignee"\n'
+    ' / age = true / show_milestone = true / max_chars = 2000 / group_by = "assignee"\n'
     "    [headings] テーブルで分類の見出しを変えられる"
     '（例: [headings] の下に "agent:review" = "確認待ち"）\n'
     "  --group-by assignee で分類ごとの代わりに担当者ごとの見出し（## @alice - 3件、最後に"
@@ -204,6 +204,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         only = config.get("only", [])
     show_assignees = opts.show_assignees or config.get("show_assignees", False)
     show_labels = opts.show_labels or config.get("show_labels", False)
+    show_milestone = opts.show_milestone or config.get("show_milestone", False)
     output: str | None = opts.output
     stale_days: int | None = config.get("stale")
     if opts.stale is not None:
@@ -370,7 +371,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             diff,
             headings,
             age,
-            opts.show_milestone,
+            show_milestone,
             opts.reverse,
         )
     elif group_by == "assignee":
@@ -392,7 +393,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             age,
             opts.reverse,
             max_chars,
-            opts.show_milestone,
+            show_milestone,
         )
     else:
         digest = format_digest(
@@ -412,7 +413,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             headings,
             age,
             max_chars,
-            opts.show_milestone,
+            show_milestone,
             opts.reverse,
         )
     if max_chars is not None and len(digest) > max_chars:

@@ -81,6 +81,15 @@ def test_main_diff_section_has_no_milestone_mark(capsys, tmp_path):
     assert "マイルストーン:" not in diff_section
 
 
+def test_main_json_with_display_options_works_as_previous_json(capsys, tmp_path):
+    previous = tmp_path / "previous.json"
+    args = ["--json", "--sort", "created", "--reverse", "--summary", "--age", "--show-milestone"]
+    assert main([*args, "--output", str(previous), MILESTONE]) == 0
+    capsys.readouterr()
+    assert main(["--diff", str(previous), MILESTONE]) == 0
+    assert capsys.readouterr().out.endswith("## 前回からの変化\n\n変化なし\n")
+
+
 def test_main_usage_mentions_show_milestone(capsys):
     assert main(["--help"]) == 0
     assert "--show-milestone" in capsys.readouterr().out
