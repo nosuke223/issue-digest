@@ -217,7 +217,7 @@ uv run issue-digest --limit 5 --sort updated issues.json
 - `--stale`、`--show-assignees`、`--show-labels`、`--age` の印を付けたときは、印を含めた行で数えます。
 - すべての Issue の行を削っても収まらないときは、そのまま出力し、標準エラーに `警告: Issue の行をすべて削っても --max-chars の N 文字に収まりません（M 文字）` を出します（終了コードは 0）。
 - 文字数は1以上の整数です。それ以外の値や値がない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
-- Markdown だけで使えます。`--json` または `--csv`（設定ファイルの `json = true` を含む）と同時に指定すると、エラーを標準エラーに出して終了コード 2 で終わります。
+- Markdown だけで使えます。コマンドラインの `--json` または `--csv` と同時に指定すると、エラーを標準エラーに出して終了コード 2 で終わります。設定ファイルの `json = true` は、`--max-chars` を指定したら使いません（Markdown を出します）。
 - `--group-by` と同時に指定すると、エラーを標準エラーに出して終了コード 2 で終わります。
 
 `--max-chars` を付けない場合の出力は変わりません。
@@ -406,7 +406,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 - コマンドラインの指定が設定ファイルより優先されます。`--stale 3` は設定の `stale` を上書きします。
 - 設定の `only` は、コマンドラインで `--only` を1つでも指定したら使いません（`--exclude` を指定したときも、`--only` と同時に使えないため使いません）。
 - 設定の `title` と `limit` も、コマンドラインで `--title`、`--limit` を指定したら使いません。
-- 設定の `json = true` は、コマンドラインで `--csv` または `--group-by` を指定したら使いません（コマンドラインが優先です）。
+- 設定の `json = true` は、コマンドラインで `--csv`、`--group-by`、`--max-chars` のどれかを指定したら使いません（コマンドラインが優先です）。
 - 真偽値のキーは、`false` と書いても何も起きません（コマンドラインで打ち消すオプションはありません）。
 - 知らないキー、型の違う値、TOML として読めない内容は、どのキーかを示すエラーを標準エラーに出して終了コード 2 で終わります。
 
@@ -512,7 +512,7 @@ uv run issue-digest --version
   - `--hide-empty`、`--only`、`--exclude`、`--since`、`--sort`、`--limit`、`--output` は Markdown と同じように効きます（`--limit` は各分類の先頭から指定件数の行にします）。
   - `--stale`、`--age`、`--show-assignees`、`--show-labels`、`--summary`、`--title`、`--diff` は、CSV に対応する列や行がないので無視します（エラーにしません。`--diff` の前回の JSON も読みません）。
   - `--json` と同時に指定すると、`エラー: --json と --csv は同時に指定できません` を標準エラーに出して終了コード 2 で終わります。
-- `--json` または `--csv` と `--max-chars` を同時に指定すると、`エラー: --max-chars は --json、--csv と同時に指定できません（Markdown だけで使えます）` を標準エラーに出して終了コード 2 で終わります。
+- コマンドラインの `--json` または `--csv` と `--max-chars` を同時に指定すると、`エラー: --max-chars は --json、--csv と同時に指定できません（Markdown だけで使えます）` を標準エラーに出して終了コード 2 で終わります。設定ファイルの `json = true` は `--max-chars` を指定したら使わないので、`--max-chars` と設定の `json = true` だけなら Markdown を出します（`--csv` を指定したときは、`--csv` との同時指定のエラーです）。
 - `--stale`、`--show-assignees`、`--show-labels`、`--age` の印が付くときは、`（N日更新なし）（担当: @alice）（ラベル: bug）（作成から12日）` の順です。
 - `--summary` の件数の行は、`--only` や `--hide-empty` に関係なく、常に6つの分類すべての件数を出します。
 - `--group-by assignee` と同時に指定した場合
