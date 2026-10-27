@@ -23,7 +23,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--only <ラベル>` | 指定したラベルの分類だけを出力する（複数回指定できる） | `uv run issue-digest --only agent:needs-decision issues.json` |
 | `--exclude <ラベル>` | 指定したラベルの分類を出力しない（複数回指定できる。`--only` とは同時に使えない） | `uv run issue-digest --exclude unclassified issues.json` |
 | `--stale <日数>` | 最終更新から指定日数以上たった Issue に `（N日更新なし）` を付ける | `uv run issue-digest --stale 7 issues.json` |
-| `--since <日付>` | 最終更新が指定日（`YYYY-MM-DD`、UTC の0時）以降の Issue だけを出力する | `uv run issue-digest --since 2026-10-01 issues.json` |
+| `--since <日付>` | 最終更新が指定日（`YYYY-MM-DD`、UTC の0時）以降、または `7d` のように基準時刻の N 日前以降の Issue だけを出力する | `uv run issue-digest --since 2026-10-01 issues.json` / `uv run issue-digest --since 7d issues.json` |
 | `--sort updated` | 各分類の中を最終更新の古い順に並べる | `uv run issue-digest --sort updated issues.json` |
 | `--sort created` | 各分類の中を作成日時の古い順に並べる | `uv run issue-digest --sort created issues.json` |
 | `--reverse` | 各分類の中の並びを逆にする（`--sort` がなければ番号の大きい順、あれば新しい順） | `uv run issue-digest --reverse issues.json` |
@@ -116,15 +116,20 @@ gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --s
 `--since <日付>` を付けると、最終更新（`updatedAt`）が指定日以降の Issue だけを出力します。最近動いた Issue だけを見たいときに使います。
 
 - 日付は `YYYY-MM-DD` の形で、UTC のその日の0時（`T00:00:00Z`）以降を対象にします。0時ちょうどに更新された Issue も出ます。時刻やタイムゾーンは指定できません。
+- `7d` のように `<整数>d` の形で日数も指定できます。基準時刻の N 日前以降に更新された Issue を出し、ちょうど N 日前に更新された Issue も出ます。cron などで日付を書き換えずに使えます。
+  - `N` は0以上の整数（半角数字のみ）で、`0d` も使えます。`d` は小文字だけです。`7D`、`7days`、`-1d`、`1.5d`、`d`、`1w` はエラーです。`h`（時間）や `w`（週）の単位はありません。
+  - 基準時刻は `--stale`、`--age` と同じです。実行の最初に現在時刻を1回だけ決め、`--since`、`--stale`、`--age` のすべてがそれを使います。
+  - `2026-10-01` と `7d` の同時指定はできません。
 - `updatedAt` がない Issue は出ません。
 - 絞った後の Issue が、見出しの総件数、分類ごとの件数、`--summary` の対象になります。
-- 日付の形が不正なとき、または `2026-02-30` のようなない日付のときは、エラーを標準エラーに出して終了コード 2 で終わります。
+- 日付としても `<整数>d` としても読めない値（`2026-02-30` のようなない日付を含む）のときは、`エラー: --since には YYYY-MM-DD の形の日付か、7d のような日数を指定してください: <値>` を標準エラーに出して終了コード 2 で終わります。
 - Markdown、`--json`、`--csv` のどれでも効きます。設定ファイルには `since` キーはありません。
 
 `--since` を付けない場合の出力は変わりません。
 
 ```
 gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --since 2026-10-01 -
+gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --since 7d -
 ```
 
 ### `--show-assignees`
