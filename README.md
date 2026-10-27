@@ -152,7 +152,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --show-labels
 
 `--age` を付けると、作成日時（`createdAt`）がある Issue の行の末尾に `（作成から12日）` を付けます。古くから残っている Issue に気づきたいときに使います。
 日数は `--stale` と同じ基準時刻からの経過日数で、1日未満は切り捨てます（作成から1日たっていなければ `（作成から0日）`）。`createdAt` がない Issue には何も付けません。
-`--age` を付けない場合の出力は変わりません。
+`--age` を付けない場合の出力は変わりません。設定ファイルの `age = true` でも指定できます。
 
 ```
 gh issue list --json number,title,labels,url,createdAt | uv run issue-digest --age -
@@ -248,7 +248,7 @@ uv run issue-digest --limit 5 --sort updated issues.json
 - `--stale`、`--show-assignees`、`--show-labels`、`--age`、`--show-milestone` の印を付けたときは、印を含めた行で数えます。
 - すべての Issue の行を削っても収まらないときは、そのまま出力し、標準エラーに `警告: Issue の行をすべて削っても --max-chars の N 文字に収まりません（M 文字）` を出します（終了コードは 0）。
 - 文字数は1以上の整数です。それ以外の値や値がない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
-- Markdown だけで使えます。コマンドラインの `--json` または `--csv` と同時に指定すると、エラーを標準エラーに出して終了コード 2 で終わります。設定ファイルの `json = true` は、`--max-chars` を指定したら使いません（Markdown を出します）。
+- Markdown だけで使えます。コマンドラインの `--json` または `--csv` と同時に指定すると、エラーを標準エラーに出して終了コード 2 で終わります。設定ファイルの `json = true` は、`--max-chars` を指定したら使いません（Markdown を出します）。設定ファイルの `max_chars` でも指定できます（設定の `json = true` と一緒に書くとエラーです）。
 - `--group-by assignee` と同時に指定すると、分類の代わりに担当者の見出しを単位にして、最後の担当者（`## 担当者なし` があればそれ）から順に、各担当者の末尾の Issue の行を削ります。行末の分類の名前も含めた行で数えます。
 
 `--max-chars` を付けない場合の出力は変わりません。
@@ -416,7 +416,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 `--config <パス>` で読むファイルを指定できます（このとき `.issue-digest.toml` は読みません）。指定したファイルがなければ、`エラー: 設定ファイルが見つかりません: <パス>` を標準エラーに出して終了コード 1 で終わります。
 ホームディレクトリなど、ほかの場所の設定ファイルは探しません。
 
-書けるキーは次の11個です。
+書けるキーは次の14個です。
 
 | キー | 型 | 対応するオプション |
 | --- | --- | --- |
@@ -427,8 +427,11 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 | `sort` | `"updated"` か `"created"` | `--sort updated` / `--sort created` |
 | `show_assignees` | 真偽値 | `--show-assignees` |
 | `show_labels` | 真偽値 | `--show-labels` |
+| `age` | 真偽値 | `--age` |
 | `title` | 1文字以上の文字列 | `--title` |
 | `limit` | 1以上の整数 | `--limit` |
+| `max_chars` | 1以上の整数 | `--max-chars` |
+| `group_by` | `"assignee"` だけ | `--group-by assignee` |
 | `json` | 真偽値 | `--json` |
 | `headings` | テーブル（`[headings]`）。キーは `--only` と同じ6つのラベル、値は1文字以上の文字列 | なし（下の「分類の見出しを変える」を参照） |
 
@@ -436,7 +439,9 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 
 - コマンドラインの指定が設定ファイルより優先されます。`--stale 3` は設定の `stale` を上書きします。
 - 設定の `only` は、コマンドラインで `--only` を1つでも指定したら使いません（`--exclude` を指定したときも、`--only` と同時に使えないため使いません）。
-- 設定の `title` と `limit` も、コマンドラインで `--title`、`--limit` を指定したら使いません。
+- 設定の `title`、`limit`、`max_chars`、`group_by` も、コマンドラインで `--title`、`--limit`、`--max-chars`、`--group-by` を指定したら使いません。
+- 設定の `group_by` と `max_chars` は、コマンドラインで `--json` または `--csv` を指定したら使いません（コマンドラインの出力形式が優先です）。
+- 設定どうしが矛盾するとき（設定の `json = true` と `group_by` または `max_chars` を一緒に書いたときなど）は、コマンドラインで同じ指定をしたときと同じエラーを標準エラーに出して終了コード 2 で終わります。
 - 設定の `json = true` は、コマンドラインで `--csv`、`--group-by`、`--max-chars` のどれかを指定したら使いません（コマンドラインが優先です）。
 - 真偽値のキーは、`false` と書いても何も起きません（コマンドラインで打ち消すオプションはありません）。
 - 知らないキー、型の違う値、TOML として読めない内容は、どのキーかを示すエラーを標準エラーに出して終了コード 2 で終わります。
@@ -449,6 +454,9 @@ stale = 7
 limit = 5
 title = "issue-digest"
 show_labels = true
+age = true
+max_chars = 2000
+group_by = "assignee"
 only = ["agent:needs-decision", "agent:blocked", "agent:review"]
 ```
 
@@ -483,11 +491,11 @@ unclassified = "その他"
 - 各 Issue の行末に、その Issue が入る分類の名前を `（着手可能）` の形で付けます。複数の分類に入る Issue は `（作業中, 着手可能）` のように見出しの順にカンマで区切ります。設定ファイルの `[headings]` があれば、その名前を使います。
 - 0件の担当者の見出しは出しません（担当者なしも同じです）。出す Issue が1件もなければ、見出しの代わりに「なし」を出します。
 - `--group-by` に指定できる値は `assignee` だけです。それ以外の値は、エラーを標準エラーに出して終了コード 2 で終わります。`--group-by` の後に値がない場合も終了コード 2 で終わります。
-- Markdown だけで使えます。`--json` または `--csv` と同時に指定すると、エラーを標準エラーに出して終了コード 2 で終わります。設定ファイルの `json = true` は、`--group-by` を指定したら使いません。
+- Markdown だけで使えます。`--json` または `--csv` と同時に指定すると、エラーを標準エラーに出して終了コード 2 で終わります。設定ファイルの `json = true` は、`--group-by` を指定したら使いません。設定ファイルの `group_by` と `json = true` を一緒に書くとエラーです。
 - `--max-chars` と同時に指定すると、最後の担当者から順に、各担当者の末尾の Issue の行を削って指定文字数以内に収めます（削った担当者の最後に `- ほか N 件`）。
 - 担当者は入力の `assignees` から読みます。`assignees` がない入力では、すべて担当者なしになります。
 
-ほかのオプションとの組み合わせは「組み合わせ」の節を見てください。`--group-by` を付けない場合の出力は変わりません。設定ファイルには `group_by` キーはありません。
+ほかのオプションとの組み合わせは「組み合わせ」の節を見てください。`--group-by` を付けない場合の出力は変わりません。設定ファイルの `group_by = "assignee"` でも指定できます（「設定ファイルと `--config <パス>`」を参照）。
 
 ```
 gh issue list --json number,title,labels,url,assignees | uv run issue-digest --group-by assignee -
@@ -576,5 +584,6 @@ uv run issue-digest --version
   - `--max-chars` は、最後の担当者の見出し（`## 担当者なし` があればそれ）から順に、各担当者の末尾の Issue の行を1行ずつ削ります。最後の担当者の Issue の行がなくなったら、1つ前の担当者を削ります。削った担当者の最後に `- ほか N 件` を出し、`--limit` で省いた件数とまとめて1行にします。見出し、件数、`--summary` の行、`--diff` の節は削りません。行末の分類の名前と印を含めた行で数えます。すべて削っても収まらないときの警告は、分類ごとのときと同じです。
 - `--fail-if-any` は、ほかのオプションすべてと同時に使えます。終了コードの判定は `--since` で絞った後の件数で行い、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--max-chars` には左右されません。`--json`、`--csv`、`--group-by`、`--output` のどれと同時でも、出力してから終了コード 3 で終わります。
 - 終了コードは、正常が 0、実行時のエラー（ファイルが読めない、書き出せないなど）が 1、オプションの指定のエラーが 2、`--fail-if-any` で指定した分類に Issue があるときが 3 です。エラーのときは 1 か 2 を優先します。
+- 設定ファイルの `group_by`、`max_chars` と `json = true` を一緒に書くと、コマンドラインで `--group-by`、`--max-chars` と `--json` を同時に指定したときと同じエラーで終了コード 2 です。コマンドラインで `--json` か `--csv` を指定したときは、設定の `group_by` と `max_chars` は使いません。
 - `--config` は、ほかのオプションすべてと同時に使えます。設定ファイルの値は、コマンドラインで同じオプションを指定したときは使いません（詳しくは「設定ファイルと `--config <パス>`」）。
 - `--version` は、ほかのオプションやファイルの指定があっても、バージョンだけを出力します。
