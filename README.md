@@ -142,6 +142,7 @@ gh issue list --json number,title,labels,url,assignees | uv run issue-digest --s
 
 `--show-labels` を付けると、`agent:` で始まらないラベルがある Issue の行の末尾に `（ラベル: bug, docs）` を付けます。`bug` や `docs` などのラベルも一緒に見たいときに使います。
 ラベルは入力の順に、カンマと空白で区切って並べます。対象のラベルがない Issue には何も付けません。
+各ラベルの名前の Markdown の記号（`\` `` ` `` `*` `_` `[` `]` `<` `>`）は、タイトルと同じようにエスケープします（例: `x_y*z` は `x\_y\*z`）。`--json` の `labels` はエスケープしません。
 `--show-labels` を付けない場合の出力は変わりません。
 
 ```
@@ -162,6 +163,7 @@ gh issue list --json number,title,labels,url,createdAt | uv run issue-digest --a
 
 `--show-milestone` を付けると、マイルストーンがある Issue の行の末尾に `（マイルストーン: v1.0）` を付けます。どのマイルストーンの Issue かを見たいときに使います。
 入力は `gh issue list --json ...,milestone` の `milestone`（`{"title": "v1.0", ...}` の形）で、`title` を表示します。`milestone` がない、または `null` の Issue には何も付けません。
+マイルストーンの名前の Markdown の記号（`\` `` ` `` `*` `_` `[` `]` `<` `>`）は、タイトルと同じようにエスケープします（例: `Sprint *2*` は `Sprint \*2\*`）。`--json` の `milestone` はエスケープしません。
 `--show-milestone` を付けない場合の出力は変わりません。設定ファイルの `show_milestone = true` でも指定できます。
 
 ```
