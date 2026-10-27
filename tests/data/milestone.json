@@ -1,0 +1,25 @@
+[
+  {
+    "number": 1,
+    "title": "マイルストーンがある Issue",
+    "labels": [{"name": "agent:ready", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/1",
+    "updatedAt": "2026-10-10T00:00:00Z",
+    "createdAt": "2026-10-01T00:00:00Z",
+    "assignees": [{"login": "alice"}],
+    "milestone": {"title": "v1.0", "number": 3}
+  },
+  {
+    "number": 2,
+    "title": "milestone が null の Issue",
+    "labels": [{"name": "agent:ready", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/2",
+    "milestone": null
+  },
+  {
+    "number": 3,
+    "title": "milestone キーがない Issue",
+    "labels": [{"name": "agent:review", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/3"
+  }
+]

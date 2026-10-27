@@ -13,6 +13,7 @@ class Issue:
     updated_at: datetime | None = None
     assignees: list[str] = field(default_factory=list)
     created_at: datetime | None = None
+    milestone: str | None = None
 
 
 class InvalidUpdatedAtError(ValueError):
@@ -36,6 +37,7 @@ def parse_issues(text: str) -> list[Issue]:
     各 Issue の `updatedAt` と `createdAt`（ISO 8601 形式）は任意。
     ないときや null のときは None になる。
     `assignees`（`[{"login": "alice"}]` の形）も任意。ないとき、null、空のときは担当者なし。
+    `milestone`（`{"title": "v1.0"}` の形）も任意。ないとき、null のときはマイルストーンなし。
     """
     data = json.loads(text)
     return [
@@ -47,6 +49,7 @@ def parse_issues(text: str) -> list[Issue]:
             updated_at=_parse_datetime(item["number"], item.get("updatedAt"), "updatedAt"),
             assignees=[a["login"] for a in item.get("assignees") or []],
             created_at=_parse_datetime(item["number"], item.get("createdAt"), "createdAt"),
+            milestone=(item.get("milestone") or {}).get("title"),
         )
         for item in data
     ]
