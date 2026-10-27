@@ -116,6 +116,25 @@ def test_config_show_labels(in_tmp_dir, capsys):
     assert "（ラベル: " in capsys.readouterr().out
 
 
+def test_config_show_milestone(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, "show_milestone = true\n")
+    milestone = str(DATA / "milestone.json")
+    assert main([milestone]) == 0
+    assert "マイルストーンがある Issue（マイルストーン: v1.0）\n" in capsys.readouterr().out
+    assert main(["--json", milestone]) == 0
+    body = json.loads(capsys.readouterr().out)
+    by_number = {i["number"]: i for c in body["categories"] for i in c["issues"]}
+    assert by_number[1]["milestone"] == "v1.0"
+    assert main(["--group-by", "assignee", milestone]) == 0
+    assert "（着手可能）（マイルストーン: v1.0）\n" in capsys.readouterr().out
+
+
+def test_config_show_milestone_false_does_nothing(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, "show_milestone = false\n")
+    assert main([str(DATA / "milestone.json")]) == 0
+    assert "（マイルストーン:" not in capsys.readouterr().out
+
+
 def test_config_title(in_tmp_dir, capsys):
     write_config(in_tmp_dir, 'title = "my-repo"\n')
     assert main([ISSUES]) == 0
@@ -166,6 +185,8 @@ def test_command_line_csv_takes_precedence_over_config_json(in_tmp_dir, capsys):
         ('sort = "name"\n', "sort"),
         ("sort = 1\n", "sort"),
         ('show_labels = "yes"\n', "show_labels"),
+        ('show_milestone = "yes"\n', "show_milestone"),
+        ("show_milestone = 1\n", "show_milestone"),
         ("title = 1\n", "title"),
         ('title = ""\n', "title"),
         ("limit = 0\n", "limit"),

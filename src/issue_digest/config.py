@@ -6,7 +6,15 @@ from issue_digest.classifier import CATEGORIES
 
 DEFAULT_CONFIG_PATH = ".issue-digest.toml"
 
-_BOOL_KEYS = ("hide_empty", "summary", "show_assignees", "json", "show_labels", "age")
+_BOOL_KEYS = (
+    "hide_empty",
+    "summary",
+    "show_assignees",
+    "json",
+    "show_labels",
+    "age",
+    "show_milestone",
+)
 _KEYS = (
     *_BOOL_KEYS,
     "only",
