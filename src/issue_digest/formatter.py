@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 
 from issue_digest.classifier import UNCLASSIFIED
 from issue_digest.diff import Diff, DiffEntry
-from issue_digest.loader import Issue
+from issue_digest.loader import Issue, repository_of
 
 HEADINGS = {
     "agent:needs-decision": "判断待ち",
@@ -76,6 +76,7 @@ def format_json(
     """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
 
     引数の意味は format_digest と同じ（reverse は各分類の `issues` の並びを逆にする）。
+    各 Issue には `repository`（URL から読み取ったリポジトリ名。読み取れなければ null）を含める。
     stale_days を指定したとき、印が付く Issue にだけ
     `stale_days`（経過日数）を加える。show_assignees が True のとき、各 Issue に
     `assignees`（login の配列。担当者がいなければ空の配列）を加える。
@@ -84,8 +85,9 @@ def format_json(
     `labels`（`agent:` で始まらないラベルの配列。なければ空の配列）を加える。
     title を指定したとき、JSON の先頭に `title` を加える。
     diff を指定したとき、末尾に `diff`（`added`、`removed`、`moved` の配列）を加える。
-    `added` と `removed` の各要素は `number`、`title`、`url`、`categories`（今回・前回の分類）、
-    `moved` の各要素は `number`、`title`、`url`、`from`、`to`（前回・今回の分類）。
+    `added` と `removed` の各要素は `number`、`title`、`url`、`repository`、`categories`
+    （今回・前回の分類）、`moved` の各要素は `number`、`title`、`url`、`repository`、`from`、`to`
+    （前回・今回の分類）。
     headings に書かれた分類は、各分類の `title` をその文字列に置き換える。
     age が True のとき、各 Issue に `age_days`（作成からの経過日数。createdAt がなければ null）
     を加える。show_milestone が True のとき、各 Issue に `milestone`（マイルストーンの名前。
@@ -93,7 +95,7 @@ def format_json(
     """
     if (stale_days is not None or age) and now is None:
         now = datetime.now(UTC)
-    total = len({issue.number for issues in classified.values() for issue in issues})
+    total = _total(classified)
     categories = []
     for category, issues in _selected_categories(
         classified, hide_empty, only, sort, exclude, reverse
@@ -105,6 +107,7 @@ def format_json(
                 "number": issue.number,
                 "title": issue.title,
                 "url": issue.url,
+                "repository": issue.repository,
             }
             days = _stale_days_of(issue, stale_days, now)
             if days is not None:
@@ -144,7 +147,25 @@ def format_json(
 
 
 def _diff_item(entry: DiffEntry, **extra: object) -> dict[str, object]:
-    return {"number": entry.number, "title": entry.title, "url": entry.url, **extra}
+    return {
+        "number": entry.number,
+        "title": entry.title,
+        "url": entry.url,
+        "repository": entry.repository,
+        **extra,
+    }
+
+
+def _total(classified: dict[str, list[Issue]]) -> int:
+    """総件数。複数の分類に入る Issue を二重に数えないよう、URL で重複を除く。"""
+    return len({issue.key for issues in classified.values() for issue in issues})
+
+
+def _issue_link(number: int, url: str) -> str:
+    """Issue へのリンク。`[owner/repo#12](url)` の形（リポジトリ名がなければ `[#12](url)`）。"""
+    repository = repository_of(url)
+    prefix = "" if repository is None else _escape_markdown(repository)
+    return f"[{prefix}#{number}]({url})"
 
 
 def format_csv(
@@ -156,23 +177,26 @@ def format_csv(
     limit: int | None = None,
     reverse: bool = False,
 ) -> str:
-    """分類結果を CSV にする。1行目は見出し行 `label,number,title,url`。
+    """分類結果を CSV にする。1行目は見出し行 `label,number,title,url,repository`。
 
     分類の順、各分類の中の順に1行ずつ出力する（複数の分類に入る Issue は分類ごとに1行）。
     クオートや改行コードは csv モジュールの既定に従う（行末は `\\r\\n`）。
     limit を指定すると、各分類の先頭 limit 件だけを出力する。
     reverse が True のとき、各分類の中の並びを（sort の後に）逆にする（limit は逆にした後）。
+    repository はリポジトリ名（URL から読み取れなければ空）。
     stale や担当者など、CSV に列のない情報は扱わない。
     """
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["label", "number", "title", "url"])
+    writer.writerow(["label", "number", "title", "url", "repository"])
     for category, issues in _selected_categories(
         classified, hide_empty, only, sort, exclude, reverse
     ):
         shown = issues if limit is None else issues[:limit]
         for issue in shown:
-            writer.writerow([category, issue.number, issue.title, issue.url])
+            writer.writerow(
+                [category, issue.number, issue.title, issue.url, issue.repository or ""]
+            )
     return buffer.getvalue()
 
 
@@ -249,11 +273,12 @@ def _selected_categories(
 
 
 def _sort_by_date(issues: list[Issue], attr: str) -> list[Issue]:
-    """日時（attr）の古い順（同じなら番号順）。日時がない Issue は末尾に番号順。"""
+    """日時（attr）の古い順（同じなら Issue.order の順）。日時がない Issue は末尾に
+    Issue.order の順（リポジトリ名の順、同じリポジトリの中は番号順）。"""
     dated = [i for i in issues if getattr(i, attr) is not None]
     undated = [i for i in issues if getattr(i, attr) is None]
-    dated.sort(key=lambda i: (getattr(i, attr), i.number))
-    undated.sort(key=lambda i: i.number)
+    dated.sort(key=lambda i: (getattr(i, attr), i.order))
+    undated.sort(key=lambda i: i.order)
     return dated + undated
 
 
@@ -279,6 +304,7 @@ def format_digest(
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
+    Issue の行は `- [owner/repo#12](url) タイトル` の形（_issue_link を参照）。
     hide_empty が True のとき、0件の分類は見出しも「なし」も出力しない。
     only を指定すると、そこに含まれる分類だけを出力する（総件数は全件のまま）。
     exclude を指定すると、そこに含まれる分類を出力しない（総件数は全件のまま）。
@@ -316,8 +342,7 @@ def format_digest(
     """
     if (stale_days is not None or age) and now is None:
         now = datetime.now(UTC)
-    # 複数の分類に入る Issue を二重に数えないよう、番号で重複を除く
-    total = len({issue.number for issues in classified.values() for issue in issues})
+    total = _total(classified)
     heading_title = "Issue ダイジェスト" if title is None else title
     header = [f"# {heading_title}（全 {total} 件）"]
     if summary:
@@ -340,7 +365,7 @@ def format_digest(
         for issue in shown:
             issue_title = _escape_markdown(_shorten_title(issue.title))
             rows.append(
-                f"- [#{issue.number}]({issue.url}) {issue_title}"
+                f"- {_issue_link(issue.number, issue.url)} {issue_title}"
                 f"{_stale_mark(issue, stale_days, now)}"
                 f"{_assignees_mark(issue, show_assignees)}"
                 f"{_labels_mark(issue, show_labels)}"
@@ -399,24 +424,25 @@ def _group_by_assignee(
     classified: dict[str, list[Issue]],
     only: list[str] | None = None,
     exclude: list[str] | None = None,
-) -> tuple[list[tuple[str | None, list[Issue]]], dict[int, list[str]]]:
+) -> tuple[list[tuple[str | None, list[Issue]]], dict[str, list[str]]]:
     """only と exclude で選んだ分類の Issue を、担当者ごとにまとめる。
 
-    1つ目の戻り値は (担当者の login、その担当者の Issue を番号順に並べたもの) の配列。
+    1つ目の戻り値は (担当者の login、その担当者の Issue を Issue.order の順
+    （リポジトリ名の順、同じリポジトリの中は番号順）に並べたもの) の配列。
     担当者は login の順（大文字と小文字を区別せずに比べる）で、担当者なしの Issue があれば
     最後に login が None の組を置く。0件の担当者は含まない。
-    2つ目の戻り値は、Issue 番号から、その Issue が入る分類（選んだ分類だけ。見出しの順）への辞書。
+    2つ目の戻り値は、Issue のキー（Issue.key）から、その Issue が入る分類
+    （選んだ分類だけ。見出しの順）への辞書。
     """
-    categories_of: dict[int, list[str]] = {}
-    issue_of: dict[int, Issue] = {}
+    categories_of: dict[str, list[str]] = {}
+    issue_of: dict[str, Issue] = {}
     for category, issues in _selected_categories(classified, False, only, None, exclude):
         for issue in issues:
-            categories_of.setdefault(issue.number, []).append(category)
-            issue_of[issue.number] = issue
+            categories_of.setdefault(issue.key, []).append(category)
+            issue_of[issue.key] = issue
     by_login: dict[str, list[Issue]] = {}
     unassigned: list[Issue] = []
-    for number in sorted(issue_of):
-        issue = issue_of[number]
+    for issue in sorted(issue_of.values(), key=lambda i: i.order):
         if not issue.assignees:
             unassigned.append(issue)
         # 同じ担当者が重複して書かれていても、1回だけ数える
@@ -469,7 +495,7 @@ def format_digest_by_assignee(
     """
     if (stale_days is not None or age) and now is None:
         now = datetime.now(UTC)
-    total = len({issue.number for issues in classified.values() for issue in issues})
+    total = _total(classified)
     heading_title = "Issue ダイジェスト" if title is None else title
     header = [f"# {heading_title}（全 {total} 件）"]
     if summary:
@@ -494,9 +520,9 @@ def format_digest_by_assignee(
         rows = []
         for issue in shown:
             issue_title = _escape_markdown(_shorten_title(issue.title))
-            names = _category_names(tuple(categories_of[issue.number]), headings)
+            names = _category_names(tuple(categories_of[issue.key]), headings)
             rows.append(
-                f"- [#{issue.number}]({issue.url}) {issue_title}（{names}）"
+                f"- {_issue_link(issue.number, issue.url)} {issue_title}（{names}）"
                 f"{_stale_mark(issue, stale_days, now)}"
                 f"{_assignees_mark(issue, show_assignees)}"
                 f"{_labels_mark(issue, show_labels)}"
@@ -530,7 +556,8 @@ def _diff_lines(diff: Diff, headings: dict[str, str] | None = None) -> list[str]
             lines.append("なし")
         for entry in entries:
             line = (
-                f"- [#{entry.number}]({entry.url}) {_escape_markdown(_shorten_title(entry.title))}"
+                f"- {_issue_link(entry.number, entry.url)}"
+                f" {_escape_markdown(_shorten_title(entry.title))}"
             )
             if show_move:
                 before = _category_names(entry.before, headings)

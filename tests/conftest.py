@@ -1,4 +1,5 @@
 import json
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -27,8 +28,13 @@ def make_issue(number: int, title: str | None = None, labels: list[str] | None =
 
 
 def issue_numbers_in_output(out: str) -> list[int]:
-    lines = [line for line in out.splitlines() if line.startswith("- [#")]
-    return [int(line.removeprefix("- [#").split("]")[0]) for line in lines]
+    """Markdown の Issue の行（`- [owner/repo#12](url)` または `- [#12](url)`）の番号を返す。"""
+    numbers = []
+    for line in out.splitlines():
+        match = re.match(r"- \[[^\]#]*#(\d+)\]\(", line)
+        if match:
+            numbers.append(int(match[1]))
+    return numbers
 
 
 def json_out(capsys) -> dict:

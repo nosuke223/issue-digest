@@ -16,7 +16,7 @@ def test_format_digest_lists_issues_and_none():
         "\n"
         "## 判断待ち (agent:needs-decision) - 1件\n"
         "\n"
-        "- [#5](https://github.com/example/repo/issues/5) CLI を作る\n"
+        "- [example/repo#5](https://github.com/example/repo/issues/5) CLI を作る\n"
         "\n"
         "## 中断 (agent:blocked) - 0件\n"
         "\n"
@@ -41,7 +41,7 @@ def test_format_digest_heading_order_and_unclassified():
 def test_format_digest_issue_in_multiple_categories():
     issues = [make_issue(1, "両方", ["agent:review", "agent:working"])]
     out = format_digest(classify_issues(issues))
-    assert out.count("- [#1](https://github.com/example/repo/issues/1) 両方") == 2
+    assert out.count("- [example/repo#1](https://github.com/example/repo/issues/1) 両方") == 2
     assert out.startswith("# Issue ダイジェスト（全 1 件）\n")
 
 
@@ -63,7 +63,7 @@ def test_format_digest_hide_empty_omits_empty_categories():
         "\n"
         "## 判断待ち (agent:needs-decision) - 1件\n"
         "\n"
-        "- [#5](https://github.com/example/repo/issues/5) CLI を作る\n"
+        "- [example/repo#5](https://github.com/example/repo/issues/5) CLI を作る\n"
     )
 
 
@@ -89,7 +89,7 @@ def test_format_digest_only_keeps_total_of_all_issues():
         "\n"
         "## レビュー待ち (agent:review) - 1件\n"
         "\n"
-        "- [#2](https://github.com/example/repo/issues/2) B\n"
+        "- [example/repo#2](https://github.com/example/repo/issues/2) B\n"
     )
 
 
@@ -129,7 +129,7 @@ def test_format_digest_show_assignees_appends_in_input_order():
 
 def test_format_digest_show_assignees_skips_issue_without_assignees():
     out = format_digest(classify_issues([make_issue(1, "A", ["agent:ready"])]), show_assignees=True)
-    assert "- [#1](https://github.com/example/repo/issues/1) A\n" in out
+    assert "- [example/repo#1](https://github.com/example/repo/issues/1) A\n" in out
     assert "担当" not in out
 
 
@@ -148,7 +148,7 @@ def test_format_digest_stale_mark_comes_before_assignees():
 
 def test_format_json_show_assignees_adds_login_list():
     issues = [
-        Issue(1, "A", ["agent:ready"], "u", assignees=["alice", "bob"]),
+        Issue(1, "A", ["agent:ready"], make_issue(1).url, assignees=["alice", "bob"]),
         make_issue(2, "B", ["agent:ready"]),
     ]
     body = json.loads(format_json(classify_issues(issues), show_assignees=True))
@@ -202,7 +202,9 @@ def test_format_digest_without_summary_unchanged():
 def test_format_digest_escapes_markdown_in_title():
     issue = make_issue(1, "[WIP] a](x) *b*", ["agent:ready"])
     out = format_digest(classify_issues([issue]))
-    assert "- [#1](https://github.com/example/repo/issues/1) \\[WIP\\] a\\](x) \\*b\\*\n" in out
+    assert (
+        "- [example/repo#1](https://github.com/example/repo/issues/1) \\[WIP\\] a\\](x) \\*b\\*\n"
+    ) in out
 
 
 def test_format_digest_escapes_all_special_characters():
@@ -225,7 +227,10 @@ def test_format_digest_show_labels_skips_agent_labels_in_input_order():
 
 
 def test_format_json_show_labels_adds_non_agent_labels():
-    issues = [Issue(1, "A", ["agent:ready", "bug"], "u"), make_issue(2, "B", ["agent:ready"])]
+    issues = [
+        Issue(1, "A", ["agent:ready", "bug"], make_issue(1).url),
+        make_issue(2, "B", ["agent:ready"]),
+    ]
     body = json.loads(format_json(classify_issues(issues), show_labels=True))
     ready = next(c for c in body["categories"] if c["label"] == "agent:ready")
     assert [i["labels"] for i in ready["issues"]] == [["bug"], []]

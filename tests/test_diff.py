@@ -28,13 +28,17 @@ def _previous(number: int, *categories: str) -> PreviousIssue:
 
 def test_load_previous_collects_categories_per_issue():
     previous = load_previous(PREVIOUS)
-    assert sorted(previous) == [1, 2, 3, 4]
-    assert previous[4].categories == ("agent:working", "agent:ready")
-    assert previous[3] == PreviousIssue(3, "片付いた Issue *C*", _url(3), ("agent:review",))
+    assert sorted(previous) == sorted(_url(n) for n in (1, 2, 3, 4))
+    assert previous[_url(4)].categories == ("agent:working", "agent:ready")
+    assert previous[_url(3)] == PreviousIssue(3, "片付いた Issue *C*", _url(3), ("agent:review",))
+
+
+def _by_key(*issues: PreviousIssue) -> dict[str, PreviousIssue]:
+    return {issue.url.lower(): issue for issue in issues}
 
 
 def test_compute_diff_single_category_move():
-    previous = {1: _previous(1, "agent:ready")}
+    previous = _by_key(_previous(1, "agent:ready"))
     classified = classify_issues([make_issue(1, labels=["agent:review"])])
     diff = compute_diff(previous, classified)
     assert diff.added == [] and diff.removed == []
@@ -42,13 +46,13 @@ def test_compute_diff_single_category_move():
 
 
 def test_compute_diff_same_category_set_is_not_moved():
-    previous = {1: _previous(1, "agent:working", "agent:ready")}
+    previous = _by_key(_previous(1, "agent:working", "agent:ready"))
     classified = classify_issues([make_issue(1, labels=["agent:ready", "agent:working"])])
     assert compute_diff(previous, classified).is_empty()
 
 
 def test_compute_diff_sorted_by_number():
-    previous = {n: _previous(n, "agent:ready") for n in (9, 7)}
+    previous = _by_key(*(_previous(n, "agent:ready") for n in (9, 7)))
     classified = classify_issues([make_issue(n) for n in (6, 2)])
     diff = compute_diff(previous, classified)
     assert [e.number for e in diff.added] == [2, 6]
@@ -80,11 +84,11 @@ def test_parse_previous_rejects_other_shapes(text):
 EXPECTED_MARKDOWN = (
     "\n## 前回からの変化\n\n"
     "### 新しい Issue - 1件\n\n"
-    f"- [#5]({_url(5)}) 新しい Issue E\n\n"
+    f"- [example/repo#5]({_url(5)}) 新しい Issue E\n\n"
     "### なくなった Issue - 1件\n\n"
-    f"- [#3]({_url(3)}) 片付いた Issue \\*C\\*\n\n"
+    f"- [example/repo#3]({_url(3)}) 片付いた Issue \\*C\\*\n\n"
     "### 分類が変わった Issue - 1件\n\n"
-    f"- [#4]({_url(4)}) 複数の分類の Issue D: 作業中, 着手可能 → レビュー待ち\n"
+    f"- [example/repo#4]({_url(4)}) 複数の分類の Issue D: 作業中, 着手可能 → レビュー待ち\n"
 )
 
 
@@ -109,7 +113,7 @@ def test_main_diff_markdown_empty_sections_show_none(capsys, tmp_path):
     assert out.endswith(
         "### 新しい Issue - 0件\n\nなし\n\n"
         "### なくなった Issue - 1件\n\n"
-        f"- [#2]({_url(2)}) ラベルなしの Issue B\n\n"
+        f"- [example/repo#2]({_url(2)}) ラベルなしの Issue B\n\n"
         "### 分類が変わった Issue - 0件\n\nなし\n"
     )
 
@@ -130,6 +134,7 @@ def test_main_diff_json(capsys):
                 "number": 5,
                 "title": "新しい Issue E",
                 "url": _url(5),
+                "repository": "example/repo",
                 "categories": ["agent:needs-decision", "agent:blocked"],
             }
         ],
@@ -138,6 +143,7 @@ def test_main_diff_json(capsys):
                 "number": 3,
                 "title": "片付いた Issue *C*",
                 "url": _url(3),
+                "repository": "example/repo",
                 "categories": ["agent:review"],
             }
         ],
@@ -146,6 +152,7 @@ def test_main_diff_json(capsys):
                 "number": 4,
                 "title": "複数の分類の Issue D",
                 "url": _url(4),
+                "repository": "example/repo",
                 "from": ["agent:working", "agent:ready"],
                 "to": ["agent:review"],
             }
@@ -247,7 +254,7 @@ def test_main_diff_uses_config_headings(capsys, tmp_path):
     config.write_text('[headings]\n"agent:review" = "確認待ち"\n', encoding="utf-8")
     assert main(["--config", str(config), "--diff", PREVIOUS, CURRENT]) == 0
     assert capsys.readouterr().out.endswith(
-        f"- [#4]({_url(4)}) 複数の分類の Issue D: 作業中, 着手可能 → 確認待ち\n"
+        f"- [example/repo#4]({_url(4)}) 複数の分類の Issue D: 作業中, 着手可能 → 確認待ち\n"
     )
 
 

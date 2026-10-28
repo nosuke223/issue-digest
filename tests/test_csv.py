@@ -19,7 +19,7 @@ def test_format_csv_header_and_order():
         make_issue(3, "C"),
     ]
     rows = _rows(format_csv(classify_issues(issues)))
-    assert rows[0] == ["label", "number", "title", "url"]
+    assert rows[0] == ["label", "number", "title", "url", "repository"]
     # 分類の順（レビュー待ち → 着手可能 → 未分類）
     assert [(r[0], r[1]) for r in rows[1:]] == [
         ("agent:review", "2"),
@@ -27,6 +27,7 @@ def test_format_csv_header_and_order():
         ("unclassified", "3"),
     ]
     assert rows[1][3] == "https://github.com/example/repo/issues/2"
+    assert rows[1][4] == "example/repo"
 
 
 def test_format_csv_issue_in_multiple_categories_has_row_per_category():
@@ -49,13 +50,13 @@ def test_format_csv_does_not_shorten_title():
 
 
 def test_format_csv_empty_has_only_header():
-    assert format_csv(classify_issues([])) == "label,number,title,url\r\n"
+    assert format_csv(classify_issues([])) == "label,number,title,url,repository\r\n"
 
 
 def test_main_csv(capsys):
     assert main(["--csv", str(DATA / "issues.json")]) == 0
     rows = _rows(capsys.readouterr().out)
-    assert rows[0] == ["label", "number", "title", "url"]
+    assert rows[0] == ["label", "number", "title", "url", "repository"]
     assert [r[:2] for r in rows[1:]] == [["agent:ready", "1"], ["unclassified", "2"]]
 
 
@@ -75,7 +76,7 @@ def test_main_csv_with_only_hide_empty_sort_exclude_limit(capsys):
 
 def test_main_csv_hide_empty_drops_empty_categories_only(capsys):
     assert main(["--csv", "--hide-empty", str(DATA / "empty.json")]) == 0
-    assert capsys.readouterr().out == "label,number,title,url\r\n"
+    assert capsys.readouterr().out == "label,number,title,url,repository\r\n"
 
 
 def test_main_csv_ignores_stale_assignees_labels_summary_title(capsys):
@@ -92,7 +93,7 @@ def test_main_csv_output_file(capsys, tmp_path):
     assert main(["--csv", "--output", str(out), str(DATA / "issues.json")]) == 0
     assert capsys.readouterr().out == ""
     data = out.read_bytes()
-    assert data.startswith(b"label,number,title,url\r\n")
+    assert data.startswith(b"label,number,title,url,repository\r\n")
     assert b"\r\r" not in data
 
 
