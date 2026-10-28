@@ -8,6 +8,34 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 
 これまでの変更は [CHANGELOG.md](CHANGELOG.md) にまとめています。
 
+## インストールと実行する場所
+
+### プロジェクトのフォルダの中で実行する
+
+このリポジトリのフォルダの中では、`uv run issue-digest ...` で実行できます。この README の例はすべてこの形です。
+
+### 別のフォルダから実行する
+
+cron や、ほかのリポジトリの作業フォルダから使うときは、`--project` にこのリポジトリのパスを渡します。
+
+```
+uv run --project <プロジェクトのパス> issue-digest issues.json
+```
+
+`issues.json` などの入力ファイルは、実行したフォルダからの相対パスで指定します。
+
+### 設定ファイルの探し方
+
+設定ファイル `.issue-digest.toml` は、プロジェクトのフォルダではなく、実行したときのカレントディレクトリから探します。
+別のフォルダで実行するときは、次のどちらかにします。
+
+- `--config <パス>` で設定ファイルを指定する
+- 実行するフォルダに `.issue-digest.toml` を置く
+
+```
+uv run --project <プロジェクトのパス> issue-digest --config <設定ファイルのパス> issues.json
+```
+
 ## 使い方
 
 `gh issue list --json number,title,labels,url` の出力を渡します。
