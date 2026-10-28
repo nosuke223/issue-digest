@@ -193,6 +193,15 @@ def test_main_diff_with_same_order_has_no_change(capsys, tmp_path):
     assert capsys.readouterr().out.endswith("\n## 前回からの変化\n\n変化なし\n")
 
 
+def test_main_usage_mentions_multiple_inputs(capsys):
+    assert main(["--help"]) == 0
+    out = capsys.readouterr().out
+    assert "<JSONファイルのパス | ->..." in out
+    assert "入力は複数指定でき" in out
+    assert "label,number,title,url,repository" in out
+    assert "Issue は URL で照合する" in out
+
+
 @pytest.mark.parametrize(
     ("url", "expected"),
     [
