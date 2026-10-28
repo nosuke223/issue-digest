@@ -64,7 +64,8 @@ USAGE = (
     "  --show-assignees で担当者を表示する（Markdown は行末に（担当: @alice）、"
     "JSON は各 Issue に assignees の配列を加える）\n"
     "  --show-labels で agent: で始まらないラベルを表示する"
-    "（Markdown は行末に（ラベル: bug, docs）、JSON は各 Issue に labels の配列を加える）\n"
+    "（設定ファイルの [category_labels] に書いたラベルも表示しない。"
+    "Markdown は行末に（ラベル: bug, docs）、JSON は各 Issue に labels の配列を加える）\n"
     "  --show-milestone でマイルストーンを表示する（Markdown は行末に（マイルストーン: v1.0）、"
     "JSON は各 Issue に milestone を加える。なければ null。"
     "入力は gh issue list --json の milestone）\n"
@@ -83,7 +84,7 @@ USAGE = (
     "  --config で読む設定ファイルを指定する（省略時はカレントディレクトリの .issue-digest.toml。"
     "なければ使わない）。キーは hide_empty、summary、only、exclude、stale、sort、reverse、"
     "show_assignees、show_labels、show_milestone、age、title、limit、max_chars、group_by、"
-    "json、headings で、コマンドラインの指定を優先する"
+    "json、headings、category_labels で、コマンドラインの指定を優先する"
     "（sort は updated か created、limit と max_chars は1以上の整数、"
     'group_by は "assignee"、title は1文字以上の文字列）'
     "（only と exclude は --only か --exclude を指定したら使わず、"
@@ -96,6 +97,11 @@ USAGE = (
     ' / age = true / show_milestone = true / max_chars = 2000 / group_by = "assignee"\n'
     "    [headings] テーブルで分類の見出しを変えられる"
     '（例: [headings] の下に "agent:review" = "確認待ち"）\n'
+    "    [category_labels] テーブルで各分類に割り当てる GitHub ラベルを変えられる"
+    '（例: [category_labels] の下に "agent:ready" = ["status:todo"]。'
+    "キーは unclassified 以外の5つの分類の名前、値は1文字以上の文字列を1つ以上入れた配列。"
+    "書いた分類は既定のラベル（agent:ready など）を使わなくなり、書かない分類は既定のラベルを使う。"
+    "--only、--exclude、--fail-if-any、JSON と CSV の label などの分類の名前は変わらない）\n"
     "  --group-by assignee で分類ごとの代わりに担当者ごとの見出し（## @alice - 3件、最後に"
     "## 担当者なし - N件）で並べ、各 Issue の行末に分類の名前を（作業中, 着手可能）の形で付ける"
     "（Markdown だけで使える。--json、--csv とは同時に指定できない。"
@@ -384,11 +390,18 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
                 )
                 return 1
     issues = merge_issues(loaded)
-    all_classified = classify_issues(issues)
+    # 分類の名前は設定に関係なく固定で、割り当てるラベルだけが変わる
+    category_labels: dict[str, list[str]] | None = config.get("category_labels")
+    # 設定で分類に使うラベルは、--show-labels で出さない
+    hidden_labels = frozenset(
+        label for labels in (category_labels or {}).values() for label in labels
+    )
+    all_classified = classify_issues(issues, category_labels)
     classified = all_classified
     if since is not None:
         classified = classify_issues(
-            [i for i in issues if i.updated_at is not None and i.updated_at >= since]
+            [i for i in issues if i.updated_at is not None and i.updated_at >= since],
+            category_labels,
         )
     diff: Diff | None = None
     if opts.diff is not None and not as_csv:
@@ -435,6 +448,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             age,
             show_milestone,
             reverse,
+            hidden_labels,
         )
     elif group_by == "assignee":
         # 0件の担当者の見出しは出さないので、--hide-empty は効果がない
@@ -456,6 +470,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             reverse,
             max_chars,
             show_milestone,
+            hidden_labels,
         )
     else:
         digest = format_digest(
@@ -477,6 +492,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             max_chars,
             show_milestone,
             reverse,
+            hidden_labels,
         )
     if max_chars is not None and len(digest) > max_chars:
         print(

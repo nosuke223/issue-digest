@@ -72,6 +72,7 @@ def format_json(
     age: bool = False,
     show_milestone: bool = False,
     reverse: bool = False,
+    hidden_labels: frozenset[str] = frozenset(),
 ) -> str:
     """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
 
@@ -82,7 +83,7 @@ def format_json(
     `assignees`（login の配列。担当者がいなければ空の配列）を加える。
     limit を指定したとき、各分類の `issues` を先頭 limit 件にし（`count` は全件のまま）、
     出力しなかった件数を `omitted` に入れる。show_labels が True のとき、各 Issue に
-    `labels`（`agent:` で始まらないラベルの配列。なければ空の配列）を加える。
+    `labels`（`agent:` で始まらず hidden_labels にもないラベルの配列。なければ空の配列）を加える。
     title を指定したとき、JSON の先頭に `title` を加える。
     diff を指定したとき、末尾に `diff`（`added`、`removed`、`moved` の配列）を加える。
     `added` と `removed` の各要素は `number`、`title`、`url`、`repository`、`categories`
@@ -115,7 +116,7 @@ def format_json(
             if show_assignees:
                 item["assignees"] = list(issue.assignees)
             if show_labels:
-                item["labels"] = _other_labels(issue)
+                item["labels"] = _other_labels(issue, hidden_labels)
             if age:
                 item["age_days"] = _age_days_of(issue, now)
             if show_milestone:
@@ -230,13 +231,20 @@ def _milestone_mark(issue: Issue, show_milestone: bool) -> str:
     return f"（マイルストーン: {_escape_markdown(issue.milestone)}）"
 
 
-def _other_labels(issue: Issue) -> list[str]:
-    """`agent:` で始まらないラベルを入力の順に返す。"""
-    return [label for label in issue.labels if not label.startswith("agent:")]
+def _other_labels(issue: Issue, hidden_labels: frozenset[str] = frozenset()) -> list[str]:
+    """`agent:` で始まらず、hidden_labels（設定で分類に使うラベル）にもないラベルを
+    入力の順に返す。"""
+    return [
+        label
+        for label in issue.labels
+        if not label.startswith("agent:") and label not in hidden_labels
+    ]
 
 
-def _labels_mark(issue: Issue, show_labels: bool) -> str:
-    labels = _other_labels(issue)
+def _labels_mark(
+    issue: Issue, show_labels: bool, hidden_labels: frozenset[str] = frozenset()
+) -> str:
+    labels = _other_labels(issue, hidden_labels)
     if not show_labels or not labels:
         return ""
     return "（ラベル: " + ", ".join(_escape_markdown(label) for label in labels) + "）"
@@ -301,6 +309,7 @@ def format_digest(
     max_chars: int | None = None,
     show_milestone: bool = False,
     reverse: bool = False,
+    hidden_labels: frozenset[str] = frozenset(),
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
@@ -320,7 +329,7 @@ def format_digest(
     Issue があれば分類の最後に `- ほか N 件` を出す。見出しの件数は全件のまま。
     show_labels が True のとき、`agent:` で始まらないラベルがある Issue の行末に
     `（ラベル: bug, docs）` を付ける（担当者の印があればその後ろ。ラベルの名前はタイトルと
-    同じ規則でエスケープする）。
+    同じ規則でエスケープする）。hidden_labels（設定で分類に使うラベル）は出さない。
     title を指定すると、1行目の `Issue ダイジェスト` をその文字列に置き換える。
     headings に書かれた分類は、分類の見出しと summary の行の名前をその文字列に置き換える。
     Issue のタイトルが40文字を超えるときは、40文字までにして末尾に `…` を付ける
@@ -368,7 +377,7 @@ def format_digest(
                 f"- {_issue_link(issue.number, issue.url)} {issue_title}"
                 f"{_stale_mark(issue, stale_days, now)}"
                 f"{_assignees_mark(issue, show_assignees)}"
-                f"{_labels_mark(issue, show_labels)}"
+                f"{_labels_mark(issue, show_labels, hidden_labels)}"
                 f"{_age_mark(issue, age, now)}"
                 f"{_milestone_mark(issue, show_milestone)}"
             )
@@ -478,6 +487,7 @@ def format_digest_by_assignee(
     reverse: bool = False,
     max_chars: int | None = None,
     show_milestone: bool = False,
+    hidden_labels: frozenset[str] = frozenset(),
 ) -> str:
     """分類結果を、担当者ごとの見出しで並べた Markdown のダイジェストにする。
 
@@ -525,7 +535,7 @@ def format_digest_by_assignee(
                 f"- {_issue_link(issue.number, issue.url)} {issue_title}（{names}）"
                 f"{_stale_mark(issue, stale_days, now)}"
                 f"{_assignees_mark(issue, show_assignees)}"
-                f"{_labels_mark(issue, show_labels)}"
+                f"{_labels_mark(issue, show_labels, hidden_labels)}"
                 f"{_age_mark(issue, age, now)}"
                 f"{_milestone_mark(issue, show_milestone)}"
             )

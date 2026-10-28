@@ -65,7 +65,7 @@ uv run issue-digest repo-a.json repo-b.json
 | `--max-chars <文字数>` | Markdown の出力全体を指定文字数以内に収める（収まらない分の Issue の行を `- ほか N 件` にする） | `uv run issue-digest --max-chars 2000 issues.json` |
 | `--summary` | 総件数の次に、分類ごとの件数を1行で出力する | `uv run issue-digest --summary issues.json` |
 | `--show-assignees` | 担当者がいる Issue に `（担当: @alice）` を付ける | `uv run issue-digest --show-assignees issues.json` |
-| `--show-labels` | `agent:` で始まらないラベルがある Issue に `（ラベル: bug, docs）` を付ける | `uv run issue-digest --show-labels issues.json` |
+| `--show-labels` | `agent:` で始まらないラベル（設定の `[category_labels]` に書いたラベルを除く）がある Issue に `（ラベル: bug, docs）` を付ける | `uv run issue-digest --show-labels issues.json` |
 | `--age` | 作成日時（`createdAt`）がある Issue に `（作成から12日）` を付ける | `uv run issue-digest --age issues.json` |
 | `--show-milestone` | マイルストーンがある Issue に `（マイルストーン: v1.0）` を付ける | `uv run issue-digest --show-milestone issues.json` |
 | `--json` | Markdown の代わりに JSON を出力する | `uv run issue-digest --json issues.json` |
@@ -134,6 +134,7 @@ uv run issue-digest --hide-empty issues.json
 `--only <ラベル>` を付けると、指定したラベルの分類だけを出力します。見たい分類だけを素早く確認したいときに使います。
 複数回指定すると、指定したすべての分類を出力します。`--hide-empty` と同時に使えます。
 指定できるのは `agent:needs-decision`、`agent:blocked`、`agent:review`、`agent:working`、`agent:ready`、`unclassified`（未分類）の6つです。
+これは分類の名前で、設定ファイルの `[category_labels]` で分類に使う GitHub ラベルを変えても、指定する名前は変わりません（例: `"agent:ready" = ["status:todo"]` と書いたときも `--only agent:ready` で、`status:todo` で分類した Issue を出します）。
 それ以外を指定すると、エラーを標準エラーに出して終了コード 2 で終わります。
 見出しの総件数は、`--only` に関係なく全件の数のままです。
 
@@ -205,6 +206,7 @@ gh issue list --json number,title,labels,url,assignees | uv run issue-digest --s
 ### `--show-labels`
 
 `--show-labels` を付けると、`agent:` で始まらないラベルがある Issue の行の末尾に `（ラベル: bug, docs）` を付けます。`bug` や `docs` などのラベルも一緒に見たいときに使います。
+設定ファイルの `[category_labels]` に書いたラベル（分類に使っているラベル）は、`agent:` で始まらなくても出しません。`agent:` で始まるラベルは、分類に使っていなくても出しません。`--json` の `labels` も同じです。
 ラベルは入力の順に、カンマと空白で区切って並べます。対象のラベルがない Issue には何も付けません。
 各ラベルの名前の Markdown の記号（`\` `` ` `` `*` `_` `[` `]` `<` `>`）は、タイトルと同じようにエスケープします（例: `x_y*z` は `x\_y\*z`）。`--json` の `labels` はエスケープしません。
 `--show-labels` を付けない場合の出力は変わりません。
@@ -487,7 +489,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 `--config <パス>` で読むファイルを指定できます（このとき `.issue-digest.toml` は読みません）。指定したファイルがなければ、`エラー: 設定ファイルが見つかりません: <パス>` を標準エラーに出して終了コード 1 で終わります。
 ホームディレクトリなど、ほかの場所の設定ファイルは探しません。
 
-書けるキーは次の17個です。
+書けるキーは次の18個です。
 
 | キー | 型 | 対応するオプション |
 | --- | --- | --- |
@@ -508,6 +510,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --json --diff
 | `group_by` | `"assignee"` だけ | `--group-by assignee` |
 | `json` | 真偽値 | `--json` |
 | `headings` | テーブル（`[headings]`）。キーは `--only` と同じ6つのラベル、値は1文字以上の文字列 | なし（下の「分類の見出しを変える」を参照） |
+| `category_labels` | テーブル（`[category_labels]`）。キーは `unclassified` 以外の5つの分類の名前、値は1文字以上の文字列を1つ以上入れた配列 | なし（下の「分類に使うラベルを変える」を参照） |
 
 `--output`、`--version` など、上に挙げていないオプションは設定できません。
 
@@ -558,6 +561,34 @@ unclassified = "その他"
 - 知らないラベルや、1文字以上の文字列でない値は、どのキーかを示すエラーを標準エラーに出して終了コード 2 で終わります。
 - コマンドラインに対応するオプションはありません。`--title` が置き換える1行目の `Issue ダイジェスト` には影響しません。
 
+#### 分類に使うラベルを変える（`[category_labels]`）
+
+設定ファイルに `[category_labels]` テーブルを書くと、各分類にどの GitHub ラベルを割り当てるかを変えられます。`status:todo` など、`agent:*` 以外のラベルで運用しているリポジトリで使います。6つの分類（判断待ち、中断、レビュー待ち、作業中、着手可能、未分類）の意味と順番は変わりません。
+
+```toml
+[category_labels]
+"agent:ready" = ["status:todo"]
+"agent:working" = ["status:doing", "status:in-progress"]
+```
+
+- キーは分類の名前（`agent:needs-decision`、`agent:blocked`、`agent:review`、`agent:working`、`agent:ready` の5つ）です。`unclassified` は指定できません。
+- 値は GitHub ラベル名の文字列の配列（1つ以上、各1文字以上）です。書いたラベルのどれかを持つ Issue が、その分類に入ります。
+- 書いた分類は、その分類の既定のラベル（`agent:ready` など）を使わなくなります。上の例では、`agent:ready` だけを持つ Issue は未分類に入ります。
+- 書かない分類は、今までどおり既定のラベル（分類の名前と同じラベル）で分類します。
+- ラベル名の比較は、大文字と小文字を区別します。
+- 複数の分類に当てはまる Issue は、今までどおりすべての分類に入ります。同じラベルを2つの分類に割り当ててもエラーにしません。どの分類のラベルも持たない Issue は未分類に入ります。
+- 分類の名前は変わりません。`--only`、`--exclude`、`--fail-if-any` に指定する名前、設定の `only`、`exclude`、`headings` のキー、Markdown の見出しの `(agent:ready)`、JSON と CSV の `label` は、設定に関係なく今までの名前（`agent:ready` など）です。そのため、`[category_labels]` を書く前の `--json` の出力も `--diff` の前回の JSON として使えます。
+- `--show-labels` と JSON の `labels` には、ここに書いたラベルを出しません（「`--show-labels`」を参照）。
+- 知らない分類の名前や `unclassified` をキーに書いた、値が文字列の配列でない、空の配列、空の文字列を含む、`[category_labels]` がテーブルでない、のどれかのときは、どのキーかを示すエラーを標準エラーに出して終了コード 2 で終わります。
+- コマンドラインに対応するオプションはありません。`[category_labels]` を書かない場合の動きは変わりません。
+
+移行の例: 書いた分類は既定のラベルを使わなくなるので、`agent:ready` から `status:todo` へ切り替える間は、次のように両方を書くと、どちらのラベルの Issue も「着手可能」に入ります。
+
+```toml
+[category_labels]
+"agent:ready" = ["status:todo", "agent:ready"]
+```
+
 ### `--group-by assignee`
 
 `--group-by assignee` を付けると、分類ごとの見出しの代わりに、担当者ごとの見出しで Issue を並べます。誰が何を抱えているかを見たいときに使います。
@@ -604,7 +635,7 @@ gh issue list --json number,title,labels,url,assignees | uv run issue-digest --g
 
 - ダイジェストはいつもどおり出力します。`--output` があるときは、ファイルに書き出してから終了コード 3 で終わります。
 - 判定に使う件数は、`--since` で絞った後の件数です。`--only`、`--exclude`、`--hide-empty`、`--limit`、`--max-chars` には左右されないので、出力に出ていない分類でも判定します。
-- 指定できるラベルは `--only` と同じ6つ（`agent:ready`、`agent:working`、`agent:review`、`agent:needs-decision`、`agent:blocked`、`unclassified`）です。それ以外を指定すると、エラーを標準エラーに出して終了コード 2 で終わります。`--fail-if-any` の後に値がない場合も終了コード 2 です。
+- 指定できるラベルは `--only` と同じ6つ（`agent:ready`、`agent:working`、`agent:review`、`agent:needs-decision`、`agent:blocked`、`unclassified`）です。これは分類の名前で、設定ファイルの `[category_labels]` で分類に使うラベルを変えても変わりません。それ以外を指定すると、エラーを標準エラーに出して終了コード 2 で終わります。`--fail-if-any` の後に値がない場合も終了コード 2 です。
 - エラー（終了コード 1、2）になるときは、今までと同じ終了コードで終わります（3 にはなりません）。ファイルに書き出せないときも終了コード 1 です。
 - Markdown、`--json`、`--csv`、`--group-by` のどれでも効きます。設定ファイルにキーはありません。
 
@@ -637,7 +668,7 @@ uv run issue-digest --version
   - `--sort updated` または `--sort created` を同時に指定すると、各分類の `issues` の順が変わります。`--reverse` を同時に指定すると、`issues` の順が逆になります。
   - `--summary` は無視します（JSON には分類ごとの `count` があるため）。
   - `--show-assignees` を同時に指定すると、各 Issue に `"assignees": ["alice", "bob"]`（login の配列。担当者がいなければ空の配列）を加えます。`--show-assignees` を付けない JSON には `assignees` を出しません。
-  - `--show-labels` を同時に指定すると、各 Issue に `"labels": ["bug"]`（`agent:` で始まらないラベルの配列。なければ空の配列）を加えます。`--show-labels` を付けない JSON には `labels` を出しません。
+  - `--show-labels` を同時に指定すると、各 Issue に `"labels": ["bug"]`（`agent:` で始まらず、設定ファイルの `[category_labels]` にも書いていないラベルの配列。なければ空の配列）を加えます。`--show-labels` を付けない JSON には `labels` を出しません。
   - `--age` を同時に指定すると、各 Issue に `"age_days": 12`（作成からの経過日数の整数。`createdAt` がなければ `null`）を加えます。`--age` を付けない JSON には `age_days` を出しません。
   - `--show-milestone` を同時に指定すると、各 Issue に `"milestone": "v1.0"`（マイルストーンの名前の文字列。なければ `null`）を加えます。`--show-milestone` を付けない JSON には `milestone` を出しません。
   - `--diff` を同時に指定すると、末尾に `diff`（`added`、`removed`、`moved`）を加えます。`--diff` を付けない JSON には `diff` を出しません。
@@ -664,4 +695,5 @@ uv run issue-digest --version
 - 終了コードは、正常が 0、実行時のエラー（ファイルが読めない、書き出せないなど）が 1、オプションの指定のエラーが 2、`--fail-if-any` で指定した分類に Issue があるときが 3 です。エラーのときは 1 か 2 を優先します。
 - 設定ファイルの `group_by`、`max_chars` と `json = true` を一緒に書くと、コマンドラインで `--group-by`、`--max-chars` と `--json` を同時に指定したときと同じエラーで終了コード 2 です。コマンドラインで `--json` か `--csv` を指定したときは、設定の `group_by` と `max_chars` は使いません。
 - `--config` は、ほかのオプションすべてと同時に使えます。設定ファイルの値は、コマンドラインで同じオプションを指定したときは使いません（詳しくは「設定ファイルと `--config <パス>`」）。
+- 設定ファイルの `[category_labels]` は、分類に使うラベルだけを変えます。`--only`、`--exclude`、`--fail-if-any`、`--diff`、`--group-by` などは、変えた後の分類に今までの名前（`agent:ready` など）で効きます。
 - `--version` は、ほかのオプションやファイルの指定があっても、バージョンだけを出力します。

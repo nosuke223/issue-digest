@@ -1,0 +1,38 @@
+[
+  {
+    "number": 1,
+    "title": "status:todo の Issue",
+    "labels": [{"name": "status:todo"}, {"name": "bug"}],
+    "url": "https://github.com/example/repo/issues/1"
+  },
+  {
+    "number": 2,
+    "title": "agent:ready だけの Issue",
+    "labels": [{"name": "agent:ready"}],
+    "url": "https://github.com/example/repo/issues/2"
+  },
+  {
+    "number": 3,
+    "title": "status:doing の Issue",
+    "labels": [{"name": "status:doing"}],
+    "url": "https://github.com/example/repo/issues/3"
+  },
+  {
+    "number": 4,
+    "title": "status:in-progress の Issue",
+    "labels": [{"name": "status:in-progress"}, {"name": "docs"}],
+    "url": "https://github.com/example/repo/issues/4"
+  },
+  {
+    "number": 5,
+    "title": "agent:review の Issue",
+    "labels": [{"name": "agent:review"}],
+    "url": "https://github.com/example/repo/issues/5"
+  },
+  {
+    "number": 6,
+    "title": "大文字の Status:Todo の Issue",
+    "labels": [{"name": "Status:Todo"}],
+    "url": "https://github.com/example/repo/issues/6"
+  }
+]
