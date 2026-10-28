@@ -14,10 +14,12 @@ _BOOL_KEYS = (
     "show_labels",
     "age",
     "show_milestone",
+    "reverse",
 )
 _KEYS = (
     *_BOOL_KEYS,
     "only",
+    "exclude",
     "stale",
     "sort",
     "headings",
@@ -86,13 +88,13 @@ def _validate(data: dict[str, Any]) -> dict[str, Any]:
                 raise ConfigError(
                     f'設定ファイルの sort には "updated" か "created" を指定してください: {value}'
                 )
-        elif key == "only":
+        elif key in ("only", "exclude"):
             if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
-                raise ConfigError("設定ファイルの only には文字列の配列を指定してください")
+                raise ConfigError(f"設定ファイルの {key} には文字列の配列を指定してください")
             for label in value:
                 if label not in CATEGORIES:
                     raise ConfigError(
-                        f"設定ファイルの only に指定できないラベルです: {label}\n"
+                        f"設定ファイルの {key} に指定できないラベルです: {label}\n"
                         f"指定できるラベル: {', '.join(CATEGORIES)}"
                     )
         elif key == "headings":

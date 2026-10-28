@@ -65,22 +65,24 @@ USAGE = (
     "  --diff で前回の --json の出力と比べ、新しい Issue、なくなった Issue、分類が変わった Issue を"
     "出す（Markdown は末尾に「## 前回からの変化」、JSON は diff を加える。--csv では無視する。"
     "前回の JSON は --only、--exclude、--hide-empty、--limit、--since を付けず、"
-    "設定ファイルの hide_empty、only、limit も使わずに出力したもの。"
+    "設定ファイルの hide_empty、only、exclude、limit も使わずに出力したもの。"
     "付けて出力した JSON だと、入っていなかった Issue は"
     "新しい Issue や分類が変わった Issue として出る）\n"
     "    例: issue-digest --json --output last.json issues.json で保存し、"
     "次回 issue-digest --diff last.json issues.json\n"
     "  --config で読む設定ファイルを指定する（省略時はカレントディレクトリの .issue-digest.toml。"
-    "なければ使わない）。キーは hide_empty、summary、only、stale、sort、show_assignees、"
-    "show_labels、show_milestone、age、title、limit、max_chars、group_by、json、headings で、"
-    "コマンドラインの指定を優先する"
+    "なければ使わない）。キーは hide_empty、summary、only、exclude、stale、sort、reverse、"
+    "show_assignees、show_labels、show_milestone、age、title、limit、max_chars、group_by、"
+    "json、headings で、コマンドラインの指定を優先する"
     "（sort は updated か created、limit と max_chars は1以上の整数、"
     'group_by は "assignee"、title は1文字以上の文字列）'
-    "（only は --only か --exclude を指定したら使わない。"
+    "（only と exclude は --only か --exclude を指定したら使わず、"
+    "両方を書くとエラー。reverse = true は常に有効。"
     "json = true は --csv、--group-by、--max-chars を指定したら使わない。"
     "group_by と max_chars は --json か --csv を指定したら使わず、"
     "設定の json = true と一緒に書くとエラー）\n"
     '    例: hide_empty = true / stale = 7 / limit = 5 / only = ["agent:review", "agent:blocked"]'
+    ' / exclude = ["unclassified"] / reverse = true'
     ' / age = true / show_milestone = true / max_chars = 2000 / group_by = "assignee"\n'
     "    [headings] テーブルで分類の見出しを変えられる"
     '（例: [headings] の下に "agent:review" = "確認待ち"）\n'
@@ -229,8 +231,12 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     only: list[str] = opts.only
     exclude: list[str] = opts.exclude
     if not only and not exclude:
-        # コマンドラインで --only も --exclude も指定しないときだけ、設定の only を使う
+        # コマンドラインで --only も --exclude も指定しないときだけ、設定の only と exclude を使う
+        # （両方を空でない配列で書くと、下の --only と --exclude の同時指定のエラーになる）
         only = config.get("only", [])
+        exclude = config.get("exclude", [])
+    # 設定の reverse = true は、コマンドラインで打ち消せない（ほかの真偽値のキーと同じ）
+    reverse = opts.reverse or config.get("reverse", False)
     show_assignees = opts.show_assignees or config.get("show_assignees", False)
     show_labels = opts.show_labels or config.get("show_labels", False)
     show_milestone = opts.show_milestone or config.get("show_milestone", False)
@@ -389,7 +395,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         # CSV に列のない --stale、--age、--show-assignees、--show-labels、--show-milestone、
         # --summary、--title、--diff は無視する
         digest = format_csv(
-            classified, hide_empty, only_filter, sort, exclude_filter, limit, opts.reverse
+            classified, hide_empty, only_filter, sort, exclude_filter, limit, reverse
         )
     elif as_json:
         # JSON には分類ごとの count があるので、--summary は Markdown のときだけ効く
@@ -409,7 +415,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             headings,
             age,
             show_milestone,
-            opts.reverse,
+            reverse,
         )
     elif group_by == "assignee":
         # 0件の担当者の見出しは出さないので、--hide-empty は効果がない
@@ -428,7 +434,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             diff,
             headings,
             age,
-            opts.reverse,
+            reverse,
             max_chars,
             show_milestone,
         )
@@ -451,7 +457,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
             age,
             max_chars,
             show_milestone,
-            opts.reverse,
+            reverse,
         )
     if max_chars is not None and len(digest) > max_chars:
         print(
