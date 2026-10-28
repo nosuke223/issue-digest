@@ -164,7 +164,7 @@ def test_command_line_limit_takes_precedence(in_tmp_dir, capsys):
 def test_command_line_csv_takes_precedence_over_config_json(in_tmp_dir, capsys):
     write_config(in_tmp_dir, "json = true\n")
     assert main(["--csv", ISSUES]) == 0
-    assert capsys.readouterr().out.startswith("label,number,title,url\r\n")
+    assert capsys.readouterr().out.startswith("label,number,title,url,repository\r\n")
 
 
 @pytest.mark.parametrize(

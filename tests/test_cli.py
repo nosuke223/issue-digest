@@ -17,10 +17,11 @@ def test_main_prints_digest(capsys):
     assert out.startswith("# Issue ダイジェスト（全 2 件）\n")
     assert (
         "## 着手可能 (agent:ready) - 1件\n\n"
-        "- [#1](https://github.com/example/repo/issues/1) サンプルの Issue A\n"
+        "- [example/repo#1](https://github.com/example/repo/issues/1) サンプルの Issue A\n"
     ) in out
     assert (
-        "## 未分類 - 1件\n\n- [#2](https://github.com/example/repo/issues/2) ラベルなしの Issue B\n"
+        "## 未分類 - 1件\n\n"
+        "- [example/repo#2](https://github.com/example/repo/issues/2) ラベルなしの Issue B\n"
     ) in out
 
 
@@ -37,10 +38,11 @@ def test_main_hide_empty(capsys):
     assert "(agent:blocked)" not in out
     assert (
         "## 着手可能 (agent:ready) - 1件\n\n"
-        "- [#1](https://github.com/example/repo/issues/1) サンプルの Issue A\n"
+        "- [example/repo#1](https://github.com/example/repo/issues/1) サンプルの Issue A\n"
     ) in out
     assert (
-        "## 未分類 - 1件\n\n- [#2](https://github.com/example/repo/issues/2) ラベルなしの Issue B\n"
+        "## 未分類 - 1件\n\n"
+        "- [example/repo#2](https://github.com/example/repo/issues/2) ラベルなしの Issue B\n"
     ) in out
 
 
@@ -665,6 +667,7 @@ def test_main_json_shape(capsys):
                 "number": 1,
                 "title": "サンプルの Issue A",
                 "url": "https://github.com/example/repo/issues/1",
+                "repository": "example/repo",
             }
         ],
     }
@@ -800,9 +803,11 @@ def test_main_without_args_shows_usage(capsys):
     assert captured.out == ""
 
 
-def test_main_with_too_many_args_shows_usage(capsys):
-    assert main(["a.json", "b.json"]) != 0
-    assert "使い方" in capsys.readouterr().err
+def test_main_with_missing_file_among_many_args(capsys):
+    assert main([str(DATA / "issues.json"), "b.json"]) == 1
+    captured = capsys.readouterr()
+    assert captured.err == "エラー: ファイルが見つかりません: b.json\n"
+    assert captured.out == ""
 
 
 def test_main_unknown_option_shows_usage(capsys):
@@ -1126,7 +1131,7 @@ def test_main_max_chars_result_can_be_exact_length(capsys):
 def test_main_max_chars_moves_to_previous_category(capsys):
     # すべての Issue の行を削った出力に、#7 の行だけを足した長さ
     base = _digest(capsys, ["--max-chars", "1", SORT])
-    line7 = "- [#7](https://github.com/example/repo/issues/7) 別の分類の新しい Issue\n"
+    line7 = "- [example/repo#7](https://github.com/example/repo/issues/7) 別の分類の新しい Issue\n"
     max_chars = len(base) + len(line7)
     assert main(["--max-chars", str(max_chars), SORT]) == 0
     out = capsys.readouterr().out

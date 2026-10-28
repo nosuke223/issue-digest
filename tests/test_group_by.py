@@ -32,22 +32,22 @@ def test_group_by_assignee_full_output(capsys):
         "\n"
         "## @alice - 3件\n"
         "\n"
-        f"- [#1]({URL}/1) 共同の Issue（作業中, 着手可能）\n"
-        f"- [#2]({URL}/2) レビュー中（レビュー待ち）\n"
-        f"- [#5]({URL}/5) 判断待ち（判断待ち）\n"
+        f"- [example/repo#1]({URL}/1) 共同の Issue（作業中, 着手可能）\n"
+        f"- [example/repo#2]({URL}/2) レビュー中（レビュー待ち）\n"
+        f"- [example/repo#5]({URL}/5) 判断待ち（判断待ち）\n"
         "\n"
         "## @bob - 1件\n"
         "\n"
-        f"- [#1]({URL}/1) 共同の Issue（作業中, 着手可能）\n"
+        f"- [example/repo#1]({URL}/1) 共同の Issue（作業中, 着手可能）\n"
         "\n"
         "## @Carol - 1件\n"
         "\n"
-        f"- [#4]({URL}/4) 未分類の Issue（未分類）\n"
+        f"- [example/repo#4]({URL}/4) 未分類の Issue（未分類）\n"
         "\n"
         "## 担当者なし - 2件\n"
         "\n"
-        f"- [#3]({URL}/3) 担当者なしで着手可能（着手可能）\n"
-        f"- [#6]({URL}/6) 担当者なしの判断待ち（判断待ち）\n"
+        f"- [example/repo#3]({URL}/3) 担当者なしで着手可能（着手可能）\n"
+        f"- [example/repo#6]({URL}/6) 担当者なしの判断待ち（判断待ち）\n"
     )
 
 
@@ -80,9 +80,9 @@ def test_group_by_assignee_only_filters_issues_and_category_names(capsys):
     out = capsys.readouterr().out
     assert out.startswith("# Issue ダイジェスト（全 6 件）\n")
     assert _sections(out) == {
-        "## @alice - 1件": [f"- [#1]({URL}/1) 共同の Issue（着手可能）"],
-        "## @bob - 1件": [f"- [#1]({URL}/1) 共同の Issue（着手可能）"],
-        "## 担当者なし - 1件": [f"- [#3]({URL}/3) 担当者なしで着手可能（着手可能）"],
+        "## @alice - 1件": [f"- [example/repo#1]({URL}/1) 共同の Issue（着手可能）"],
+        "## @bob - 1件": [f"- [example/repo#1]({URL}/1) 共同の Issue（着手可能）"],
+        "## 担当者なし - 1件": [f"- [example/repo#3]({URL}/3) 担当者なしで着手可能（着手可能）"],
     }
 
 
@@ -96,7 +96,7 @@ def test_group_by_assignee_exclude(capsys):
     assert main(["--group-by", "assignee", *excludes, GROUP_BY]) == 0
     sections = _sections(capsys.readouterr().out)
     assert list(sections) == ["## @alice - 2件", "## @bob - 1件", "## @Carol - 1件"]
-    assert sections["## @bob - 1件"] == [f"- [#1]({URL}/1) 共同の Issue（作業中）"]
+    assert sections["## @bob - 1件"] == [f"- [example/repo#1]({URL}/1) 共同の Issue（作業中）"]
 
 
 def test_group_by_assignee_since(capsys):
@@ -129,12 +129,14 @@ def test_group_by_assignee_limit_within_assignee(capsys):
     assert main(["--group-by", "assignee", "--limit", "1", "--sort", "updated", GROUP_BY]) == 0
     sections = _sections(capsys.readouterr().out)
     assert sections["## @alice - 3件"] == [
-        f"- [#1]({URL}/1) 共同の Issue（作業中, 着手可能）",
+        f"- [example/repo#1]({URL}/1) 共同の Issue（作業中, 着手可能）",
         "- ほか 2 件",
     ]
-    assert sections["## @bob - 1件"] == [f"- [#1]({URL}/1) 共同の Issue（作業中, 着手可能）"]
+    assert sections["## @bob - 1件"] == [
+        f"- [example/repo#1]({URL}/1) 共同の Issue（作業中, 着手可能）"
+    ]
     assert sections["## 担当者なし - 2件"] == [
-        f"- [#3]({URL}/3) 担当者なしで着手可能（着手可能）",
+        f"- [example/repo#3]({URL}/3) 担当者なしで着手可能（着手可能）",
         "- ほか 1 件",
     ]
 
@@ -144,11 +146,14 @@ def test_group_by_assignee_marks_follow_category_names(capsys):
     assert main([*args, GROUP_BY], now=NOW) == 0
     sections = _sections(capsys.readouterr().out)
     assert sections["## @bob - 1件"] == [
-        f"- [#1]({URL}/1) 共同の Issue（作業中, 着手可能）（22日更新なし）"
+        f"- [example/repo#1]({URL}/1) 共同の Issue（作業中, 着手可能）（22日更新なし）"
         "（担当: @bob, @alice）（ラベル: bug）"
     ]
     # 印が付かない Issue は分類の名前だけ
-    assert sections["## 担当者なし - 2件"][1] == f"- [#6]({URL}/6) 担当者なしの判断待ち（判断待ち）"
+    assert (
+        sections["## 担当者なし - 2件"][1]
+        == f"- [example/repo#6]({URL}/6) 担当者なしの判断待ち（判断待ち）"
+    )
 
 
 def test_group_by_assignee_age_follows_other_marks(capsys):
@@ -210,7 +215,7 @@ def test_group_by_assignee_uses_config_headings_and_title(capsys, tmp_path):
     assert main([*args, GROUP_BY]) == 0
     out = capsys.readouterr().out
     assert out.startswith("# repo（全 6 件）\n")
-    assert f"- [#1]({URL}/1) 共同の Issue（作業中, すぐ着手）" in out
+    assert f"- [example/repo#1]({URL}/1) 共同の Issue（作業中, すぐ着手）" in out
 
 
 def test_group_by_assignee_ignores_config_json(capsys, tmp_path):
@@ -237,7 +242,7 @@ def test_group_by_max_chars_trims_unassigned_from_end(capsys):
     out = _group_by_digest(capsys, ["--max-chars", str(len(full) - 1)])
     assert len(out) <= len(full) - 1
     assert _sections(out)["## 担当者なし - 2件"] == [
-        f"- [#3]({URL}/3) 担当者なしで着手可能（着手可能）",
+        f"- [example/repo#3]({URL}/3) 担当者なしで着手可能（着手可能）",
         "- ほか 1 件",
     ]
     assert issue_numbers_in_output(out) == [1, 2, 5, 1, 4, 3]
@@ -247,8 +252,8 @@ def test_group_by_max_chars_moves_to_previous_assignee(capsys):
     full = _group_by_digest(capsys, [])
     # 担当者なしの Issue の行をすべて削った出力
     expected = full.replace(
-        f"- [#3]({URL}/3) 担当者なしで着手可能（着手可能）\n"
-        f"- [#6]({URL}/6) 担当者なしの判断待ち（判断待ち）\n",
+        f"- [example/repo#3]({URL}/3) 担当者なしで着手可能（着手可能）\n"
+        f"- [example/repo#6]({URL}/6) 担当者なしの判断待ち（判断待ち）\n",
         "- ほか 2 件\n",
     )
     assert _group_by_digest(capsys, ["--max-chars", str(len(expected))]) == expected
@@ -268,7 +273,7 @@ def test_group_by_max_chars_with_limit_merges_omitted_count(capsys):
     assert sections["## 担当者なし - 2件"] == ["- ほか 2 件"]
     # 削っていない担当者は --limit の分だけ
     assert sections["## @alice - 3件"] == [
-        f"- [#1]({URL}/1) 共同の Issue（作業中, 着手可能）",
+        f"- [example/repo#1]({URL}/1) 共同の Issue（作業中, 着手可能）",
         "- ほか 2 件",
     ]
 

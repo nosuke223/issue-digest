@@ -1,0 +1,22 @@
+[
+  {
+    "number": 5,
+    "title": "Beta の判断待ち",
+    "labels": [{"name": "agent:needs-decision"}],
+    "url": "https://github.com/Beta/app/pull/5"
+  },
+  {
+    "number": 1,
+    "title": "Beta の着手可能",
+    "labels": [{"name": "agent:ready"}],
+    "url": "https://github.com/Beta/app/issues/1",
+    "updatedAt": "2026-10-01T00:00:00Z",
+    "assignees": [{"login": "alice"}]
+  },
+  {
+    "number": 2,
+    "title": "a と同じ Issue（大文字の URL）",
+    "labels": [{"name": "agent:working"}],
+    "url": "https://github.com/Alpha/Tools/issues/2"
+  }
+]

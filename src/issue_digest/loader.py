@@ -1,7 +1,30 @@
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+
+# https://<ホスト>/<owner>/<repo>/issues/<番号> または .../pull/<番号>（ホストは問わない）
+_ISSUE_URL = re.compile(r"https?://[^/]+/([^/]+)/([^/]+)/(?:issues|pull)/\d+/?(?:[?#].*)?")
+
+
+def repository_of(url: str) -> str | None:
+    """Issue の URL からリポジトリ名（`owner/repo`）を読み取る。読み取れなければ None。"""
+    match = _ISSUE_URL.fullmatch(url)
+    return None if match is None else f"{match[1]}/{match[2]}"
+
+
+def issue_key(url: str) -> str:
+    """Issue を見分けるキー。URL の大文字と小文字を区別しない。"""
+    return url.lower()
+
+
+def order_key(repository: str | None, number: int, url: str) -> tuple:
+    """Issue の既定の並びのキー。リポジトリ名（大文字と小文字を区別しない）の順、
+    同じリポジトリの中は番号の小さい順。リポジトリ名がないものは最後に番号の小さい順。"""
+    if repository is None:
+        return (1, "", number, url)
+    return (0, repository.lower(), number, url)
 
 
 @dataclass(frozen=True)
@@ -14,6 +37,18 @@ class Issue:
     assignees: list[str] = field(default_factory=list)
     created_at: datetime | None = None
     milestone: str | None = None
+
+    @property
+    def repository(self) -> str | None:
+        return repository_of(self.url)
+
+    @property
+    def key(self) -> str:
+        return issue_key(self.url)
+
+    @property
+    def order(self) -> tuple:
+        return order_key(self.repository, self.number, self.url)
 
 
 class InvalidUpdatedAtError(ValueError):
@@ -53,6 +88,15 @@ def parse_issues(text: str) -> list[Issue]:
         )
         for item in data
     ]
+
+
+def merge_issues(groups: list[list[Issue]]) -> list[Issue]:
+    """複数の入力の Issue を1つにまとめる。URL が同じ Issue は最初に出てきた1件だけを使う。"""
+    merged: dict[str, Issue] = {}
+    for issues in groups:
+        for issue in issues:
+            merged.setdefault(issue.key, issue)
+    return list(merged.values())
 
 
 def _parse_datetime(number: int, value: str | None, key: str) -> datetime | None:

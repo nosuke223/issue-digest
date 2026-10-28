@@ -11,12 +11,18 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 ## 使い方
 
 `gh issue list --json number,title,labels,url` の出力を渡します。
+複数のリポジトリの出力を並べて渡すと、1つのダイジェストにまとめます（「入力」を参照）。
+
+```
+uv run issue-digest issues.json
+uv run issue-digest repo-a.json repo-b.json
+```
 
 ### オプション一覧
 
 | オプション | 何をするか | 例 |
 | --- | --- | --- |
-| `-` | 標準入力から読む | `gh issue list --json number,title,labels,url \| uv run issue-digest -` |
+| `-` | 標準入力から読む（ほかの入力と混ぜられる。1回まで） | `gh issue list --json number,title,labels,url \| uv run issue-digest -` |
 | `-h` / `--help` | 使い方を出力する | `uv run issue-digest --help` |
 | `--version` | バージョンだけを出力する | `uv run issue-digest --version` |
 | `--hide-empty` | 0件の分類を出力しない | `uv run issue-digest --hide-empty issues.json` |
@@ -26,7 +32,7 @@ AI エージェントによる自律開発の練習用プロジェクトでも�
 | `--since <日付>` | 最終更新が指定日（`YYYY-MM-DD`、UTC の0時）以降、または `7d` のように基準時刻の N 日前以降の Issue だけを出力する | `uv run issue-digest --since 2026-10-01 issues.json` / `uv run issue-digest --since 7d issues.json` |
 | `--sort updated` | 各分類の中を最終更新の古い順に並べる | `uv run issue-digest --sort updated issues.json` |
 | `--sort created` | 各分類の中を作成日時の古い順に並べる | `uv run issue-digest --sort created issues.json` |
-| `--reverse` | 各分類の中の並びを逆にする（`--sort` がなければ番号の大きい順、あれば新しい順） | `uv run issue-digest --reverse issues.json` |
+| `--reverse` | 各分類の中の並びを逆にする（`--sort` がなければリポジトリ名と番号の逆順、あれば新しい順） | `uv run issue-digest --reverse issues.json` |
 | `--limit <件数>` | 各分類で、先頭から指定件数だけ Issue を出力する | `uv run issue-digest --limit 5 issues.json` |
 | `--max-chars <文字数>` | Markdown の出力全体を指定文字数以内に収める（収まらない分の Issue の行を `- ほか N 件` にする） | `uv run issue-digest --max-chars 2000 issues.json` |
 | `--summary` | 総件数の次に、分類ごとの件数を1行で出力する | `uv run issue-digest --summary issues.json` |
@@ -56,6 +62,30 @@ uv run issue-digest issues.json
 ```
 gh issue list --json number,title,labels,url | uv run issue-digest -
 ```
+
+入力は複数指定できます。複数のリポジトリの Issue を1つのダイジェストで読みたいときに使います。
+
+```
+gh issue list --repo alpha/tools --json number,title,labels,url > alpha.json
+gh issue list --repo beta/app --json number,title,labels,url | uv run issue-digest alpha.json -
+```
+
+- 入力は指定した順に読み、すべての Issue を1つにまとめてから、分類・絞り込み・並べ替えをします。
+- `-`（標準入力）はほかのファイルと混ぜて指定できますが、1回までです。2回以上指定すると、`エラー: -（標準入力）は1回だけ指定できます` を標準エラーに出して終了コード 2 で終わります。
+- 入力を1つも指定しないときは、使い方を標準エラーに出して終了コード 2 で終わります。
+- 1つでも読めない入力があれば、そのファイルを示すエラー（`エラー: ファイルが見つかりません: <パス>` など）を標準エラーに出して終了コード 1 で終わります。
+- Issue は URL で見分けます（大文字と小文字は区別しません）。URL が同じ Issue が複数の入力（または1つの入力の中）にあるときは、最初に出てきた1件だけを使い、件数を二重に数えません。別のリポジトリの同じ番号の Issue は、別の Issue として数えます。
+
+### リポジトリ名の表示
+
+入力が1つでも、各 Issue にリポジトリ名（`owner/repo`）を付けて出します。リポジトリ名は Issue の URL（`https://<ホスト>/<owner>/<repo>/issues/<番号>` または `.../pull/<番号>`）から読み取ります。ホストは `github.com` 以外でもかまいません。
+
+- Markdown: Issue の行は `- [owner/repo#12](url) タイトル` の形です（`--group-by assignee`、`--diff` の節の行も同じ）。リポジトリ名の Markdown の記号（`\` `` ` `` `*` `_` `[` `]` `<` `>`）は、タイトルと同じようにエスケープします（例: `my_repo` は `my\_repo`）。
+- JSON: 各 Issue に `"repository": "owner/repo"` を加えます（`diff` の `added`、`removed`、`moved` の各要素にも）。
+- CSV: 末尾の `repository` 列に出します。
+- URL から読み取れない Issue は、エラーにせず、Markdown は今までどおり `- [#12](url) タイトル`、JSON は `"repository": null`、CSV は空にします。
+
+各分類の中の既定の並びは、リポジトリ名（大文字と小文字を区別しない）の順、同じリポジトリの中は番号の小さい順です。リポジトリ名がない Issue は最後に番号の小さい順で並べます。入力が1つで、すべて同じリポジトリのときは、番号の小さい順です。
 
 ### タイトルの長さ
 
@@ -193,9 +223,9 @@ uv run issue-digest --summary issues.json
 ### `--sort updated`
 
 `--sort updated` を付けると、各分類の中の Issue を `updatedAt`（最終更新）の古い順に並べます。止まっている Issue を見つけやすくするために使います。
-`updatedAt` が同じ Issue は番号の小さい順、`updatedAt` がない Issue は分類の末尾に番号の小さい順で並べます。分類の順番は変わりません。
+`updatedAt` が同じ Issue は既定の並び（リポジトリ名の順、同じリポジトリの中は番号の小さい順。「リポジトリ名の表示」を参照）、`updatedAt` がない Issue は分類の末尾に既定の並びで並べます。分類の順番は変わりません。
 `--sort` に指定できる値は `updated` と `created` です。それ以外の値や値がない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
-`--sort` を付けない場合の並び順（Issue 番号の小さい順）は変わりません。
+`--sort` を付けない場合の並び順（既定の並び）は変わりません。
 
 ```
 gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --sort updated --stale 7 -
@@ -204,7 +234,7 @@ gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --s
 ### `--sort created`
 
 `--sort created` を付けると、各分類の中の Issue を `createdAt`（作成日時）の古い順に並べます。古くからある Issue を優先して片付けたいときに使います。
-並べ方の決まりは `--sort updated` と同じです。`createdAt` が同じ Issue は番号の小さい順、`createdAt` がない Issue は分類の末尾に番号の小さい順で並べます。分類の順番は変わりません。
+並べ方の決まりは `--sort updated` と同じです。`createdAt` が同じ Issue は既定の並び（リポジトリ名の順、同じリポジトリの中は番号の小さい順）、`createdAt` がない Issue は分類の末尾に既定の並びで並べます。分類の順番は変わりません。
 入力の各 Issue の `createdAt`（ISO 8601 形式。例: `2026-10-20T12:34:56Z`）は省略できます。日時として読めない値のときは、エラーを標準エラーに出して終了コード 1 で終わります。
 `--sort updated` と `--sort` なしの動作は変わりません。`--sort` は1つの値しか指定できないため、`updated` と `created` は同時に使えません。
 
@@ -216,12 +246,12 @@ gh issue list --json number,title,labels,url,createdAt | uv run issue-digest --s
 
 `--reverse` を付けると、各分類の中の Issue の並びを逆にします。新しい Issue から順に見たいときに使います。`--group-by assignee` のときは、各担当者の中の並びを逆にします。分類や担当者の順番は変わりません。
 
-- `--sort` がなければ、番号の大きい順になります。
-- `--sort updated` / `--sort created` と一緒なら、`--sort` で並べた結果をそのまま逆にするので、新しい順になります（同じ日時の Issue は番号の大きい順。`updatedAt`・`createdAt` がない Issue は、逆にするので分類の先頭に番号の大きい順で並びます）。
+- `--sort` がなければ、既定の並び（リポジトリ名の順、同じリポジトリの中は番号の小さい順）を逆にします。入力が1つのリポジトリだけなら、番号の大きい順になります。
+- `--sort updated` / `--sort created` と一緒なら、`--sort` で並べた結果をそのまま逆にするので、新しい順になります（同じ日時の Issue は既定の並びの逆。`updatedAt`・`createdAt` がない Issue は、逆にするので分類の先頭に既定の並びの逆で並びます）。
 - `--limit` は逆にした後の先頭から数えます（`--reverse --limit 5` で、新しい5件）。
 - `--max-chars` で削るのは、逆にした後の末尾の行です。
 - `--json`、`--csv` でも同じように並びが変わります。
-- `--diff` の `## 前回からの変化` の節の並び（番号の小さい順）は変わりません。
+- `--diff` の `## 前回からの変化` の節の並び（リポジトリ名の順、同じリポジトリの中は番号の小さい順）は変わりません。
 - 設定ファイルに `reverse = true` と書くと、`--reverse` を付けたときと同じになります。コマンドラインで打ち消す方法はありません（ほかの真偽値のキーと同じ）。
 
 `--reverse` を付けない場合の出力は変わりません。
@@ -253,7 +283,7 @@ uv run issue-digest --limit 5 --sort updated issues.json
 - 収まらないときは、最後の分類から順に、分類の末尾の Issue の行を1行ずつ削ります。最後の分類の Issue の行がなくなったら、1つ前の分類を削ります。
 - 削った分類の最後に `- ほか N 件` を出します。`--limit` で省いた件数とまとめて1行にします。
 - 削るのは分類の Issue の行だけです。見出し、件数、`--summary` の行、`--diff` の節（`## 前回からの変化`）は削りません。
-- `--stale`、`--show-assignees`、`--show-labels`、`--age`、`--show-milestone` の印を付けたときは、印を含めた行で数えます。
+- `--stale`、`--show-assignees`、`--show-labels`、`--age`、`--show-milestone` の印を付けたときは、印を含めた行で数えます。リポジトリ名（`[owner/repo#12]`）も含めた行で数えます。
 - すべての Issue の行を削っても収まらないときは、そのまま出力し、標準エラーに `警告: Issue の行をすべて削っても --max-chars の N 文字に収まりません（M 文字）` を出します（終了コードは 0）。
 - 文字数は1以上の整数です。それ以外の値や値がない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
 - Markdown だけで使えます。コマンドラインの `--json` または `--csv` と同時に指定すると、エラーを標準エラーに出して終了コード 2 で終わります。設定ファイルの `json = true` は、`--max-chars` を指定したら使いません（Markdown を出します）。設定ファイルの `max_chars` でも指定できます（設定の `json = true` と一緒に書くとエラーです）。
@@ -272,6 +302,7 @@ UTF-8 で日本語はエスケープせず、インデントは2です。`--json
 
 - `total`: Markdown の見出しと同じ総件数（重複を除いた全件数。`--only` に関係なく全件）
 - `categories`: 分類の配列。順と `label`、`title` は Markdown の見出しと同じ（未分類の `label` は `unclassified`）
+- 各 Issue の `number`、`title`、`url`、`repository`（URL から読み取ったリポジトリ名。読み取れなければ `null`）
 
 ```
 uv run issue-digest --json issues.json
@@ -291,7 +322,8 @@ uv run issue-digest --json issues.json
         {
           "number": 12,
           "title": "仕様を決めたい",
-          "url": "https://github.com/example/repo/issues/12"
+          "url": "https://github.com/example/repo/issues/12",
+          "repository": "example/repo"
         }
       ]
     }
@@ -307,7 +339,8 @@ uv run issue-digest --json issues.json
 文字コードは UTF-8 で、クオートと改行（行末は `\r\n`）の扱いは Python の `csv` モジュールの既定に従います。カンマ、ダブルクオート、改行を含むタイトルも正しくクオートされます。
 `--csv` を付けない場合の出力は変わりません。
 
-- 1行目は見出し行 `label,number,title,url` です。
+- 1行目は見出し行 `label,number,title,url,repository` です。
+- `repository` は URL から読み取ったリポジトリ名です。読み取れなければ空にします。
 - 2行目からは、分類の順、各分類の中の Issue の順で1行ずつ出力します。複数の分類に入る Issue は、分類ごとに1行出力します。
 - `label` は分類のラベル（未分類は `unclassified`）です。Markdown と違い、タイトルは省略しません。
 - 出力する分類がなければ、見出し行だけを出力します。
@@ -319,9 +352,9 @@ uv run issue-digest --csv issues.json
 出力例:
 
 ```
-label,number,title,url
-agent:ready,1,サンプルの Issue A,https://github.com/example/repo/issues/1
-unclassified,2,ラベルなしの Issue B,https://github.com/example/repo/issues/2
+label,number,title,url,repository
+agent:ready,1,サンプルの Issue A,https://github.com/example/repo/issues/1,example/repo
+unclassified,2,ラベルなしの Issue B,https://github.com/example/repo/issues/2,example/repo
 ```
 
 ### `--title <文字列>`
@@ -356,9 +389,11 @@ uv run issue-digest --output digest.md issues.json
 
 - 新しい Issue: 前回になく、今回ある Issue
 - なくなった Issue: 前回あり、今回ない Issue（タイトルと URL は前回の JSON のもの）
-- 分類が変わった Issue: `- [#12](url) タイトル: 着手可能 → レビュー待ち` の形で出します。複数の分類に入る Issue は、分類の集合が変わったときだけ出し、`作業中, 着手可能 → レビュー待ち` のように分類を見出しの順にカンマで区切って並べます。タイトルだけが変わった Issue は出しません。
+- 分類が変わった Issue: `- [owner/repo#12](url) タイトル: 着手可能 → レビュー待ち` の形で出します。複数の分類に入る Issue は、分類の集合が変わったときだけ出し、`作業中, 着手可能 → レビュー待ち` のように分類を見出しの順にカンマで区切って並べます。タイトルだけが変わった Issue は出しません。
 
-どれかに変化があるときは3つの小見出し（`### 新しい Issue - 1件` など）をすべて出し、0件の小見出しには「なし」を出します。各小見出しの中は Issue 番号の小さい順です。
+前回と今回の Issue は URL で照合します（大文字と小文字は区別しません）。別のリポジトリの同じ番号の Issue を取り違えることはありません。前回の JSON の `repository` は読まず、URL から読み取るので、リポジトリ名を出す前の版の `--json` の出力も前回の JSON として使えます。
+
+どれかに変化があるときは3つの小見出し（`### 新しい Issue - 1件` など）をすべて出し、0件の小見出しには「なし」を出します。各小見出しの中は、リポジトリ名の順、同じリポジトリの中は Issue 番号の小さい順です（リポジトリ名がない Issue は最後に番号の小さい順）。
 どれも変化がなければ、節の中に「変化なし」だけを出します。
 
 前回の JSON は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since` を付けず、設定ファイル（`.issue-digest.toml` や `--config`）の `hide_empty`、`only`、`exclude`、`limit` も使わずに出力したものを前提とします。付けて出力した JSON を使うと、その JSON に入っていなかった Issue は「新しい Issue」として出ます。複数の分類に入る Issue で、前回は一部の分類にしか出ていなかったものは「分類が変わった Issue」として出ます。
@@ -384,7 +419,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --diff last.j
 
 ### 新しい Issue - 1件
 
-- [#5](https://github.com/example/repo/issues/5) 新しい Issue E
+- [example/repo#5](https://github.com/example/repo/issues/5) 新しい Issue E
 
 ### なくなった Issue - 0件
 
@@ -392,22 +427,22 @@ gh issue list --json number,title,labels,url | uv run issue-digest --diff last.j
 
 ### 分類が変わった Issue - 1件
 
-- [#12](https://github.com/example/repo/issues/12) 仕様を決めたい: 着手可能 → レビュー待ち
+- [example/repo#12](https://github.com/example/repo/issues/12) 仕様を決めたい: 着手可能 → レビュー待ち
 ```
 
-`--json` と同時に指定すると、JSON の末尾に `diff` を加えます。`added`、`removed`、`moved` の配列で、それぞれ Issue 番号の小さい順です。変化がなければ3つとも空の配列です。
+`--json` と同時に指定すると、JSON の末尾に `diff` を加えます。`added`、`removed`、`moved` の配列で、並びは Markdown の各小見出しの中と同じです。変化がなければ3つとも空の配列です。
 
-- `added`、`removed` の各要素: `number`、`title`、`url`、`categories`（`added` は今回の、`removed` は前回の分類のラベルの配列）
-- `moved` の各要素: `number`、`title`（今回のもの）、`url`、`from`（前回の分類のラベルの配列）、`to`（今回の分類のラベルの配列）
+- `added`、`removed` の各要素: `number`、`title`、`url`、`repository`（URL から読み取ったリポジトリ名。読み取れなければ `null`）、`categories`（`added` は今回の、`removed` は前回の分類のラベルの配列）
+- `moved` の各要素: `number`、`title`（今回のもの）、`url`、`repository`、`from`（前回の分類のラベルの配列）、`to`（今回の分類のラベルの配列）
 
 ```json
 "diff": {
   "added": [
-    {"number": 5, "title": "新しい Issue E", "url": "https://github.com/example/repo/issues/5", "categories": ["agent:ready"]}
+    {"number": 5, "title": "新しい Issue E", "url": "https://github.com/example/repo/issues/5", "repository": "example/repo", "categories": ["agent:ready"]}
   ],
   "removed": [],
   "moved": [
-    {"number": 12, "title": "仕様を決めたい", "url": "https://github.com/example/repo/issues/12", "from": ["agent:ready"], "to": ["agent:review"]}
+    {"number": 12, "title": "仕様を決めたい", "url": "https://github.com/example/repo/issues/12", "repository": "example/repo", "from": ["agent:ready"], "to": ["agent:review"]}
   ]
 }
 ```
@@ -501,7 +536,7 @@ unclassified = "その他"
 
 - 見出しは `## @alice - 3件` の形です。担当者のログイン名の順（大文字と小文字は区別せずに比べます）に並べ、最後に `## 担当者なし - N件` を出します。
 - 担当者が複数いる Issue は、それぞれの担当者の下に出します。
-- 各担当者の中は Issue 番号の小さい順です。
+- 各担当者の中は、リポジトリ名の順、同じリポジトリの中は Issue 番号の小さい順です（リポジトリ名がない Issue は最後に番号の小さい順）。
 - 各 Issue の行末に、その Issue が入る分類の名前を `（着手可能）` の形で付けます。複数の分類に入る Issue は `（作業中, 着手可能）` のように見出しの順にカンマで区切ります。設定ファイルの `[headings]` があれば、その名前を使います。
 - 0件の担当者の見出しは出しません（担当者なしも同じです）。出す Issue が1件もなければ、見出しの代わりに「なし」を出します。
 - `--group-by` に指定できる値は `assignee` だけです。それ以外の値は、エラーを標準エラーに出して終了コード 2 で終わります。`--group-by` の後に値がない場合も終了コード 2 で終わります。
@@ -522,16 +557,16 @@ gh issue list --json number,title,labels,url,assignees | uv run issue-digest --g
 
 ## @alice - 2件
 
-- [#1](https://github.com/example/repo/issues/1) 共同の Issue（作業中, 着手可能）
-- [#2](https://github.com/example/repo/issues/2) レビュー中（レビュー待ち）
+- [example/repo#1](https://github.com/example/repo/issues/1) 共同の Issue（作業中, 着手可能）
+- [example/repo#2](https://github.com/example/repo/issues/2) レビュー中（レビュー待ち）
 
 ## @bob - 1件
 
-- [#1](https://github.com/example/repo/issues/1) 共同の Issue（作業中, 着手可能）
+- [example/repo#1](https://github.com/example/repo/issues/1) 共同の Issue（作業中, 着手可能）
 
 ## 担当者なし - 1件
 
-- [#3](https://github.com/example/repo/issues/3) 担当者なしで着手可能（着手可能）
+- [example/repo#3](https://github.com/example/repo/issues/3) 担当者なしで着手可能（着手可能）
 ```
 
 ### `--fail-if-any <ラベル>`
@@ -561,6 +596,7 @@ uv run issue-digest --version
 
 ### 組み合わせ
 
+- 入力を複数指定したときも、すべてのオプションは入力が1つのときと同じように効きます。まとめた後の Issue（URL が同じものは最初の1件だけ）が、件数、`--since`、`--only`、`--exclude`、`--sort`、`--reverse`、`--limit`、`--max-chars`、`--summary`、`--group-by`、`--diff`、`--fail-if-any` の対象です。設定ファイルに入力を書くキーはありません。
 - `--hide-empty`、`--only`、`--stale`、`--since`、`--sort`、`--reverse`、`--limit`、`--title`、`--output`、`--diff` は、どれも同時に使えます（`--csv` との併用は下の項目を参照）。
 - `--reverse` は `--sort` の後に並びを逆にし、そのあとで `--limit` と `--max-chars` が効きます（`--limit` は逆にした後の先頭から、`--max-chars` は逆にした後の末尾の行から）。
 - `--since` で絞るのは出力する Issue です。件数（総件数、分類ごとの件数、`--summary`）は絞った後の Issue で数えます。`--json`、`--csv` でも同じです。

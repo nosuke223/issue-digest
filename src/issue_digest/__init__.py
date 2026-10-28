@@ -13,7 +13,13 @@ from issue_digest.formatter import (
     format_digest_by_assignee,
     format_json,
 )
-from issue_digest.loader import InvalidUpdatedAtError, load_issues, parse_issues
+from issue_digest.loader import (
+    InvalidUpdatedAtError,
+    Issue,
+    load_issues,
+    merge_issues,
+    parse_issues,
+)
 
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
@@ -24,9 +30,12 @@ USAGE = (
     " [--show-labels] [--show-milestone] [--title <文字列>] [--output <パス>]"
     " [--diff <前回のJSONのパス>]"
     " [--config <パス>] [--group-by assignee] [--fail-if-any <ラベル>]..."
-    " <JSONファイルのパス | ->\n"
+    " <JSONファイルのパス | ->...\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
+    "  入力は複数指定でき、指定した順に読んで1つのダイジェストにまとめる"
+    "（- は1回まで。Issue は URL で見分け、URL が同じ Issue は最初の1件だけを使う。"
+    "各 Issue には URL から読み取ったリポジトリ名を [owner/repo#12] の形で付ける）\n"
     "  --only で指定した分類だけを出力する（複数回指定できる）\n"
     "  --exclude で指定した分類を出力しない（複数回指定できる。--only とは同時に指定できない）\n"
     "  --summary で見出しの次に全分類の件数を1行で出力する\n"
@@ -39,8 +48,8 @@ USAGE = (
     "  --sort updated で各分類の中を最終更新の古い順に並べる"
     "（--sort created なら作成日時の古い順）\n"
     "  --reverse で各分類（--group-by assignee のときは各担当者）の中の並びを逆にする"
-    "（--sort がなければ番号の大きい順、--sort があれば新しい順。--limit と --max-chars は"
-    "逆にした後の並びに効く。--diff の節の並びは変わらない）\n"
+    "（--sort がなければリポジトリ名と番号の逆順、--sort があれば新しい順。"
+    "--limit と --max-chars は逆にした後の並びに効く。--diff の節の並びは変わらない）\n"
     "  --limit で各分類の出力を先頭から指定件数までにする（Markdown は最後に「- ほか N 件」、"
     "JSON は各分類に omitted を加える。件数は全件のまま）\n"
     "  --max-chars で Markdown の出力全体（末尾の改行を含む）を指定文字数以内にする"
@@ -49,7 +58,7 @@ USAGE = (
     "収まらなければそのまま出し、標準エラーに警告を出す。--group-by と一緒に指定すると、"
     "最後の担当者から順に削る。--json、--csv とは同時に指定できない）\n"
     "  --json で Markdown の代わりに JSON を出力する\n"
-    "  --csv で Markdown の代わりに CSV（見出し行 label,number,title,url）を出力する"
+    "  --csv で Markdown の代わりに CSV（見出し行 label,number,title,url,repository）を出力する"
     "（--json とは同時に指定できない。--stale、--age、--show-assignees、--show-labels、"
     "--show-milestone、--summary、--title は無視する）\n"
     "  --show-assignees で担当者を表示する（Markdown は行末に（担当: @alice）、"
@@ -63,7 +72,8 @@ USAGE = (
     "（JSON は先頭に title を加える）\n"
     "  --output でダイジェストを標準出力ではなく指定したファイルに書き出す（上書きする）\n"
     "  --diff で前回の --json の出力と比べ、新しい Issue、なくなった Issue、分類が変わった Issue を"
-    "出す（Markdown は末尾に「## 前回からの変化」、JSON は diff を加える。--csv では無視する。"
+    "出す（Issue は URL で照合する。"
+    "Markdown は末尾に「## 前回からの変化」、JSON は diff を加える。--csv では無視する。"
     "前回の JSON は --only、--exclude、--hide-empty、--limit、--since を付けず、"
     "設定ファイルの hide_empty、only、exclude、limit も使わずに出力したもの。"
     "付けて出力した JSON だと、入っていなかった Issue は"
@@ -304,8 +314,11 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         print("エラー: --title には1文字以上を指定してください", file=sys.stderr)
         return 2
     paths: list[str] = opts.paths
-    if len(paths) != 1:
+    if not paths:
         print(USAGE, file=sys.stderr)
+        return 2
+    if paths.count("-") > 1:
+        print("エラー: -（標準入力）は1回だけ指定できます", file=sys.stderr)
         return 2
     if as_json and as_csv:
         print("エラー: --json と --csv は同時に指定できません", file=sys.stderr)
@@ -343,28 +356,34 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
                 return 2
     only_filter = only or None
     exclude_filter = exclude or None
-    path = paths[0]
-    if path == "-":
-        try:
-            issues = parse_issues(sys.stdin.read())
-        except InvalidUpdatedAtError as e:
-            print(f"エラー: {e}", file=sys.stderr)
-            return 1
-        except (OSError, ValueError, KeyError, TypeError) as e:
-            print(f"エラー: 標準入力を読み込めません ({type(e).__name__})", file=sys.stderr)
-            return 1
-    else:
-        try:
-            issues = load_issues(path)
-        except FileNotFoundError:
-            print(f"エラー: ファイルが見つかりません: {path}", file=sys.stderr)
-            return 1
-        except InvalidUpdatedAtError as e:
-            print(f"エラー: {e}", file=sys.stderr)
-            return 1
-        except (OSError, ValueError, KeyError, TypeError) as e:
-            print(f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})", file=sys.stderr)
-            return 1
+    # 入力は指定した順に読み、URL が同じ Issue は最初に出てきた1件だけを使う
+    loaded: list[list[Issue]] = []
+    for path in paths:
+        if path == "-":
+            try:
+                loaded.append(parse_issues(sys.stdin.read()))
+            except InvalidUpdatedAtError as e:
+                print(f"エラー: {e}", file=sys.stderr)
+                return 1
+            except (OSError, ValueError, KeyError, TypeError) as e:
+                print(f"エラー: 標準入力を読み込めません ({type(e).__name__})", file=sys.stderr)
+                return 1
+        else:
+            try:
+                loaded.append(load_issues(path))
+            except FileNotFoundError:
+                print(f"エラー: ファイルが見つかりません: {path}", file=sys.stderr)
+                return 1
+            except InvalidUpdatedAtError as e:
+                print(f"エラー: {e}", file=sys.stderr)
+                return 1
+            except (OSError, ValueError, KeyError, TypeError) as e:
+                print(
+                    f"エラー: ファイルを読み込めません: {path} ({type(e).__name__})",
+                    file=sys.stderr,
+                )
+                return 1
+    issues = merge_issues(loaded)
     all_classified = classify_issues(issues)
     classified = all_classified
     if since is not None:

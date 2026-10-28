@@ -1,0 +1,23 @@
+[
+  {
+    "number": 2,
+    "title": "alpha のレビュー",
+    "labels": [{"name": "agent:review"}],
+    "url": "https://github.com/alpha/tools/issues/2",
+    "updatedAt": "2026-10-05T00:00:00Z"
+  },
+  {
+    "number": 1,
+    "title": "alpha の着手可能",
+    "labels": [{"name": "agent:ready"}],
+    "url": "https://github.com/alpha/tools/issues/1",
+    "updatedAt": "2026-10-01T00:00:00Z",
+    "assignees": [{"login": "alice"}]
+  },
+  {
+    "number": 3,
+    "title": "リポジトリ名のない URL",
+    "labels": [{"name": "agent:ready"}],
+    "url": "https://example.com/tickets/3"
+  }
+]

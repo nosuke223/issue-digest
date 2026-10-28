@@ -138,7 +138,7 @@ def test_config_reverse_matches_command_line(in_tmp_dir, capsys, path, args):
     if "--max-chars" in args:
         # 一部の行だけを削って「- ほか N 件」にしている
         assert "- ほか " in got.out
-        assert "- [#" in got.out
+        assert "- [example/repo#" in got.out
 
 
 def test_config_reverse_with_command_line_reverse(in_tmp_dir, capsys):

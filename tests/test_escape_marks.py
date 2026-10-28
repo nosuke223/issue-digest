@@ -10,7 +10,7 @@ GROUP_BY_OPTIONS = [[], ["--group-by", "assignee"]]
 
 
 def _line_of(out: str, number: int) -> str:
-    prefix = f"- [#{number}]("
+    prefix = f"- [example/repo#{number}]("
     return next(line for line in out.splitlines() if line.startswith(prefix))
 
 
