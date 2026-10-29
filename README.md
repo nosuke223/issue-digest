@@ -38,7 +38,8 @@ uv run --project <プロジェクトのパス> issue-digest --config <設定フ�
 
 ## 使い方
 
-`gh issue list --json number,title,labels,url` の出力を渡します。
+`gh issue list -L 1000 --json number,title,labels,url` の出力を渡します。
+`gh issue list` は件数を指定しないと最初の30件で切られるので、パイプで渡すときは `-L` で件数を指定してください。
 複数のリポジトリの出力を並べて渡すと、1つのダイジェストにまとめます（「入力」を参照）。
 `--repo` を付けると、`gh` を自分で実行しなくても、GitHub から直接取得できます（「`--repo <OWNER/REPO>`」を参照）。
 
@@ -52,7 +53,7 @@ uv run issue-digest --repo owner/repo
 
 | オプション | 何をするか | 例 |
 | --- | --- | --- |
-| `-` | 標準入力から読む（ほかの入力と混ぜられる。1回まで） | `gh issue list --json number,title,labels,url \| uv run issue-digest -` |
+| `-` | 標準入力から読む（ほかの入力と混ぜられる。1回まで） | `gh issue list -L 1000 --json number,title,labels,url \| uv run issue-digest -` |
 | `--repo <OWNER/REPO>` | `gh` を実行して、指定したリポジトリの開いている Issue を取得する（複数回指定できる。ファイル入力と混ぜられる） | `uv run issue-digest --repo nosuke223/issue-digest` |
 | `-h` / `--help` | 使い方を出力する | `uv run issue-digest --help` |
 | `--version` | バージョンだけを出力する | `uv run issue-digest --version` |
@@ -91,14 +92,14 @@ uv run issue-digest issues.json
 パイプで渡す場合（引数に `-` を指定すると標準入力から読みます）:
 
 ```
-gh issue list --json number,title,labels,url | uv run issue-digest -
+gh issue list -L 1000 --json number,title,labels,url | uv run issue-digest -
 ```
 
 入力は複数指定できます。複数のリポジトリの Issue を1つのダイジェストで読みたいときに使います。
 
 ```
-gh issue list --repo alpha/tools --json number,title,labels,url > alpha.json
-gh issue list --repo beta/app --json number,title,labels,url | uv run issue-digest alpha.json -
+gh issue list -L 1000 --repo alpha/tools --json number,title,labels,url > alpha.json
+gh issue list -L 1000 --repo beta/app --json number,title,labels,url | uv run issue-digest alpha.json -
 ```
 
 `gh` を自分で実行する代わりに、`--repo` でリポジトリを指定して取得することもできます（「`--repo <OWNER/REPO>`」を参照）。ファイル入力と混ぜて指定できます。
@@ -196,13 +197,13 @@ uv run issue-digest --exclude unclassified --exclude agent:working --hide-empty 
 `--stale <日数>` を付けると、最終更新から指定日数以上たった Issue の行の末尾に `（N日更新なし）` を付けます。止まっている Issue に気づきたいときに使います。
 N は経過日数を切り捨てた整数です。`--hide-empty`、`--only` と同時に使えます。
 この印を付けるには、入力の各 Issue に `updatedAt`（ISO 8601 形式。例: `2026-10-20T12:34:56Z`）が必要です。
-`gh issue list --json number,title,labels,url,updatedAt` の出力をそのまま渡せます。
+`gh issue list -L 1000 --json number,title,labels,url,updatedAt` の出力をそのまま渡せます。
 `updatedAt` がない Issue には印を付けません。
 日数は0以上の整数で指定します。それ以外を指定すると、エラーを標準エラーに出して終了コード 2 で終わります。
 `--stale` を付けない場合の出力は変わりません。
 
 ```
-gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --stale 7 -
+gh issue list -L 1000 --json number,title,labels,url,updatedAt | uv run issue-digest --stale 7 -
 ```
 
 ### `--since <日付>`
@@ -222,8 +223,8 @@ gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --s
 `--since` を付けない場合の出力は変わりません。
 
 ```
-gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --since 2026-10-01 -
-gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --since 7d -
+gh issue list -L 1000 --json number,title,labels,url,updatedAt | uv run issue-digest --since 2026-10-01 -
+gh issue list -L 1000 --json number,title,labels,url,updatedAt | uv run issue-digest --since 7d -
 ```
 
 ### `--show-assignees`
@@ -234,7 +235,7 @@ gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --s
 `--show-assignees` を付けない場合の出力は変わりません。
 
 ```
-gh issue list --json number,title,labels,url,assignees | uv run issue-digest --show-assignees -
+gh issue list -L 1000 --json number,title,labels,url,assignees | uv run issue-digest --show-assignees -
 ```
 
 ### `--show-labels`
@@ -246,7 +247,7 @@ gh issue list --json number,title,labels,url,assignees | uv run issue-digest --s
 `--show-labels` を付けない場合の出力は変わりません。
 
 ```
-gh issue list --json number,title,labels,url | uv run issue-digest --show-labels -
+gh issue list -L 1000 --json number,title,labels,url | uv run issue-digest --show-labels -
 ```
 
 ### `--age`
@@ -256,18 +257,18 @@ gh issue list --json number,title,labels,url | uv run issue-digest --show-labels
 `--age` を付けない場合の出力は変わりません。設定ファイルの `age = true` でも指定できます。
 
 ```
-gh issue list --json number,title,labels,url,createdAt | uv run issue-digest --age -
+gh issue list -L 1000 --json number,title,labels,url,createdAt | uv run issue-digest --age -
 ```
 
 ### `--show-milestone`
 
 `--show-milestone` を付けると、マイルストーンがある Issue の行の末尾に `（マイルストーン: v1.0）` を付けます。どのマイルストーンの Issue かを見たいときに使います。
-入力は `gh issue list --json ...,milestone` の `milestone`（`{"title": "v1.0", ...}` の形）で、`title` を表示します。`milestone` がない、または `null` の Issue には何も付けません。
+入力は `gh issue list -L 1000 --json ...,milestone` の `milestone`（`{"title": "v1.0", ...}` の形）で、`title` を表示します。`milestone` がない、または `null` の Issue には何も付けません。
 マイルストーンの名前の Markdown の記号（`\` `` ` `` `*` `_` `[` `]` `<` `>`）は、タイトルと同じようにエスケープします（例: `Sprint *2*` は `Sprint \*2\*`）。`--json` の `milestone` はエスケープしません。
 `--show-milestone` を付けない場合の出力は変わりません。設定ファイルの `show_milestone = true` でも指定できます。
 
 ```
-gh issue list --json number,title,labels,url,milestone | uv run issue-digest --show-milestone -
+gh issue list -L 1000 --json number,title,labels,url,milestone | uv run issue-digest --show-milestone -
 ```
 
 ### `--summary`
@@ -292,7 +293,7 @@ uv run issue-digest --summary issues.json
 `--sort` を付けない場合の並び順（既定の並び）は変わりません。
 
 ```
-gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --sort updated --stale 7 -
+gh issue list -L 1000 --json number,title,labels,url,updatedAt | uv run issue-digest --sort updated --stale 7 -
 ```
 
 ### `--sort created`
@@ -303,7 +304,7 @@ gh issue list --json number,title,labels,url,updatedAt | uv run issue-digest --s
 `--sort updated` と `--sort` なしの動作は変わりません。`--sort` は1つの値しか指定できないため、`updated` と `created` は同時に使えません。
 
 ```
-gh issue list --json number,title,labels,url,createdAt | uv run issue-digest --sort created -
+gh issue list -L 1000 --json number,title,labels,url,createdAt | uv run issue-digest --sort created -
 ```
 
 ### `--reverse`
@@ -470,10 +471,10 @@ uv run issue-digest --output digest.md issues.json
 
 ```
 # 前回: JSON を保存しておく
-gh issue list --json number,title,labels,url | uv run issue-digest --json --output last.json -
+gh issue list -L 1000 --json number,title,labels,url | uv run issue-digest --json --output last.json -
 
 # 次回: 前回の JSON と比べる
-gh issue list --json number,title,labels,url | uv run issue-digest --diff last.json -
+gh issue list -L 1000 --json number,title,labels,url | uv run issue-digest --diff last.json -
 ```
 
 出力例:
@@ -514,7 +515,7 @@ gh issue list --json number,title,labels,url | uv run issue-digest --diff last.j
 `--diff` を付けた JSON も、次回の前回の JSON として使えます。
 
 ```
-gh issue list --json number,title,labels,url | uv run issue-digest --json --diff last.json --output next.json -
+gh issue list -L 1000 --json number,title,labels,url | uv run issue-digest --json --diff last.json --output next.json -
 ```
 
 ### 設定ファイルと `--config <パス>`
@@ -640,7 +641,7 @@ unclassified = "その他"
 ほかのオプションとの組み合わせは「組み合わせ」の節を見てください。`--group-by` を付けない場合の出力は変わりません。設定ファイルの `group_by = "assignee"` でも指定できます（「設定ファイルと `--config <パス>`」を参照）。
 
 ```
-gh issue list --json number,title,labels,url,assignees | uv run issue-digest --group-by assignee -
+gh issue list -L 1000 --json number,title,labels,url,assignees | uv run issue-digest --group-by assignee -
 ```
 
 出力例:
