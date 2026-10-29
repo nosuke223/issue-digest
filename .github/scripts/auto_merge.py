@@ -103,6 +103,33 @@ def codex_clean(state: dict | None, head: str) -> bool | None:
     return not findings
 
 
+def codex_receipt_clean(comments: list, head: str) -> bool:
+    """Codex の返事のコメントに、head のコミットで「大きな問題なし」とあるか。
+
+    まれに、まとめの状態の has_any_findings が空（null）のままになる。そのとき `@codex review` で
+    頼み直すと、指摘がなければ「Didn't find any major issues」のコメントで返ってくる
+    （issue-digest PR #163）。
+    """
+    for c in comments:
+        body = c.get("body") or ""
+        if (
+            (c.get("user") or {}).get("login") == CODEX_BOT
+            and "codex-review-receipt:v1" in body
+            and "Didn't find any major issues" in body
+            and f"`{head[:10]}" in body
+        ):
+            return True
+    return False
+
+
+def codex_result(comments: list, head: str) -> bool | None:
+    """codex_clean と同じ値。状態が空でも、返事のコメントで指摘なしと分かれば True。"""
+    clean = codex_clean(codex_state(comments), head)
+    if clean is None and codex_receipt_clean(comments, head):
+        return True
+    return clean
+
+
 def test_result(check_runs: list) -> bool | None:
     """True: test が成功 / False: 失敗 / None: まだ（ないか、実行中）。"""
     runs = [r for r in check_runs if r.get("name") == TEST_CHECK]
@@ -202,7 +229,7 @@ def collect(repo: str, owner: str, pr: dict) -> tuple[int | None, dict | None]:
         "owner": owner,
         "label_actor": label_added_by(events, AUTO_LABEL),
         "owner_comments": sum(1 for c in issue_comments if c["user"]["login"] == owner),
-        "codex": codex_clean(codex_state(pr_comments), head),
+        "codex": codex_result(pr_comments, head),
         "test": test_result(checks.get("check_runs", [])),
         "careful": careful_files(changed_paths(files)),
         "mergeable": detail.get("mergeable"),
