@@ -9,11 +9,13 @@
     AGENT_ACCOUNT  エージェントの GitHub アカウント
     AUTO_MERGE     off: 何もしない / dry-run（未設定も同じ）: 判定の結果をコメントするだけ
 
-標準ライブラリと gh だけで動く。
+標準ライブラリと gh だけで動く。このファイルは agent-env の template/ から配置したもので、
+テストは agent-env の setup/test_auto_merge.py にある（変更も agent-env で行う）。
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -24,7 +26,9 @@ CODEX_BOT = "chatgpt-codex-connector[bot]"
 CODEX_STATE_RE = re.compile(r"<!-- codex-review-state:v1 (\{.*?\}) -->", re.DOTALL)
 AUTO_LABEL = "merge:auto"
 TEST_CHECK = "test"
-MARKER = "<!-- auto-merge-check sha={sha} -->"
+# 判定のコメントの印。result は判定の結果と理由の要約で、変わったときだけコメントし直す
+MARKER = "<!-- auto-merge-check sha={sha} result={result} -->"
+MARKER_RE = re.compile(r"<!-- auto-merge-check sha=(\w+) result=(\w+) -->")
 # 変えていたら人が見る（ルール、設定、CI、依存）
 CAREFUL_PREFIXES = (".github/", ".claude/", ".env")
 CAREFUL_NAMES = {"pyproject.toml", "uv.lock", "CLAUDE.md", "AGENTS.md"}
@@ -129,6 +133,10 @@ def judge(facts: dict) -> tuple[str, list[str]]:
     return ("ng" if reasons else "ok"), reasons
 
 
+def result_digest(verdict: str, reasons: list[str]) -> str:
+    return hashlib.sha256("\n".join([verdict, *reasons]).encode()).hexdigest()[:12]
+
+
 def comment_body(verdict: str, reasons: list[str], sha: str) -> str:
     if verdict == "ok":
         text = "🤖 自動マージの判定（試運転）: 条件を満たしています。本番ならマージします。"
@@ -136,7 +144,8 @@ def comment_body(verdict: str, reasons: list[str], sha: str) -> str:
         text = "🤖 自動マージの判定（試運転）: 条件を満たしていません。\n\n" + "\n".join(
             f"- {r}" for r in reasons
         )
-    return f"{text}\n\n対象のコミット: `{sha[:7]}`\n{MARKER.format(sha=sha)}"
+    marker = MARKER.format(sha=sha, result=result_digest(verdict, reasons))
+    return f"{text}\n\n対象のコミット: `{sha[:7]}`\n{marker}"
 
 
 # GitHub から事実を集める
@@ -184,9 +193,18 @@ def collect(repo: str, owner: str, pr: dict) -> tuple[int | None, dict | None]:
     return number, facts
 
 
-def already_commented(comments: list, sha: str) -> bool:
-    marker = MARKER.format(sha=sha)
-    return any(marker in (c.get("body") or "") for c in comments)
+def already_commented(comments: list, sha: str, verdict: str, reasons: list[str]) -> bool:
+    """このコミットへの最後の判定のコメントが、同じ結果と理由か。
+
+    同じコミットでも、テストの再実行や所有者のコメントで結果が変わることがあるので、
+    結果か理由が変わったらコメントし直す。
+    """
+    last = None
+    for c in comments:
+        for m in MARKER_RE.finditer(c.get("body") or ""):
+            if m.group(1) == sha:
+                last = m.group(2)
+    return last == result_digest(verdict, reasons)
 
 
 def main() -> int:
@@ -206,7 +224,7 @@ def main() -> int:
         verdict, reasons = judge(facts)
         sha = pr["head"]["sha"]
         print(f"PR #{pr['number']}（Issue #{number}）: {verdict} {reasons}")
-        if verdict == "wait" or already_commented(facts["pr_comments"], sha):
+        if verdict == "wait" or already_commented(facts["pr_comments"], sha, verdict, reasons):
             continue
         body = comment_body(verdict, reasons, sha)
         subprocess.run(
