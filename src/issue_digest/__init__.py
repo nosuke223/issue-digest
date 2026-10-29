@@ -393,7 +393,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None, run: Runner
             try:
                 loaded.append(parse_issues(sys.stdin.read()))
             except InvalidUpdatedAtError as e:
-                print(f"エラー: {e}", file=sys.stderr)
+                print(f"エラー: -（標準入力）: {e}", file=sys.stderr)
                 return 1
             except (OSError, ValueError, KeyError, TypeError) as e:
                 print(f"エラー: 標準入力を読み込めません ({type(e).__name__})", file=sys.stderr)
@@ -405,7 +405,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None, run: Runner
                 print(f"エラー: ファイルが見つかりません: {path}", file=sys.stderr)
                 return 1
             except InvalidUpdatedAtError as e:
-                print(f"エラー: {e}", file=sys.stderr)
+                print(f"エラー: {path}: {e}", file=sys.stderr)
                 return 1
             except (OSError, ValueError, KeyError, TypeError) as e:
                 print(
