@@ -104,6 +104,17 @@ def test_result(check_runs: list) -> bool | None:
     return all(r.get("conclusion") == "success" for r in runs)
 
 
+def changed_paths(files: list) -> list[str]:
+    """PR の変更したファイルのパス。名前を変えたファイルは、変える前のパスも含める
+    （ルールのファイルを別の場所へ移すと、移した先のパスだけでは見落とすため）。"""
+    paths = []
+    for f in files:
+        paths.append(f["filename"])
+        if f.get("previous_filename"):
+            paths.append(f["previous_filename"])
+    return paths
+
+
 def careful_files(files: list[str]) -> list[str]:
     return [f for f in files if f.startswith(CAREFUL_PREFIXES) or f in CAREFUL_NAMES]
 
@@ -186,7 +197,7 @@ def collect(repo: str, owner: str, pr: dict) -> tuple[int | None, dict | None]:
         "owner_comments": sum(1 for c in issue_comments if c["user"]["login"] == owner),
         "codex": codex_clean(codex_state(pr_comments), head),
         "test": test_result(checks.get("check_runs", [])),
-        "careful": careful_files([f["filename"] for f in files]),
+        "careful": careful_files(changed_paths(files)),
         "mergeable": detail.get("mergeable"),
         "pr_comments": pr_comments,
     }
