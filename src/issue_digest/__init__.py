@@ -13,6 +13,7 @@ from issue_digest.formatter import (
     format_digest_by_assignee,
     format_json,
 )
+from issue_digest.github import LIMIT, FetchError, Runner, fetch_issue_list, is_valid_repo, run_gh
 from issue_digest.loader import (
     InvalidUpdatedAtError,
     Issue,
@@ -30,12 +31,17 @@ USAGE = (
     " [--show-labels] [--show-milestone] [--title <文字列>] [--output <パス>]"
     " [--diff <前回のJSONのパス>]"
     " [--config <パス>] [--group-by assignee] [--fail-if-any <ラベル>]..."
-    " <JSONファイルのパス | ->...\n"
+    " [--repo <OWNER/REPO>]... [<JSONファイルのパス | ->...]\n"
     "       issue-digest --version\n"
     "  - で標準入力から読む / --hide-empty で0件の分類を出力しない\n"
     "  入力は複数指定でき、指定した順に読んで1つのダイジェストにまとめる"
     "（- は1回まで。Issue は URL で見分け、URL が同じ Issue は最初の1件だけを使う。"
-    "各 Issue には URL から読み取ったリポジトリ名を [owner/repo#12] の形で付ける）\n"
+    "各 Issue には URL から読み取ったリポジトリ名を [owner/repo#12] の形で付ける。"
+    "ファイルか --repo のどちらかが1つ以上必要）\n"
+    "  --repo で gh issue list -R <OWNER/REPO> --state open -L 1000 --json <必要な項目すべて> を"
+    "実行し、開いている Issue を取得して入力に加える（複数回指定でき、ファイル入力と混ぜられる。"
+    "入力の順はファイル入力の後に --repo の指定順。HOST/OWNER/REPO も指定できる。"
+    "1000件取得したら標準エラーに警告を出す。gh の実行は60秒まで）\n"
     "  --only で指定した分類だけを出力する（複数回指定できる）\n"
     "  --exclude で指定した分類を出力しない（複数回指定できる。--only とは同時に指定できない）\n"
     "  --summary で見出しの次に全分類の件数を1行で出力する\n"
@@ -153,6 +159,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--diff")
     parser.add_argument("--config")
     parser.add_argument("--group-by")
+    parser.add_argument("--repo", action="append", default=[])
     parser.add_argument("paths", nargs="*")
     return parser
 
@@ -178,14 +185,19 @@ def _parse_since_days(value: str) -> int | None:
     return None
 
 
-def _join_since_value(args: list[str]) -> list[str]:
-    """`--since -1d` を `--since=-1d` にする。argparse が -1d をオプションと見なして
-    使い方を出さずに、値の検査のエラーを出すため。`--` で始まる値（別のオプション）は変えない。"""
+def _join_dash_value(args: list[str]) -> list[str]:
+    """`--since -1d` を `--since=-1d` に、`--repo -x/y` を `--repo=-x/y` にする。argparse が
+    -1d をオプションと見なして使い方を出さずに、値の検査のエラーを出すため。
+    `--` で始まる値（別のオプション）は変えない。"""
     joined: list[str] = []
     i = 0
     while i < len(args):
-        if args[i] == "--since" and i + 1 < len(args) and re.fullmatch(r"-[^-].*", args[i + 1]):
-            joined.append(f"--since={args[i + 1]}")
+        if (
+            args[i] in ("--since", "--repo")
+            and i + 1 < len(args)
+            and re.fullmatch(r"-[^-].*", args[i + 1])
+        ):
+            joined.append(f"{args[i]}={args[i + 1]}")
             i += 2
         else:
             joined.append(args[i])
@@ -193,8 +205,9 @@ def _join_since_value(args: list[str]) -> list[str]:
     return joined
 
 
-def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
-    """now は --stale、--age、--since Nd の基準時刻。省略時は現在時刻（テストで固定できる）。"""
+def main(argv: list[str] | None = None, now: datetime | None = None, run: Runner = run_gh) -> int:
+    """now は --stale、--age、--since Nd の基準時刻。省略時は現在時刻（テストで固定できる）。
+    run は --repo で gh を実行する関数（テストで差し替えられる）。"""
     args = sys.argv[1:] if argv is None else argv
     # 実行の最初に1回だけ決め、--since、--stale、--age のすべてがこの時刻を使う
     if now is None:
@@ -202,7 +215,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
     if "--version" in args:
         print(f"issue-digest {version('issue-digest')}")
         return 0
-    args = _join_since_value(args)
+    args = _join_dash_value(args)
     try:
         opts = _build_parser().parse_args(args)
     except _UsageError:
@@ -320,7 +333,18 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
         print("エラー: --title には1文字以上を指定してください", file=sys.stderr)
         return 2
     paths: list[str] = opts.paths
-    if not paths:
+    repos: list[str] = []
+    for repo in opts.repo:
+        if not is_valid_repo(repo):
+            print(
+                f"エラー: --repo には OWNER/REPO か HOST/OWNER/REPO の形を指定してください: {repo}",
+                file=sys.stderr,
+            )
+            return 2
+        # 同じリポジトリ（大文字と小文字を区別しない）を2回指定しても、gh は1回だけ実行する
+        if repo.lower() not in (r.lower() for r in repos):
+            repos.append(repo)
+    if not paths and not repos:
         print(USAGE, file=sys.stderr)
         return 2
     if paths.count("-") > 1:
@@ -389,6 +413,31 @@ def main(argv: list[str] | None = None, now: datetime | None = None) -> int:
                     file=sys.stderr,
                 )
                 return 1
+    # --repo はファイル入力の後に、指定した順に取得する
+    for repo in repos:
+        try:
+            output_of_gh = fetch_issue_list(repo, run)
+        except FetchError as e:
+            print(f"エラー: {e}", file=sys.stderr)
+            return 1
+        try:
+            fetched = parse_issues(output_of_gh.decode("utf-8"))
+        except InvalidUpdatedAtError as e:
+            print(f"エラー: {e}", file=sys.stderr)
+            return 1
+        except (ValueError, KeyError, TypeError) as e:
+            print(
+                f"エラー: gh issue list の出力を読み込めません: {repo} ({type(e).__name__})",
+                file=sys.stderr,
+            )
+            return 1
+        if len(fetched) >= LIMIT:
+            print(
+                f"警告: {repo} の Issue を{LIMIT}件取得しました。"
+                "これ以上ある場合は、一部が含まれていません",
+                file=sys.stderr,
+            )
+        loaded.append(fetched)
     issues = merge_issues(loaded)
     # 分類の名前は設定に関係なく固定で、割り当てるラベルだけが変わる
     category_labels: dict[str, list[str]] | None = config.get("category_labels")
