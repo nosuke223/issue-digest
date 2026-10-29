@@ -1,0 +1,26 @@
+# PR と main で、テストと lint を GitHub 上でも実行する。自動マージの条件の1つ（ジョブ名 test）。
+# Python と uv のプロジェクト向け。ほかの言語では、「プロジェクト固有」を埋めるときに書き換える（ジョブ名は test のまま）。
+name: テスト
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+      - name: テスト
+        run: uv run pytest
+      - name: lint
+        run: uv run ruff check .
+      - name: format
+        run: uv run ruff format --check .
