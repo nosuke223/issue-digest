@@ -27,6 +27,7 @@ _KEYS = (
     "limit",
     "max_chars",
     "group_by",
+    "category_labels",
 )
 
 
@@ -111,5 +112,26 @@ def _validate(data: dict[str, Any]) -> dict[str, Any]:
                 if not isinstance(heading, str) or heading == "":
                     raise ConfigError(
                         f"設定ファイルの headings.{label} には1文字以上の文字列を指定してください"
+                    )
+        elif key == "category_labels":
+            if not isinstance(value, dict):
+                raise ConfigError(
+                    "設定ファイルの category_labels はテーブル（[category_labels]）で"
+                    "指定してください"
+                )
+            for category, labels in value.items():
+                if category not in CATEGORIES[:-1]:
+                    raise ConfigError(
+                        f"設定ファイルの category_labels に指定できない分類です: {category}\n"
+                        f"指定できる分類: {', '.join(CATEGORIES[:-1])}"
+                    )
+                if (
+                    not isinstance(labels, list)
+                    or not labels
+                    or not all(isinstance(v, str) and v != "" for v in labels)
+                ):
+                    raise ConfigError(
+                        f'設定ファイルの category_labels."{category}" には、'
+                        "1文字以上の文字列を1つ以上入れた配列を指定してください"
                     )
     return data
