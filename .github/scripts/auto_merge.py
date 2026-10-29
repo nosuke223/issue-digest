@@ -90,10 +90,17 @@ def codex_state(comments: list) -> dict | None:
 
 
 def codex_clean(state: dict | None, head: str) -> bool | None:
-    """True: 最新のコミットに指摘なし / False: 指摘あり / None: まだ（レビュー中など）。"""
+    """True: 最新のコミットに指摘なし / False: 指摘あり / None: まだ（レビュー中など）。
+
+    完了していても has_any_findings が空（null）のことがある（レビューの報告がなく、
+    実際にレビューされたか分からない）。指摘なしと明記されたときだけ True にする。
+    """
     if not state or state.get("commit_sha") != head or state.get("status") != "completed":
         return None
-    return not state.get("has_any_findings")
+    findings = state.get("has_any_findings")
+    if findings is None:
+        return None
+    return not findings
 
 
 def test_result(check_runs: list) -> bool | None:
