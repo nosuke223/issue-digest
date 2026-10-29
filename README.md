@@ -40,10 +40,12 @@ uv run --project <プロジェクトのパス> issue-digest --config <設定フ�
 
 `gh issue list --json number,title,labels,url` の出力を渡します。
 複数のリポジトリの出力を並べて渡すと、1つのダイジェストにまとめます（「入力」を参照）。
+`--repo` を付けると、`gh` を自分で実行しなくても、GitHub から直接取得できます（「`--repo <OWNER/REPO>`」を参照）。
 
 ```
 uv run issue-digest issues.json
 uv run issue-digest repo-a.json repo-b.json
+uv run issue-digest --repo owner/repo
 ```
 
 ### オプション一覧
@@ -51,6 +53,7 @@ uv run issue-digest repo-a.json repo-b.json
 | オプション | 何をするか | 例 |
 | --- | --- | --- |
 | `-` | 標準入力から読む（ほかの入力と混ぜられる。1回まで） | `gh issue list --json number,title,labels,url \| uv run issue-digest -` |
+| `--repo <OWNER/REPO>` | `gh` を実行して、指定したリポジトリの開いている Issue を取得する（複数回指定できる。ファイル入力と混ぜられる） | `uv run issue-digest --repo nosuke223/issue-digest` |
 | `-h` / `--help` | 使い方を出力する | `uv run issue-digest --help` |
 | `--version` | バージョンだけを出力する | `uv run issue-digest --version` |
 | `--hide-empty` | 0件の分類を出力しない | `uv run issue-digest --hide-empty issues.json` |
@@ -98,11 +101,42 @@ gh issue list --repo alpha/tools --json number,title,labels,url > alpha.json
 gh issue list --repo beta/app --json number,title,labels,url | uv run issue-digest alpha.json -
 ```
 
-- 入力は指定した順に読み、すべての Issue を1つにまとめてから、分類・絞り込み・並べ替えをします。
+`gh` を自分で実行する代わりに、`--repo` でリポジトリを指定して取得することもできます（「`--repo <OWNER/REPO>`」を参照）。ファイル入力と混ぜて指定できます。
+
+```
+uv run issue-digest --repo alpha/tools --repo beta/app
+uv run issue-digest alpha.json --repo beta/app
+```
+
+- 入力は指定した順に読み、すべての Issue を1つにまとめてから、分類・絞り込み・並べ替えをします。`--repo` で取得した Issue は、ファイル入力（`-` を含む）をすべて読んだ後に、`--repo` を指定した順に加えます（コマンドラインで `--repo` をファイルより前に書いても同じです）。
 - `-`（標準入力）はほかのファイルと混ぜて指定できますが、1回までです。2回以上指定すると、`エラー: -（標準入力）は1回だけ指定できます` を標準エラーに出して終了コード 2 で終わります。
-- 入力を1つも指定しないときは、使い方を標準エラーに出して終了コード 2 で終わります。
+- ファイル入力も `--repo` も1つも指定しないときは、使い方を標準エラーに出して終了コード 2 で終わります。ファイル入力がなくても、`--repo` が1つ以上あれば動きます。
 - 1つでも読めない入力があれば、そのファイルを示すエラー（`エラー: ファイルが見つかりません: <パス>` など）を標準エラーに出して終了コード 1 で終わります。
 - Issue は URL で見分けます（大文字と小文字は区別しません）。URL が同じ Issue が複数の入力（または1つの入力の中）にあるときは、最初に出てきた1件だけを使い、件数を二重に数えません。別のリポジトリの同じ番号の Issue は、別の Issue として数えます。
+
+### `--repo <OWNER/REPO>`
+
+`--repo <OWNER/REPO>` を付けると、`gh` コマンドを実行して、指定したリポジトリの開いている Issue を取得し、入力に加えます。必要な項目の付け忘れや、件数の切り捨てを避けたいときに使います。
+`gh` をインストールし、`gh auth login` でログインしておく必要があります（issue-digest は認証情報を読みません）。
+
+```
+uv run issue-digest --repo nosuke223/issue-digest
+uv run issue-digest --repo alpha/tools --repo beta/app --summary
+```
+
+- 1つのリポジトリにつき、`gh issue list -R <OWNER/REPO> --state open -L 1000 --json number,title,labels,url,updatedAt,createdAt,assignees,milestone` を実行します。ほかのオプション（`--stale` など）に関係なく、毎回すべての項目を取得します。シェルは通しません。
+- 取得するのは開いている Issue だけです。閉じた Issue を取得するオプションや、取得件数の上限を変えるオプションはありません。
+- 1つのリポジトリで1000件を取得したときは、`警告: <リポジトリ> の Issue を1000件取得しました。これ以上ある場合は、一部が含まれていません` を標準エラーに出します（ダイジェストはいつもどおり出力し、終了コードは変わりません）。
+- 複数回指定でき、ファイル入力と混ぜて指定できます。取得した Issue は、ファイルから読んだ Issue と同じように1つにまとめます（URL が同じ Issue は最初の1件だけ。リポジトリ名の表示も同じ）。同じリポジトリ（大文字と小文字を区別しない）を2回指定してもエラーにせず、`gh` は1回だけ実行します。
+- 値の形は `OWNER/REPO` か `HOST/OWNER/REPO`（GitHub Enterprise など）です。各部分に使えるのは英数字、`.`、`_`、`-` だけです。それ以外の値（`-` で始まる値、空、スラッシュの数が違うなど）は、`gh` を実行せずに `エラー: --repo には OWNER/REPO か HOST/OWNER/REPO の形を指定してください: <値>` を標準エラーに出して終了コード 2 で終わります。`--repo` の後に値がない場合も終了コード 2 です。
+- 取得に失敗したときは、ダイジェストを出力せずに、標準エラーに次のどれかを出して終了コード 1 で終わります。
+  - `gh` が見つからない: `エラー: gh コマンドが見つかりません`
+  - `gh` が失敗した（ログインしていない、リポジトリが見つからないなど）: `エラー: gh issue list に失敗しました: <リポジトリ>（<gh の標準エラーの最初の1行>）`（`gh` の標準エラーが空のときは `（終了コード N）`）
+  - 60秒で終わらない: `エラー: gh issue list が60秒で終わりませんでした: <リポジトリ>`（`gh` は中断します）
+  - `gh` の出力が読めない: `エラー: gh issue list の出力を読み込めません: <リポジトリ> (JSONDecodeError)` など
+- 設定ファイルに取得先を書くキーはありません。
+
+パイプで `gh issue list` の出力を渡す場合は、`-L` で件数を指定しないと、`gh` の既定の30件で切られます（例: `gh issue list -L 1000 --json number,title,labels,url | uv run issue-digest -`）。
 
 ### リポジトリ名の表示
 
@@ -656,6 +690,7 @@ uv run issue-digest --version
 ### 組み合わせ
 
 - 入力を複数指定したときも、すべてのオプションは入力が1つのときと同じように効きます。まとめた後の Issue（URL が同じものは最初の1件だけ）が、件数、`--since`、`--only`、`--exclude`、`--sort`、`--reverse`、`--limit`、`--max-chars`、`--summary`、`--group-by`、`--diff`、`--fail-if-any` の対象です。設定ファイルに入力を書くキーはありません。
+- `--repo` は、ほかのオプションすべてと同時に使えます。取得した Issue は、ファイルから読んだ Issue と同じように、件数、`--since`、`--only`、`--exclude`、`--sort`、`--reverse`、`--limit`、`--max-chars`、`--summary`、`--group-by`、`--diff`、`--fail-if-any`、`--json`、`--csv` の対象です。`--repo` での取得に失敗したとき（終了コード 1）は、`--output` のファイルを書き出さず、`--fail-if-any` の判定もしません。
 - `--hide-empty`、`--only`、`--stale`、`--since`、`--sort`、`--reverse`、`--limit`、`--title`、`--output`、`--diff` は、どれも同時に使えます（`--csv` との併用は下の項目を参照）。
 - `--reverse` は `--sort` の後に並びを逆にし、そのあとで `--limit` と `--max-chars` が効きます（`--limit` は逆にした後の先頭から、`--max-chars` は逆にした後の末尾の行から）。
 - `--since` で絞るのは出力する Issue です。件数（総件数、分類ごとの件数、`--summary`）は絞った後の Issue で数えます。`--json`、`--csv` でも同じです。
