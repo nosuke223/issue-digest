@@ -235,7 +235,22 @@ def test_main_unreadable_gh_output(capsys, output, error):
 def test_main_invalid_updated_at_in_gh_output(capsys):
     output = b'[{"number": 7, "title": "t", "labels": [], "url": "u", "updatedAt": "x"}]'
     assert main(["--repo", "o/r"], run=FakeGh({"o/r": output})) == 1
-    assert capsys.readouterr().err == "エラー: Issue #7 の updatedAt を日時として読めません: x\n"
+    assert capsys.readouterr().err == (
+        "エラー: --repo o/r: Issue #7 の updatedAt を日時として読めません: x\n"
+    )
+
+
+@pytest.mark.parametrize("key", ["updatedAt", "createdAt"])
+def test_main_invalid_date_names_the_second_repo(capsys, key):
+    issue = {"number": 1, "title": "t", "labels": [], "updatedAt": "2026-10-20T00:00:00Z"}
+    good = json.dumps([{**issue, "url": "https://github.com/beta/good/issues/1"}]).encode()
+    bad_issue = {**issue, "url": "https://github.com/alpha/bad/issues/1", key: "yesterday"}
+    bad = json.dumps([bad_issue]).encode()
+    run = FakeGh({"beta/good": good, "alpha/bad": bad})
+    assert main(["--repo", "beta/good", "--repo", "alpha/bad"], run=run) == 1
+    assert capsys.readouterr().err == (
+        f"エラー: --repo alpha/bad: Issue #1 の {key} を日時として読めません: yesterday\n"
+    )
 
 
 @pytest.mark.parametrize(
