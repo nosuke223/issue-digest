@@ -10,6 +10,7 @@ _BOOL_KEYS = (
     "hide_empty",
     "summary",
     "show_assignees",
+    "show_author",
     "json",
     "show_labels",
     "age",

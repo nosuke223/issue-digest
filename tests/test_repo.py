@@ -12,7 +12,7 @@ REPO_B = str(DATA / "multi_repo_b.json")
 OUTPUT_A = (DATA / "multi_repo_a.json").read_bytes()
 OUTPUT_B = (DATA / "multi_repo_b.json").read_bytes()
 
-GH_FIELDS = "number,title,labels,url,updatedAt,createdAt,assignees,milestone"
+GH_FIELDS = "number,title,labels,url,updatedAt,createdAt,assignees,milestone,author"
 
 
 class FakeGh:

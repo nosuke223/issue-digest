@@ -37,6 +37,7 @@ class Issue:
     assignees: list[str] = field(default_factory=list)
     created_at: datetime | None = None
     milestone: str | None = None
+    author: str | None = None
 
     @property
     def repository(self) -> str | None:
@@ -73,6 +74,7 @@ def parse_issues(text: str) -> list[Issue]:
     ないときや null のときは None になる。
     `assignees`（`[{"login": "alice"}]` の形）も任意。ないとき、null、空のときは担当者なし。
     `milestone`（`{"title": "v1.0"}` の形）も任意。ないとき、null のときはマイルストーンなし。
+    `author`（`{"login": "alice"}` の形）も任意。ないとき、null のときは作成者なし。
     """
     data = json.loads(text)
     return [
@@ -85,6 +87,7 @@ def parse_issues(text: str) -> list[Issue]:
             assignees=[a["login"] for a in item.get("assignees") or []],
             created_at=_parse_datetime(item["number"], item.get("createdAt"), "createdAt"),
             milestone=(item.get("milestone") or {}).get("title"),
+            author=(item.get("author") or {}).get("login"),
         )
         for item in data
     ]
