@@ -256,8 +256,47 @@ def test_main_invalid_updated_at(capsys, tmp_path):
     )
     assert main(["--stale", "7", str(bad)], now=NOW) == 1
     captured = capsys.readouterr()
-    assert captured.err == "エラー: Issue #1 の updatedAt を日時として読めません: xx\n"
+    assert captured.err == f"エラー: {bad}: Issue #1 の updatedAt を日時として読めません: xx\n"
     assert captured.out == ""
+
+
+def test_main_invalid_updated_at_in_second_file_shows_its_path(capsys, tmp_path):
+    good = tmp_path / "good.json"
+    good.write_text(
+        '[{"number": 1, "title": "t", "labels": [], "url": "https://github.com/a/x/issues/1",'
+        ' "updatedAt": "2026-10-01T00:00:00Z"}]',
+        encoding="utf-8",
+    )
+    bad = tmp_path / "bad.json"
+    bad.write_text(
+        '[{"number": 1, "title": "t", "labels": [], "url": "https://github.com/g/x/issues/1",'
+        ' "updatedAt": "yesterday"}]',
+        encoding="utf-8",
+    )
+    assert main([str(good), str(bad)], now=NOW) == 1
+    captured = capsys.readouterr()
+    assert captured.err == (
+        f"エラー: {bad}: Issue #1 の updatedAt を日時として読めません: yesterday\n"
+    )
+    assert captured.out == ""
+
+
+def test_main_invalid_created_at_in_second_file_shows_its_path(capsys, tmp_path):
+    good = tmp_path / "good.json"
+    good.write_text(
+        '[{"number": 1, "title": "t", "labels": [], "url": "https://github.com/a/x/issues/1"}]',
+        encoding="utf-8",
+    )
+    bad = tmp_path / "bad.json"
+    bad.write_text(
+        '[{"number": 1, "title": "t", "labels": [], "url": "https://github.com/g/x/issues/1",'
+        ' "createdAt": "yesterday"}]',
+        encoding="utf-8",
+    )
+    assert main([str(good), str(bad)], now=NOW) == 1
+    assert capsys.readouterr().err == (
+        f"エラー: {bad}: Issue #1 の createdAt を日時として読めません: yesterday\n"
+    )
 
 
 def test_main_invalid_updated_at_on_stdin(capsys, monkeypatch):
@@ -265,7 +304,9 @@ def test_main_invalid_updated_at_on_stdin(capsys, monkeypatch):
     monkeypatch.setattr("sys.stdin", io.StringIO(text))
     assert main(["-"]) == 1
     captured = capsys.readouterr()
-    assert captured.err == "エラー: Issue #7 の updatedAt を日時として読めません: xx\n"
+    assert (
+        captured.err == "エラー: -（標準入力）: Issue #7 の updatedAt を日時として読めません: xx\n"
+    )
     assert captured.out == ""
 
 
@@ -273,7 +314,9 @@ def test_main_non_string_updated_at(capsys, monkeypatch):
     text = '[{"number": 3, "title": "t", "labels": [], "url": "u", "updatedAt": 123}]'
     monkeypatch.setattr("sys.stdin", io.StringIO(text))
     assert main(["-"]) == 1
-    assert capsys.readouterr().err == "エラー: Issue #3 の updatedAt を日時として読めません: 123\n"
+    assert capsys.readouterr().err == (
+        "エラー: -（標準入力）: Issue #3 の updatedAt を日時として読めません: 123\n"
+    )
 
 
 def test_main_show_assignees(capsys):
@@ -390,7 +433,9 @@ def test_main_invalid_created_at(capsys, monkeypatch):
     monkeypatch.setattr("sys.stdin", io.StringIO(text))
     assert main(["--sort", "created", "-"]) == 1
     captured = capsys.readouterr()
-    assert captured.err == "エラー: Issue #4 の createdAt を日時として読めません: xx\n"
+    assert (
+        captured.err == "エラー: -（標準入力）: Issue #4 の createdAt を日時として読めません: xx\n"
+    )
     assert captured.out == ""
 
 
