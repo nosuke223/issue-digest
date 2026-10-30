@@ -21,6 +21,7 @@ _KEYS = (
     "only",
     "exclude",
     "stale",
+    "since",
     "sort",
     "headings",
     "title",
@@ -65,6 +66,18 @@ def _validate(data: dict[str, Any]) -> dict[str, Any]:
             if isinstance(value, bool) or not isinstance(value, int) or value < 0:
                 raise ConfigError(
                     f"設定ファイルの stale には0以上の整数を指定してください: {value}"
+                )
+        elif key == "since":
+            if not isinstance(value, str):
+                raise ConfigError(
+                    '設定ファイルの since には "7d" のような日数の文字列を指定してください'
+                    f": {value}"
+                )
+            number = value[:-1]
+            if not (value.endswith("d") and number.isascii() and number.isdigit()):
+                raise ConfigError(
+                    '設定ファイルの since には "7d" のような日数の形だけ指定できます'
+                    f"（日付の形は書けません）: {value}"
                 )
         elif key == "limit":
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:
