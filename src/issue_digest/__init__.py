@@ -437,7 +437,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None, run: Runner
         try:
             fetched = parse_issues(output_of_gh.decode("utf-8"))
         except InvalidUpdatedAtError as e:
-            print(f"エラー: {e}", file=sys.stderr)
+            print(f"エラー: --repo {repo}: {e}", file=sys.stderr)
             return 1
         except (ValueError, KeyError, TypeError) as e:
             print(
