@@ -82,16 +82,17 @@ USAGE = (
     "出す（Issue は URL で照合する。"
     "Markdown は末尾に「## 前回からの変化」、JSON は diff を加える。--csv では無視する。"
     "前回の JSON は --only、--exclude、--hide-empty、--limit、--since を付けず、"
-    "設定ファイルの hide_empty、only、exclude、limit も使わずに出力したもの。"
+    "設定ファイルの hide_empty、only、exclude、limit、since も使わずに出力したもの。"
     "付けて出力した JSON だと、入っていなかった Issue は"
     "新しい Issue や分類が変わった Issue として出る）\n"
     "    例: issue-digest --json --output last.json issues.json で保存し、"
     "次回 issue-digest --diff last.json issues.json\n"
     "  --config で読む設定ファイルを指定する（省略時はカレントディレクトリの .issue-digest.toml。"
-    "なければ使わない）。キーは hide_empty、summary、only、exclude、stale、sort、reverse、"
+    "なければ使わない）。キーは hide_empty、summary、only、exclude、stale、since、sort、reverse、"
     "show_assignees、show_labels、show_milestone、age、title、limit、max_chars、group_by、"
     "json、headings、category_labels で、コマンドラインの指定を優先する"
-    "（sort は updated か created、limit と max_chars は1以上の整数、"
+    '（since は "7d" のような日数の形の文字列だけで、--since を指定したら使わない。'
+    "sort は updated か created、limit と max_chars は1以上の整数、"
     'group_by は "assignee"、title は1文字以上の文字列）'
     "（only と exclude は --only か --exclude を指定したら使わず、"
     "両方を書くとエラー。reverse = true は常に有効。"
@@ -318,6 +319,19 @@ def main(argv: list[str] | None = None, now: datetime | None = None, run: Runner
             print(
                 "エラー: --since には YYYY-MM-DD の形の日付か、7d のような日数を指定してください:"
                 f" {opts.since}",
+                file=sys.stderr,
+            )
+            return 2
+    elif "since" in config:
+        # 設定の since は日数の形だけ（load_config で検査済み）。--since があれば使わない
+        days = _parse_since_days(config["since"])
+        try:
+            since = now - timedelta(days=days) if days is not None else None
+        except OverflowError:
+            since = None
+        if since is None:
+            print(
+                f"エラー: 設定ファイルの since の日数が大きすぎます: {config['since']}",
                 file=sys.stderr,
             )
             return 2

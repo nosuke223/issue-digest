@@ -218,7 +218,7 @@ gh issue list -L 1000 --json number,title,labels,url,updatedAt | uv run issue-di
 - `updatedAt` がない Issue は出ません。
 - 絞った後の Issue が、見出しの総件数、分類ごとの件数、`--summary` の対象になります。
 - 日付としても `<整数>d` としても読めない値（`2026-02-30` のようなない日付を含む）のときは、`エラー: --since には YYYY-MM-DD の形の日付か、7d のような日数を指定してください: <値>` を標準エラーに出して終了コード 2 で終わります。
-- Markdown、`--json`、`--csv` のどれでも効きます。設定ファイルには `since` キーはありません。
+- Markdown、`--json`、`--csv` のどれでも効きます。設定ファイルには `since = "7d"` の形で書けます（日数の形だけ。日付の形は書けません。意味と基準時刻はコマンドラインの `--since 7d` と同じです）。コマンドラインで `--since` を指定したら、設定の `since` は使いません。詳しくは「設定ファイルと `--config <パス>`」を参照してください。
 
 `--since` を付けない場合の出力は変わりません。
 
@@ -461,7 +461,7 @@ uv run issue-digest --output digest.md issues.json
 どれかに変化があるときは3つの小見出し（`### 新しい Issue - 1件` など）をすべて出し、0件の小見出しには「なし」を出します。各小見出しの中は、リポジトリ名の順、同じリポジトリの中は Issue 番号の小さい順です（リポジトリ名がない Issue は最後に番号の小さい順）。
 どれも変化がなければ、節の中に「変化なし」だけを出します。
 
-前回の JSON は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since` を付けず、設定ファイル（`.issue-digest.toml` や `--config`）の `hide_empty`、`only`、`exclude`、`limit` も使わずに出力したものを前提とします。付けて出力した JSON を使うと、その JSON に入っていなかった Issue は「新しい Issue」として出ます。複数の分類に入る Issue で、前回は一部の分類にしか出ていなかったものは「分類が変わった Issue」として出ます。
+前回の JSON は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since` を付けず、設定ファイル（`.issue-digest.toml` や `--config`）の `hide_empty`、`only`、`exclude`、`limit`、`since` も使わずに出力したものを前提とします。付けて出力した JSON を使うと、その JSON に入っていなかった Issue は「新しい Issue」として出ます。複数の分類に入る Issue で、前回は一部の分類にしか出ていなかったものは「分類が変わった Issue」として出ます。
 今回の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit`（設定ファイルの `only`、`exclude`、`hide_empty`、`limit` も）に関係なく、全分類の全件で行います。
 `--title`、`--stale`、`--show-assignees`、`--show-labels`、`--age`、`--show-milestone`、`--summary`、`--sort`、`--reverse`、`--diff` を付けて出力した JSON も、前回の JSON として使えます（増えた項目は読みません。`--sort` と `--reverse` は並びだけが変わります）。
 
@@ -524,7 +524,7 @@ gh issue list -L 1000 --json number,title,labels,url | uv run issue-digest --jso
 `--config <パス>` で読むファイルを指定できます（このとき `.issue-digest.toml` は読みません）。指定したファイルがなければ、`エラー: 設定ファイルが見つかりません: <パス>` を標準エラーに出して終了コード 1 で終わります。
 ホームディレクトリなど、ほかの場所の設定ファイルは探しません。
 
-書けるキーは次の18個です。
+書けるキーは次の19個です。
 
 | キー | 型 | 対応するオプション |
 | --- | --- | --- |
@@ -533,6 +533,7 @@ gh issue list -L 1000 --json number,title,labels,url | uv run issue-digest --jso
 | `only` | 文字列の配列（`--only` と同じ6つのラベル） | `--only` |
 | `exclude` | 文字列の配列（`--exclude` と同じ6つのラベル） | `--exclude` |
 | `stale` | 0以上の整数 | `--stale` |
+| `since` | `"7d"` のような `<整数>d` の形の文字列（日付の形は書けない） | `--since 7d` |
 | `sort` | `"updated"` か `"created"` | `--sort updated` / `--sort created` |
 | `reverse` | 真偽値 | `--reverse` |
 | `show_assignees` | 真偽値 | `--show-assignees` |
@@ -552,6 +553,7 @@ gh issue list -L 1000 --json number,title,labels,url | uv run issue-digest --jso
 - コマンドラインの指定が設定ファイルより優先されます。`--stale 3` は設定の `stale` を上書きします。
 - 設定の `only` と `exclude` は、コマンドラインで `--only` か `--exclude` を1つでも指定したら、どちらも使いません。指定しないときだけ使います。
 - 設定に `only` と `exclude` を両方書く（どちらも空の配列でない）と、`エラー: --only と --exclude は同時に指定できません` を標準エラーに出して終了コード 2 で終わります。空の配列は、書かないのと同じです。コマンドラインで `--only` か `--exclude` を指定したときは、設定の `only` と `exclude` を使わないので、このエラーになりません。
+- 設定の `since` は `"7d"` の形だけ書けます。日付の形（`"2026-10-01"`）は、書くと日付が固定になって古くなるので書けません。日付の形、`"7"`、`"7D"`、数値などは、`エラー: 設定ファイルの since には ...` を標準エラーに出して終了コード 2 で終わります。コマンドラインで `--since` を指定したら（日付の形でも日数の形でも）、設定の `since` は使いません。
 - 設定の `title`、`limit`、`max_chars`、`group_by` も、コマンドラインで `--title`、`--limit`、`--max-chars`、`--group-by` を指定したら使いません。
 - 設定の `group_by` と `max_chars` は、コマンドラインで `--json` または `--csv` を指定したら使いません（コマンドラインの出力形式が優先です）。
 - 設定どうしが矛盾するとき（設定の `json = true` と `group_by` または `max_chars` を一緒に書いたときなど）は、コマンドラインで同じ指定をしたときと同じエラーを標準エラーに出して終了コード 2 で終わります。
@@ -564,6 +566,7 @@ gh issue list -L 1000 --json number,title,labels,url | uv run issue-digest --jso
 ```toml
 hide_empty = true
 stale = 7
+since = "7d"
 limit = 5
 title = "issue-digest"
 show_labels = true
