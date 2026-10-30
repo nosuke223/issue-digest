@@ -48,7 +48,7 @@
 - 設定ファイルの `[category_labels]`: 分類に使う GitHub ラベルを変える（#158）
 - `--repo <OWNER/REPO>`: `gh` を実行して、GitHub から Issue を直接取得する（#162）
 - 設定ファイルに `since` を `"7d"` の形で書けるようにした（#172）
-- `--show-author`: 作成者を行末に表示する（#168）
+- `--show-author`: 作成者を行末に表示する（#176）
 
 ### 変更
 
