@@ -704,6 +704,28 @@ uv run issue-digest --fail-if-any agent:needs-decision --fail-if-any agent:block
 uv run issue-digest --version
 ```
 
+### 終了コード
+
+cron や CI で終了コードによって処理を分けたいときの一覧です。
+
+| 終了コード | 意味 | 起きる例 |
+| --- | --- | --- |
+| 0 | 正常 | ダイジェストを出力した。`--fail-if-any` を付けたときは、指定した分類のどれにも Issue がなかった |
+| 1 | 実行時のエラー | 入力のファイルが読めない（`エラー: ファイルが見つかりません: <パス>`）、`--output` のファイルを書き出せない、`gh` が失敗した、`updatedAt` や `createdAt` が日時として読めない |
+| 2 | オプションの指定のエラー | `--fail-if-any` や `--only` に知らない値を指定した、`--only` と `--exclude` のように同時に使えないものを指定した、`--repo` の形の誤り、設定ファイルの誤り |
+| 3 | `--fail-if-any` で指定した分類に Issue がある | `--fail-if-any agent:ready` を付けて、着手可能の分類に Issue が1件以上あった |
+
+- エラー（1 か 2）のときは、3 より 1 か 2 を優先します。`--fail-if-any` の分類に Issue があっても、エラーなら 3 にはなりません。
+- 終了コード 3 のときも、ダイジェストはいつもどおり出力します。`--output` があるときは、ファイルに書き出してから終了コード 3 で終わります。
+
+cron でダイジェストを保存しながら、終了コード 3 のときだけ通知する例です（`notify` は通知するコマンドに置き換えてください）。
+
+```
+uv run issue-digest --fail-if-any agent:needs-decision --fail-if-any agent:blocked --output digest.md issues.json
+status=$?
+if [ "$status" -eq 3 ]; then notify "判断待ちか中断の Issue があります"; fi
+```
+
 ### 組み合わせ
 
 - 入力を複数指定したときも、すべてのオプションは入力が1つのときと同じように効きます。まとめた後の Issue（URL が同じものは最初の1件だけ）が、件数、`--since`、`--only`、`--exclude`、`--sort`、`--reverse`、`--limit`、`--max-chars`、`--summary`、`--group-by`、`--diff`、`--fail-if-any` の対象です。設定ファイルに入力を書くキーはありません。
@@ -745,7 +767,7 @@ uv run issue-digest --version
   - `--json`、`--csv` と同時に指定するとエラーです。
   - `--max-chars` は、最後の担当者の見出し（`## 担当者なし` があればそれ）から順に、各担当者の末尾の Issue の行を1行ずつ削ります。最後の担当者の Issue の行がなくなったら、1つ前の担当者を削ります。削った担当者の最後に `- ほか N 件` を出し、`--limit` で省いた件数とまとめて1行にします。見出し、件数、`--summary` の行、`--diff` の節は削りません。行末の分類の名前と印を含めた行で数えます。すべて削っても収まらないときの警告は、分類ごとのときと同じです。
 - `--fail-if-any` は、ほかのオプションすべてと同時に使えます。終了コードの判定は `--since` で絞った後の件数で行い、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--max-chars` には左右されません。`--json`、`--csv`、`--group-by`、`--output` のどれと同時でも、出力してから終了コード 3 で終わります。
-- 終了コードは、正常が 0、実行時のエラー（ファイルが読めない、書き出せないなど）が 1、オプションの指定のエラーが 2、`--fail-if-any` で指定した分類に Issue があるときが 3 です。エラーのときは 1 か 2 を優先します。
+- 終了コードは「終了コード」の節を見てください。
 - 設定ファイルの `group_by`、`max_chars` と `json = true` を一緒に書くと、コマンドラインで `--group-by`、`--max-chars` と `--json` を同時に指定したときと同じエラーで終了コード 2 です。コマンドラインで `--json` か `--csv` を指定したときは、設定の `group_by` と `max_chars` は使いません。
 - `--config` は、ほかのオプションすべてと同時に使えます。設定ファイルの値は、コマンドラインで同じオプションを指定したときは使いません（詳しくは「設定ファイルと `--config <パス>`」）。
 - 設定ファイルの `[category_labels]` は、分類に使うラベルだけを変えます。`--only`、`--exclude`、`--fail-if-any`、`--diff`、`--group-by` などは、変えた後の分類に今までの名前（`agent:ready` など）で効きます。
