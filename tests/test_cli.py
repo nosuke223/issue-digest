@@ -818,6 +818,37 @@ def test_main_invalid_json(capsys, tmp_path):
     assert "読み込めません" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize("key", ["author", "milestone"])
+@pytest.mark.parametrize("value", ["alice", 1, ["alice"]])
+@pytest.mark.parametrize("extra", [[], ["--show-author"], ["--show-milestone"]])
+def test_main_non_object_author_or_milestone_in_file(capsys, tmp_path, key, value, extra):
+    item = {"number": 1, "title": "t", "labels": [], "url": "https://github.com/o/r/issues/1"}
+    path = tmp_path / "bad.json"
+    path.write_text(json.dumps([{**item, key: value}]), encoding="utf-8")
+    assert main([*extra, str(path)]) == 1
+    captured = capsys.readouterr()
+    assert captured.err == f"エラー: ファイルを読み込めません: {path} (TypeError)\n"
+    assert captured.out == ""
+
+
+@pytest.mark.parametrize("key", ["author", "milestone"])
+def test_main_non_object_author_or_milestone_on_stdin(capsys, monkeypatch, key):
+    item = {"number": 1, "title": "t", "labels": [], "url": "https://github.com/o/r/issues/1"}
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps([{**item, key: "alice"}])))
+    assert main(["-"]) == 1
+    captured = capsys.readouterr()
+    assert captured.err == "エラー: 標準入力を読み込めません (TypeError)\n"
+    assert captured.out == ""
+
+
+def test_main_null_author_and_milestone_are_ignored(capsys, tmp_path):
+    item = {"number": 1, "title": "t", "labels": [], "url": "https://github.com/o/r/issues/1"}
+    path = tmp_path / "null.json"
+    path.write_text(json.dumps([{**item, "author": None, "milestone": None}]), encoding="utf-8")
+    assert main(["--show-author", "--show-milestone", str(path)]) == 0
+    assert "（作成者:" not in capsys.readouterr().out
+
+
 def test_main_reads_stdin(capsys, monkeypatch):
     text = (DATA / "issues.json").read_text(encoding="utf-8")
     monkeypatch.setattr("sys.stdin", io.StringIO(text))

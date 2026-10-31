@@ -75,6 +75,7 @@ def parse_issues(text: str) -> list[Issue]:
     `assignees`（`[{"login": "alice"}]` の形）も任意。ないとき、null、空のときは担当者なし。
     `milestone`（`{"title": "v1.0"}` の形）も任意。ないとき、null のときはマイルストーンなし。
     `author`（`{"login": "alice"}` の形）も任意。ないとき、null のときは作成者なし。
+    `milestone` と `author` がオブジェクトでないときは TypeError になる。
     """
     data = json.loads(text)
     return [
@@ -86,11 +87,20 @@ def parse_issues(text: str) -> list[Issue]:
             updated_at=_parse_datetime(item["number"], item.get("updatedAt"), "updatedAt"),
             assignees=[a["login"] for a in item.get("assignees") or []],
             created_at=_parse_datetime(item["number"], item.get("createdAt"), "createdAt"),
-            milestone=(item.get("milestone") or {}).get("title"),
-            author=(item.get("author") or {}).get("login"),
+            milestone=_object_field(item.get("milestone"), "title"),
+            author=_object_field(item.get("author"), "login"),
         )
         for item in data
     ]
+
+
+def _object_field(value: object, key: str) -> str | None:
+    """`{"<key>": ...}` の形の項目から値を読む。null は None、オブジェクト以外は TypeError。"""
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise TypeError(f"オブジェクトではありません: {value!r}")
+    return value.get(key)
 
 
 def merge_issues(groups: list[list[Issue]]) -> list[Issue]:
