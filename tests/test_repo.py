@@ -232,6 +232,16 @@ def test_main_unreadable_gh_output(capsys, output, error):
     assert captured.out == ""
 
 
+@pytest.mark.parametrize("key", ["author", "milestone"])
+def test_main_gh_output_with_non_object_field(capsys, key):
+    item = {"number": 1, "title": "t", "labels": [], "url": "https://github.com/o/r/issues/1"}
+    output = json.dumps([{**item, key: "alice"}]).encode()
+    assert main(["--repo", "o/r"], run=FakeGh({"o/r": output})) == 1
+    captured = capsys.readouterr()
+    assert captured.err == "エラー: gh issue list の出力を読み込めません: o/r (TypeError)\n"
+    assert captured.out == ""
+
+
 def test_main_invalid_updated_at_in_gh_output(capsys):
     output = b'[{"number": 7, "title": "t", "labels": [], "url": "u", "updatedAt": "x"}]'
     assert main(["--repo", "o/r"], run=FakeGh({"o/r": output})) == 1
