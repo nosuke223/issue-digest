@@ -73,6 +73,7 @@ def format_json(
     show_milestone: bool = False,
     reverse: bool = False,
     hidden_labels: frozenset[str] = frozenset(),
+    show_author: bool = False,
 ) -> str:
     """分類結果を JSON のダイジェストにする。末尾は改行で終わる。
 
@@ -92,7 +93,8 @@ def format_json(
     headings に書かれた分類は、各分類の `title` をその文字列に置き換える。
     age が True のとき、各 Issue に `age_days`（作成からの経過日数。createdAt がなければ null）
     を加える。show_milestone が True のとき、各 Issue に `milestone`（マイルストーンの名前。
-    なければ null）を加える。
+    なければ null）を加える。show_author が True のとき、各 Issue に `author`
+    （作成者の login。なければ null）を加える。
     """
     if (stale_days is not None or age) and now is None:
         now = datetime.now(UTC)
@@ -115,6 +117,8 @@ def format_json(
                 item["stale_days"] = days
             if show_assignees:
                 item["assignees"] = list(issue.assignees)
+            if show_author:
+                item["author"] = issue.author or None
             if show_labels:
                 item["labels"] = _other_labels(issue, hidden_labels)
             if age:
@@ -225,6 +229,12 @@ def _assignees_mark(issue: Issue, show_assignees: bool) -> str:
     return "（担当: " + ", ".join(f"@{login}" for login in issue.assignees) + "）"
 
 
+def _author_mark(issue: Issue, show_author: bool) -> str:
+    if not show_author or not issue.author:
+        return ""
+    return f"（作成者: @{issue.author}）"
+
+
 def _milestone_mark(issue: Issue, show_milestone: bool) -> str:
     if not show_milestone or not issue.milestone:
         return ""
@@ -310,6 +320,7 @@ def format_digest(
     show_milestone: bool = False,
     reverse: bool = False,
     hidden_labels: frozenset[str] = frozenset(),
+    show_author: bool = False,
 ) -> str:
     """分類結果を Markdown のダイジェストにする。末尾は改行で終わる。
 
@@ -348,6 +359,8 @@ def format_digest(
     エスケープする）。
     reverse が True のとき、各分類の中の並びを（sort の後に）逆にする。limit と max_chars は
     逆にした後の並びに効く。
+    show_author が True のとき、作成者がある Issue の行末に `（作成者: @alice）` を付ける
+    （担当者の印の直後）。
     """
     if (stale_days is not None or age) and now is None:
         now = datetime.now(UTC)
@@ -377,6 +390,7 @@ def format_digest(
                 f"- {_issue_link(issue.number, issue.url)} {issue_title}"
                 f"{_stale_mark(issue, stale_days, now)}"
                 f"{_assignees_mark(issue, show_assignees)}"
+                f"{_author_mark(issue, show_author)}"
                 f"{_labels_mark(issue, show_labels, hidden_labels)}"
                 f"{_age_mark(issue, age, now)}"
                 f"{_milestone_mark(issue, show_milestone)}"
@@ -488,6 +502,7 @@ def format_digest_by_assignee(
     max_chars: int | None = None,
     show_milestone: bool = False,
     hidden_labels: frozenset[str] = frozenset(),
+    show_author: bool = False,
 ) -> str:
     """分類結果を、担当者ごとの見出しで並べた Markdown のダイジェストにする。
 
@@ -535,6 +550,7 @@ def format_digest_by_assignee(
                 f"- {_issue_link(issue.number, issue.url)} {issue_title}（{names}）"
                 f"{_stale_mark(issue, stale_days, now)}"
                 f"{_assignees_mark(issue, show_assignees)}"
+                f"{_author_mark(issue, show_author)}"
                 f"{_labels_mark(issue, show_labels, hidden_labels)}"
                 f"{_age_mark(issue, age, now)}"
                 f"{_milestone_mark(issue, show_milestone)}"

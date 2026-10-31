@@ -69,6 +69,7 @@ uv run issue-digest --repo owner/repo
 | `--max-chars <文字数>` | Markdown の出力全体を指定文字数以内に収める（収まらない分の Issue の行を `- ほか N 件` にする） | `uv run issue-digest --max-chars 2000 issues.json` |
 | `--summary` | 総件数の次に、分類ごとの件数を1行で出力する | `uv run issue-digest --summary issues.json` |
 | `--show-assignees` | 担当者がいる Issue に `（担当: @alice）` を付ける | `uv run issue-digest --show-assignees issues.json` |
+| `--show-author` | 作成者がある Issue に `（作成者: @alice）` を付ける | `uv run issue-digest --show-author issues.json` |
 | `--show-labels` | `agent:` で始まらないラベル（設定の `[category_labels]` に書いたラベルを除く）がある Issue に `（ラベル: bug, docs）` を付ける | `uv run issue-digest --show-labels issues.json` |
 | `--age` | 作成日時（`createdAt`）がある Issue に `（作成から12日）` を付ける | `uv run issue-digest --age issues.json` |
 | `--show-milestone` | マイルストーンがある Issue に `（マイルストーン: v1.0）` を付ける | `uv run issue-digest --show-milestone issues.json` |
@@ -125,7 +126,7 @@ uv run issue-digest --repo nosuke223/issue-digest
 uv run issue-digest --repo alpha/tools --repo beta/app --summary
 ```
 
-- 1つのリポジトリにつき、`gh issue list -R <OWNER/REPO> --state open -L 1000 --json number,title,labels,url,updatedAt,createdAt,assignees,milestone` を実行します。ほかのオプション（`--stale` など）に関係なく、毎回すべての項目を取得します。シェルは通しません。
+- 1つのリポジトリにつき、`gh issue list -R <OWNER/REPO> --state open -L 1000 --json number,title,labels,url,updatedAt,createdAt,assignees,milestone,author` を実行します。ほかのオプション（`--stale` など）に関係なく、毎回すべての項目を取得します。シェルは通しません。
 - 取得するのは開いている Issue だけです。閉じた Issue を取得するオプションや、取得件数の上限を変えるオプションはありません。
 - 1つのリポジトリで1000件を取得したときは、`警告: <リポジトリ> の Issue を1000件取得しました。これ以上ある場合は、一部が含まれていません` を標準エラーに出します（ダイジェストはいつもどおり出力し、終了コードは変わりません）。
 - 複数回指定でき、ファイル入力と混ぜて指定できます。取得した Issue は、ファイルから読んだ Issue と同じように1つにまとめます（URL が同じ Issue は最初の1件だけ。リポジトリ名の表示も同じ）。同じリポジトリ（大文字と小文字を区別しない）を2回指定してもエラーにせず、`gh` は1回だけ実行します。
@@ -239,6 +240,16 @@ gh issue list -L 1000 --json number,title,labels,url,updatedAt | uv run issue-di
 gh issue list -L 1000 --json number,title,labels,url,assignees | uv run issue-digest --show-assignees -
 ```
 
+### `--show-author`
+
+`--show-author` を付けると、作成者がある Issue の行の末尾に `（作成者: @alice）` を付けます。外部から来た Issue や、特定の人が作った Issue を見分けたいときに使います。
+作成者は入力の `author`（`{"login": "alice", ...}` の形）の `login` を、そのまま表示します（`app/dependabot` のようなボットの名前も変えません）。`author` がない、または `null` の Issue には何も付けません（エラーにしません）。
+`--show-author` を付けない場合の出力は変わりません。作成者での絞り込みや、作成者ごとの見出しはありません。
+
+```
+gh issue list -L 1000 --json number,title,labels,url,author | uv run issue-digest --show-author -
+```
+
 ### `--show-labels`
 
 `--show-labels` を付けると、`agent:` で始まらないラベルがある Issue の行の末尾に `（ラベル: bug, docs）` を付けます。`bug` や `docs` などのラベルも一緒に見たいときに使います。
@@ -349,7 +360,7 @@ uv run issue-digest --limit 5 --sort updated issues.json
 - 収まらないときは、最後の分類から順に、分類の末尾の Issue の行を1行ずつ削ります。最後の分類の Issue の行がなくなったら、1つ前の分類を削ります。
 - 削った分類の最後に `- ほか N 件` を出します。`--limit` で省いた件数とまとめて1行にします。
 - 削るのは分類の Issue の行だけです。見出し、件数、`--summary` の行、`--diff` の節（`## 前回からの変化`）は削りません。
-- `--stale`、`--show-assignees`、`--show-labels`、`--age`、`--show-milestone` の印を付けたときは、印を含めた行で数えます。リポジトリ名（`[owner/repo#12]`）も含めた行で数えます。
+- `--stale`、`--show-assignees`、`--show-author`、`--show-labels`、`--age`、`--show-milestone` の印を付けたときは、印を含めた行で数えます。リポジトリ名（`[owner/repo#12]`）も含めた行で数えます。
 - すべての Issue の行を削っても収まらないときは、そのまま出力し、標準エラーに `警告: Issue の行をすべて削っても --max-chars の N 文字に収まりません（M 文字）` を出します（終了コードは 0）。
 - 文字数は1以上の整数です。それ以外の値や値がない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
 - Markdown だけで使えます。コマンドラインの `--json` または `--csv` と同時に指定すると、エラーを標準エラーに出して終了コード 2 で終わります。設定ファイルの `json = true` は、`--max-chars` を指定したら使いません（Markdown を出します）。設定ファイルの `max_chars` でも指定できます（設定の `json = true` と一緒に書くとエラーです）。
@@ -464,7 +475,7 @@ uv run issue-digest --output digest.md issues.json
 
 前回の JSON は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since` を付けず、設定ファイル（`.issue-digest.toml` や `--config`）の `hide_empty`、`only`、`exclude`、`limit`、`since` も使わずに出力したものを前提とします。付けて出力した JSON を使うと、その JSON に入っていなかった Issue は「新しい Issue」として出ます。複数の分類に入る Issue で、前回は一部の分類にしか出ていなかったものは「分類が変わった Issue」として出ます。
 今回の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit`（設定ファイルの `only`、`exclude`、`hide_empty`、`limit` も）に関係なく、全分類の全件で行います。
-`--title`、`--stale`、`--show-assignees`、`--show-labels`、`--age`、`--show-milestone`、`--summary`、`--sort`、`--reverse`、`--diff` を付けて出力した JSON も、前回の JSON として使えます（増えた項目は読みません。`--sort` と `--reverse` は並びだけが変わります）。
+`--title`、`--stale`、`--show-assignees`、`--show-author`、`--show-labels`、`--age`、`--show-milestone`、`--summary`、`--sort`、`--reverse`、`--diff` を付けて出力した JSON も、前回の JSON として使えます（増えた項目は読みません。`--sort` と `--reverse` は並びだけが変わります）。
 
 前回の JSON が見つからない、JSON として読めない、または `--json` の出力の形でない（`total` と `categories` がない、分類の `label` が見出しのラベルでない、Issue に `number`、`title`、`url` がないなど）ときは、エラーを標準エラーに出して終了コード 1 で終わります。
 `--diff` の後にパスがない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
@@ -525,7 +536,7 @@ gh issue list -L 1000 --json number,title,labels,url | uv run issue-digest --jso
 `--config <パス>` で読むファイルを指定できます（このとき `.issue-digest.toml` は読みません）。指定したファイルがなければ、`エラー: 設定ファイルが見つかりません: <パス>` を標準エラーに出して終了コード 1 で終わります。
 ホームディレクトリなど、ほかの場所の設定ファイルは探しません。
 
-書けるキーは次の19個です。
+書けるキーは次の20個です。
 
 | キー | 型 | 対応するオプション |
 | --- | --- | --- |
@@ -538,6 +549,7 @@ gh issue list -L 1000 --json number,title,labels,url | uv run issue-digest --jso
 | `sort` | `"updated"` か `"created"` | `--sort updated` / `--sort created` |
 | `reverse` | 真偽値 | `--reverse` |
 | `show_assignees` | 真偽値 | `--show-assignees` |
+| `show_author` | 真偽値 | `--show-author` |
 | `show_labels` | 真偽値 | `--show-labels` |
 | `show_milestone` | 真偽値 | `--show-milestone` |
 | `age` | 真偽値 | `--age` |
@@ -699,7 +711,7 @@ uv run issue-digest --version
 - `--hide-empty`、`--only`、`--stale`、`--since`、`--sort`、`--reverse`、`--limit`、`--title`、`--output`、`--diff` は、どれも同時に使えます（`--csv` との併用は下の項目を参照）。
 - `--reverse` は `--sort` の後に並びを逆にし、そのあとで `--limit` と `--max-chars` が効きます（`--limit` は逆にした後の先頭から、`--max-chars` は逆にした後の末尾の行から）。
 - `--since` で絞るのは出力する Issue です。件数（総件数、分類ごとの件数、`--summary`）は絞った後の Issue で数えます。`--json`、`--csv` でも同じです。
-- `--diff` の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since` に関係なく全分類の全件で行います。`## 前回からの変化` の節の行には、`--stale`、`--show-assignees`、`--show-labels`、`--age`、`--show-milestone` の印を付けません。
+- `--diff` の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since` に関係なく全分類の全件で行います。`## 前回からの変化` の節の行には、`--stale`、`--show-assignees`、`--show-author`、`--show-labels`、`--age`、`--show-milestone` の印を付けません。
 - `--max-chars` は、Markdown を出すほかのオプションと同時に使えます。`--limit` と同時に指定すると、`--limit` で省いた後の出力をさらに削り、`- ほか N 件` の件数は両方で省いた件数の合計になります。`--output` と同時に指定すると、削った後の出力をファイルに書き出します（`--json`、`--csv`、`--group-by` との併用は下の項目を参照）。
 - `--exclude` は `--only` 以外と同時に使えます。`--only` と同時に指定するとエラーです。
 - `--json` と同時に指定した場合
@@ -708,6 +720,7 @@ uv run issue-digest --version
   - `--sort updated` または `--sort created` を同時に指定すると、各分類の `issues` の順が変わります。`--reverse` を同時に指定すると、`issues` の順が逆になります。
   - `--summary` は無視します（JSON には分類ごとの `count` があるため）。
   - `--show-assignees` を同時に指定すると、各 Issue に `"assignees": ["alice", "bob"]`（login の配列。担当者がいなければ空の配列）を加えます。`--show-assignees` を付けない JSON には `assignees` を出しません。
+  - `--show-author` を同時に指定すると、各 Issue に `"author": "bob"`（作成者の `login` の文字列。なければ `null`）を加えます。`--show-author` を付けない JSON には `author` を出しません。
   - `--show-labels` を同時に指定すると、各 Issue に `"labels": ["bug"]`（`agent:` で始まらず、設定ファイルの `[category_labels]` にも書いていないラベルの配列。なければ空の配列）を加えます。`--show-labels` を付けない JSON には `labels` を出しません。
   - `--age` を同時に指定すると、各 Issue に `"age_days": 12`（作成からの経過日数の整数。`createdAt` がなければ `null`）を加えます。`--age` を付けない JSON には `age_days` を出しません。
   - `--show-milestone` を同時に指定すると、各 Issue に `"milestone": "v1.0"`（マイルストーンの名前の文字列。なければ `null`）を加えます。`--show-milestone` を付けない JSON には `milestone` を出しません。
@@ -715,16 +728,16 @@ uv run issue-digest --version
 - `--json` と `--output <パス>` を同時に指定すると、JSON をファイルに書き出します。
 - `--csv` と同時に指定した場合
   - `--hide-empty`、`--only`、`--exclude`、`--since`、`--sort`、`--reverse`、`--limit`、`--output` は Markdown と同じように効きます（`--limit` は各分類の先頭から指定件数の行にします）。
-  - `--stale`、`--age`、`--show-assignees`、`--show-labels`、`--show-milestone`、`--summary`、`--title`、`--diff` は、CSV に対応する列や行がないので無視します（エラーにしません。`--diff` の前回の JSON も読みません）。
+  - `--stale`、`--age`、`--show-assignees`、`--show-author`、`--show-labels`、`--show-milestone`、`--summary`、`--title`、`--diff` は、CSV に対応する列や行がないので無視します（エラーにしません。`--diff` の前回の JSON も読みません）。
   - `--json` と同時に指定すると、`エラー: --json と --csv は同時に指定できません` を標準エラーに出して終了コード 2 で終わります。
 - コマンドラインの `--json` または `--csv` と `--max-chars` を同時に指定すると、`エラー: --max-chars は --json、--csv と同時に指定できません（Markdown だけで使えます）` を標準エラーに出して終了コード 2 で終わります。設定ファイルの `json = true` は `--max-chars` を指定したら使わないので、`--max-chars` と設定の `json = true` だけなら Markdown を出します（`--csv` を指定したときは、`--csv` との同時指定のエラーです）。
-- `--stale`、`--show-assignees`、`--show-labels`、`--age`、`--show-milestone` の印が付くときは、`（N日更新なし）（担当: @alice）（ラベル: bug）（作成から12日）（マイルストーン: v1.0）` の順です。
+- `--stale`、`--show-assignees`、`--show-author`、`--show-labels`、`--age`、`--show-milestone` の印が付くときは、`（N日更新なし）（担当: @alice）（作成者: @bob）（ラベル: bug）（作成から12日）（マイルストーン: v1.0）` の順です。
 - `--summary` の件数の行は、`--only` や `--hide-empty` に関係なく、常に6つの分類すべての件数を出します。
 - `--group-by assignee` と同時に指定した場合
   - `--only`、`--exclude`、`--since` は、出す Issue を絞ります。`--only`、`--exclude` では、選んだ分類のどれかに入る Issue だけを出し、行末の分類の名前も選んだ分類だけにします。
   - 見出しの総件数は、分類ごとのときと同じです（`--since` で絞った後の全件。`--only`、`--exclude` に関係なし）。
   - `--sort`、`--reverse`、`--limit` は各担当者の中で効きます（`--limit` で出さなかった Issue があれば、その担当者の最後に `- ほか N 件`。見出しの件数は全件のまま）。
-  - `--stale`、`--show-assignees`、`--show-labels`、`--age`、`--show-milestone` の印は、分類の名前の後ろに付きます（例: `（作業中, 着手可能）（13日更新なし）（担当: @alice）（ラベル: bug）（作成から12日）（マイルストーン: v1.0）`）。
+  - `--stale`、`--show-assignees`、`--show-author`、`--show-labels`、`--age`、`--show-milestone` の印は、分類の名前の後ろに付きます（例: `（作業中, 着手可能）（13日更新なし）（担当: @alice）（作成者: @bob）（ラベル: bug）（作成から12日）（マイルストーン: v1.0）`）。
   - `--summary` は、総件数の次に担当者ごとの件数を1行で出します（例: `@alice 2 / @bob 1 / 担当者なし 1`。順は見出しと同じ）。この行は `--only`、`--exclude` に関係なく、`--since` で絞った後の全件で数えます。出す Issue がなければ「なし」です。
   - `--hide-empty` は効果がありません（0件の担当者は出さないため）。
   - `--diff` の `## 前回からの変化` の節は、分類ごとのときと同じです。

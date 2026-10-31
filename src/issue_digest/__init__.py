@@ -27,7 +27,7 @@ USAGE = (
     " [--stale <日数>] [--age] [--since <YYYY-MM-DD | Nd>]"
     " [--json | --csv] [--sort updated|created] [--reverse] [--limit <件数>]"
     " [--max-chars <文字数>]"
-    " [--show-assignees]"
+    " [--show-assignees] [--show-author]"
     " [--show-labels] [--show-milestone] [--title <文字列>] [--output <パス>]"
     " [--diff <前回のJSONのパス>]"
     " [--config <パス>] [--group-by assignee] [--fail-if-any <ラベル>]..."
@@ -65,10 +65,12 @@ USAGE = (
     "最後の担当者から順に削る。--json、--csv とは同時に指定できない）\n"
     "  --json で Markdown の代わりに JSON を出力する\n"
     "  --csv で Markdown の代わりに CSV（見出し行 label,number,title,url,repository）を出力する"
-    "（--json とは同時に指定できない。--stale、--age、--show-assignees、--show-labels、"
-    "--show-milestone、--summary、--title は無視する）\n"
+    "（--json とは同時に指定できない。--stale、--age、--show-assignees、--show-author、"
+    "--show-labels、--show-milestone、--summary、--title は無視する）\n"
     "  --show-assignees で担当者を表示する（Markdown は行末に（担当: @alice）、"
     "JSON は各 Issue に assignees の配列を加える）\n"
+    "  --show-author で作成者を表示する（Markdown は担当者の印の直後に（作成者: @alice）、"
+    "JSON は各 Issue に author を加える。なければ null。入力は gh issue list --json の author）\n"
     "  --show-labels で agent: で始まらないラベルを表示する"
     "（設定ファイルの [category_labels] に書いたラベルも表示しない。"
     "Markdown は行末に（ラベル: bug, docs）、JSON は各 Issue に labels の配列を加える）\n"
@@ -89,7 +91,7 @@ USAGE = (
     "次回 issue-digest --diff last.json issues.json\n"
     "  --config で読む設定ファイルを指定する（省略時はカレントディレクトリの .issue-digest.toml。"
     "なければ使わない）。キーは hide_empty、summary、only、exclude、stale、since、sort、reverse、"
-    "show_assignees、show_labels、show_milestone、age、title、limit、max_chars、group_by、"
+    "show_assignees、show_author、show_labels、show_milestone、age、title、limit、max_chars、group_by、"
     "json、headings、category_labels で、コマンドラインの指定を優先する"
     '（since は "7d" のような日数の形の文字列だけで、--since を指定したら使わない。'
     "sort は updated か created、limit と max_chars は1以上の整数、"
@@ -143,6 +145,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--csv", action="store_true")
     parser.add_argument("--show-assignees", action="store_true")
+    parser.add_argument("--show-author", action="store_true")
     parser.add_argument("--show-labels", action="store_true")
     parser.add_argument("--age", action="store_true")
     parser.add_argument("--show-milestone", action="store_true")
@@ -268,6 +271,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None, run: Runner
     # 設定の reverse = true は、コマンドラインで打ち消せない（ほかの真偽値のキーと同じ）
     reverse = opts.reverse or config.get("reverse", False)
     show_assignees = opts.show_assignees or config.get("show_assignees", False)
+    show_author = opts.show_author or config.get("show_author", False)
     show_labels = opts.show_labels or config.get("show_labels", False)
     show_milestone = opts.show_milestone or config.get("show_milestone", False)
     output: str | None = opts.output
@@ -487,8 +491,8 @@ def main(argv: list[str] | None = None, now: datetime | None = None, run: Runner
             )
             return 1
     if as_csv:
-        # CSV に列のない --stale、--age、--show-assignees、--show-labels、--show-milestone、
-        # --summary、--title、--diff は無視する
+        # CSV に列のない --stale、--age、--show-assignees、--show-author、--show-labels、
+        # --show-milestone、--summary、--title、--diff は無視する
         digest = format_csv(
             classified, hide_empty, only_filter, sort, exclude_filter, limit, reverse
         )
@@ -512,6 +516,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None, run: Runner
             show_milestone,
             reverse,
             hidden_labels,
+            show_author,
         )
     elif group_by == "assignee":
         # 0件の担当者の見出しは出さないので、--hide-empty は効果がない
@@ -534,6 +539,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None, run: Runner
             max_chars,
             show_milestone,
             hidden_labels,
+            show_author,
         )
     else:
         digest = format_digest(
@@ -556,6 +562,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None, run: Runner
             show_milestone,
             reverse,
             hidden_labels,
+            show_author,
         )
     if max_chars is not None and len(digest) > max_chars:
         print(

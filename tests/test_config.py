@@ -58,6 +58,12 @@ def test_config_show_assignees(in_tmp_dir, capsys):
     assert "担当者が2人の Issue（担当: @bob, @alice）\n" in capsys.readouterr().out
 
 
+def test_config_show_author(in_tmp_dir, capsys):
+    write_config(in_tmp_dir, "show_author = true\n")
+    assert main([str(DATA / "author.json")]) == 0
+    assert "作成者がある Issue（作成者: @bob）\n" in capsys.readouterr().out
+
+
 def test_config_option_selects_file(in_tmp_dir, capsys):
     path = write_config(in_tmp_dir, "hide_empty = true\n", name="other.toml")
     assert main(["--config", str(path), ISSUES]) == 0
@@ -174,6 +180,7 @@ def test_command_line_csv_takes_precedence_over_config_json(in_tmp_dir, capsys):
         ('hide_empty = "yes"\n', "hide_empty"),
         ("summary = 1\n", "summary"),
         ("show_assignees = 0\n", "show_assignees"),
+        ("show_author = 0\n", "show_author"),
         ('json = "true"\n', "json"),
         ('only = "agent:ready"\n', "only"),
         ("only = [1]\n", "only"),

@@ -3,7 +3,7 @@ import subprocess
 from collections.abc import Callable
 
 # --stale などの指定に関係なく、ダイジェストに使うすべての項目を毎回取得する
-FIELDS = "number,title,labels,url,updatedAt,createdAt,assignees,milestone"
+FIELDS = "number,title,labels,url,updatedAt,createdAt,assignees,milestone,author"
 LIMIT = 1000
 TIMEOUT_SECONDS = 60
 
