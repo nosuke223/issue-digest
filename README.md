@@ -216,7 +216,7 @@ gh issue list -L 1000 --json number,title,labels,url,updatedAt | uv run issue-di
 - `7d` のように `<整数>d` の形で日数も指定できます。基準時刻の N 日前以降に更新された Issue を出し、ちょうど N 日前に更新された Issue も出ます。cron などで日付を書き換えずに使えます。
   - `N` は0以上の整数（半角数字のみ）で、`0d` も使えます。`d` は小文字だけです。`7D`、`7days`、`-1d`、`1.5d`、`d`、`1w` はエラーです。`h`（時間）や `w`（週）の単位はありません。
   - 基準時刻は `--stale`、`--age` と同じです。実行の最初に現在時刻を1回だけ決め、`--since`、`--stale`、`--age` のすべてがそれを使います。
-  - `2026-10-01` と `7d` の同時指定はできません。
+  - `--since` は1つの値しか使えません。`--since 2026-10-01 --since 7d` のように複数回指定しても、エラーにはならず、最後の指定（この例では `7d`）だけを使います。
 - `updatedAt` がない Issue は出ません。
 - 絞った後の Issue が、見出しの総件数、分類ごとの件数、`--summary` の対象になります。
 - 日付としても `<整数>d` としても読めない値（`2026-02-30` のようなない日付を含む）のときは、`エラー: --since には YYYY-MM-DD の形の日付か、7d のような日数を指定してください: <値>` を標準エラーに出して終了コード 2 で終わります。
@@ -313,7 +313,7 @@ gh issue list -L 1000 --json number,title,labels,url,updatedAt | uv run issue-di
 `--sort created` を付けると、各分類の中の Issue を `createdAt`（作成日時）の古い順に並べます。古くからある Issue を優先して片付けたいときに使います。
 並べ方の決まりは `--sort updated` と同じです。`createdAt` が同じ Issue は既定の並び（リポジトリ名の順、同じリポジトリの中は番号の小さい順）、`createdAt` がない Issue は分類の末尾に既定の並びで並べます。分類の順番は変わりません。
 入力の各 Issue の `createdAt`（ISO 8601 形式。例: `2026-10-20T12:34:56Z`）は省略できます。日時として読めない値のときは、その入力のパス（標準入力は `-（標準入力）`）を付けたエラー（例: `エラー: bad.json: Issue #4 の createdAt を日時として読めません: xx`）を標準エラーに出して終了コード 1 で終わります。
-`--sort updated` と `--sort` なしの動作は変わりません。`--sort` は1つの値しか指定できないため、`updated` と `created` は同時に使えません。
+`--sort updated` と `--sort` なしの動作は変わりません。`--sort` は1つの値しか使えません。`--sort updated --sort created` のように複数回指定しても、エラーにはならず、最後の指定（この例では `created`）だけを使います。
 
 ```
 gh issue list -L 1000 --json number,title,labels,url,createdAt | uv run issue-digest --sort created -
