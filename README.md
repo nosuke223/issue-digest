@@ -475,7 +475,7 @@ uv run issue-digest --output digest.md issues.json
 どれも変化がなければ、節の中に「変化なし」だけを出します。
 
 前回の JSON は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since` を付けず、設定ファイル（`.issue-digest.toml` や `--config`）の `hide_empty`、`only`、`exclude`、`limit`、`since` も使わずに出力したものを前提とします。付けて出力した JSON を使うと、その JSON に入っていなかった Issue は「新しい Issue」として出ます。複数の分類に入る Issue で、前回は一部の分類にしか出ていなかったものは「分類が変わった Issue」として出ます。
-今回の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit`（設定ファイルの `only`、`exclude`、`hide_empty`、`limit` も）に関係なく、全分類の全件で行います。
+今回の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since`（設定ファイルの `only`、`exclude`、`hide_empty`、`limit`、`since` も）に関係なく、全分類の全件で行います。
 `--title`、`--stale`、`--show-assignees`、`--show-author`、`--show-labels`、`--age`、`--show-milestone`、`--summary`、`--sort`、`--reverse`、`--diff` を付けて出力した JSON も、前回の JSON として使えます（増えた項目は読みません。`--sort` と `--reverse` は並びだけが変わります）。
 
 前回の JSON が見つからない、JSON として読めない、または `--json` の出力の形でない（`total` と `categories` がない、分類の `label` が見出しのラベルでない、Issue に `number`、`title`、`url` がないなど）ときは、エラーを標準エラーに出して終了コード 1 で終わります。
@@ -712,8 +712,8 @@ cron や CI で終了コードによって処理を分けたいときの一覧�
 | 終了コード | 意味 | 起きる例 |
 | --- | --- | --- |
 | 0 | 正常 | ダイジェストを出力した。`--fail-if-any` を付けたときは、指定した分類のどれにも Issue がなかった |
-| 1 | 実行時のエラー | 入力のファイルが読めない（`エラー: ファイルが見つかりません: <パス>`）、`--output` のファイルを書き出せない、`gh` が失敗した、`updatedAt` や `createdAt` が日時として読めない |
-| 2 | オプションの指定のエラー | `--fail-if-any` や `--only` に知らない値を指定した、`--only` と `--exclude` のように同時に使えないものを指定した、`--repo` の形の誤り、設定ファイルの誤り |
+| 1 | 実行時のエラー | 入力のファイルが読めない（`エラー: ファイルが見つかりません: <パス>`）、設定ファイルが見つからない・読めない（`エラー: 設定ファイルが見つかりません: <パス>`）、`--diff` の前回の JSON が見つからない・形が違う、`--output` のファイルを書き出せない、`gh` が失敗した、`updatedAt` や `createdAt` が日時として読めない |
+| 2 | オプションの指定のエラー | `--fail-if-any` や `--only` に知らない値を指定した、`--only` と `--exclude` のように同時に使えないものを指定した、`--repo` の形の誤り、設定ファイルの中身の誤り（TOML として読めない、知らないキー、値の型や形の誤り） |
 | 3 | `--fail-if-any` で指定した分類に Issue がある | `--fail-if-any agent:ready` を付けて、着手可能の分類に Issue が1件以上あった |
 
 - エラー（1 か 2）のときは、3 より 1 か 2 を優先します。`--fail-if-any` の分類に Issue があっても、エラーなら 3 にはなりません。
