@@ -1,0 +1,49 @@
+[
+  {
+    "number": 1,
+    "title": "9月30日の終わりの Issue",
+    "labels": [{"name": "agent:ready", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/1",
+    "assignees": [{"login": "alice"}],
+    "updatedAt": "2026-09-30T23:59:59Z"
+  },
+  {
+    "number": 2,
+    "title": "10月1日の0時ちょうどの Issue",
+    "labels": [{"name": "agent:ready", "color": "0e8a16"}],
+    "url": "https://github.com/example/repo/issues/2",
+    "assignees": [{"login": "alice"}],
+    "updatedAt": "2026-10-01T00:00:00Z"
+  },
+  {
+    "number": 3,
+    "title": "10月31日の終わりの Issue",
+    "labels": [{"name": "agent:review", "color": "fbca04"}],
+    "url": "https://github.com/example/repo/issues/3",
+    "assignees": [{"login": "bob"}],
+    "updatedAt": "2026-10-31T23:59:59Z"
+  },
+  {
+    "number": 4,
+    "title": "11月1日の0時ちょうどの Issue",
+    "labels": [{"name": "agent:blocked", "color": "d93f0b"}],
+    "url": "https://github.com/example/repo/issues/4",
+    "assignees": [],
+    "updatedAt": "2026-11-01T00:00:00Z"
+  },
+  {
+    "number": 5,
+    "title": "日本時間では11月1日、UTC では10月31日の Issue",
+    "labels": [{"name": "agent:review", "color": "fbca04"}],
+    "url": "https://github.com/example/repo/issues/5",
+    "assignees": [],
+    "updatedAt": "2026-11-01T08:00:00+09:00"
+  },
+  {
+    "number": 6,
+    "title": "updatedAt がない Issue",
+    "labels": [{"name": "agent:working", "color": "1d76db"}],
+    "url": "https://github.com/example/repo/issues/6",
+    "assignees": []
+  }
+]

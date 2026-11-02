@@ -307,4 +307,4 @@ def test_main_usage_mentions_diff(capsys):
     out = capsys.readouterr().out
     assert "[--diff <前回のJSONのパス>]" in out
     assert "--diff last.json" in out
-    assert "--limit、--since を付けず" in out
+    assert "--limit、--since、--until を付けず" in out
