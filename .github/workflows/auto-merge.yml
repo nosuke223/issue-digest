@@ -1,6 +1,7 @@
 # エージェントの PR が自動マージの条件を満たしているかを判定する（agent-env の PLAN.md「自動マージの方式」）。
-# 試運転の段階なので、判定の結果を PR にコメントするだけで、マージはしない。
-# 止めるときは、リポジトリの変数 AUTO_MERGE を off にする（Settings → Secrets and variables → Actions → Variables）。
+# リポジトリの変数 AUTO_MERGE が on なら、条件を満たした PR を承認してマージする。未設定か dry-run なら、
+# 判定の結果を PR にコメントするだけ（試運転）。止めるときは off にする（Settings → Secrets and variables → Actions → Variables）。
+# 承認には、Settings → Actions → General の「Allow GitHub Actions to create and approve pull requests」が要る。
 #
 # PR のブランチのコードを動かさないよう、main で動くきっかけ（定期、手動、テストの完了、コメント）だけを使う。
 name: 自動マージの判定
@@ -17,8 +18,8 @@ on:
     types: [created, edited]
 
 permissions:
-  contents: read
-  issues: read
+  contents: write # マージ
+  issues: write # マージ後に Issue の agent:* のラベルを外す
   pull-requests: write
   checks: read
 
