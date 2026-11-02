@@ -25,7 +25,7 @@ from issue_digest.loader import (
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
     " [--stale <日数>] [--age] [--since <YYYY-MM-DD | Nd>] [--until <YYYY-MM-DD>]"
-    " [--json | --csv] [--sort updated|created] [--reverse] [--limit <件数>]"
+    " [--json | --csv] [--sort updated|created|number] [--reverse] [--limit <件数>]"
     " [--max-chars <文字数>]"
     " [--show-assignees] [--show-author]"
     " [--show-labels] [--show-milestone] [--title <文字列>] [--output <パス>]"
@@ -56,7 +56,8 @@ USAGE = (
     "--since の日付（7d なら基準時刻から直した日付）が --until より後ならエラー。"
     "updatedAt がない Issue、件数、--diff の扱いは --since と同じ。設定ファイルには書けない）\n"
     "  --sort updated で各分類の中を最終更新の古い順に並べる"
-    "（--sort created なら作成日時の古い順）\n"
+    "（--sort created なら作成日時の古い順、--sort number なら番号の小さい順。"
+    "番号が同じ Issue は既定の並び）\n"
     "  --reverse で各分類（--group-by assignee のときは各担当者）の中の並びを逆にする"
     "（--sort がなければリポジトリ名と番号の逆順、--sort があれば新しい順。"
     "--limit と --max-chars は逆にした後の並びに効く。--diff の節の並びは変わらない）\n"
@@ -98,7 +99,7 @@ USAGE = (
     "show_assignees、show_author、show_labels、show_milestone、age、title、limit、max_chars、group_by、"
     "json、fail_if_any、headings、category_labels で、コマンドラインの指定を優先する"
     '（since は "7d" のような日数の形の文字列だけで、--since を指定したら使わない。'
-    "sort は updated か created、limit と max_chars は1以上の整数、"
+    "sort は updated、created、number のどれか、limit と max_chars は1以上の整数、"
     'group_by は "assignee"、title は1文字以上の文字列）'
     "（only と exclude は --only か --exclude を指定したら使わず、"
     "両方を書くとエラー。fail_if_any は --fail-if-any を指定したら使わない。"
@@ -294,9 +295,9 @@ def main(argv: list[str] | None = None, now: datetime | None = None, run: Runner
             return 2
         stale_days = int(opts.stale)
     sort: str | None = opts.sort if opts.sort is not None else config.get("sort")
-    if sort is not None and sort not in ("updated", "created"):
+    if sort is not None and sort not in ("updated", "created", "number"):
         print(
-            f"エラー: --sort に指定できる値は updated か created です: {sort}",
+            f"エラー: --sort に指定できる値は updated、created、number のどれかです: {sort}",
             file=sys.stderr,
         )
         return 2

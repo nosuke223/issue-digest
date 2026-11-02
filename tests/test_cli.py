@@ -396,7 +396,7 @@ def test_main_sort_invalid_value(capsys, value):
     assert main(["--sort", value, str(DATA / "sort.json")]) == 2
     captured = capsys.readouterr()
     assert "--sort" in captured.err
-    assert "updated か created" in captured.err
+    assert "updated、created、number" in captured.err
     assert captured.out == ""
 
 
