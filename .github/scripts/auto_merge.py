@@ -7,7 +7,8 @@
     GH_TOKEN       GitHub Actions のトークン
     REPO           所有者/リポジトリ
     AGENT_ACCOUNT  エージェントの GitHub アカウント
-    AUTO_MERGE     off: 何もしない / dry-run（未設定も同じ）: 判定の結果をコメントするだけ
+    AUTO_MERGE     off: 何もしない / dry-run（未設定も同じ）: 判定の結果をコメントするだけ /
+                   on: 条件を満たしたら承認してマージする
 
 標準ライブラリと gh だけで動く。このファイルは agent-env の template/ から配置したもので、
 テストは agent-env の setup/test_auto_merge.py にある（変更も agent-env で行う）。
@@ -26,9 +27,12 @@ CODEX_BOT = "chatgpt-codex-connector[bot]"
 CODEX_STATE_RE = re.compile(r"<!-- codex-review-state:v1 (\{.*?\}) -->", re.DOTALL)
 AUTO_LABEL = "merge:auto"
 TEST_CHECK = "test"
-# 判定のコメントの印。result は判定の結果と理由の要約で、変わったときだけコメントし直す
-MARKER = "<!-- auto-merge-check sha={sha} result={result} -->"
-MARKER_RE = re.compile(r"<!-- auto-merge-check sha=(\w+) result=(\w+) -->")
+# 判定のコメントの印。result は判定の結果と理由の要約で、変わったときだけコメントし直す。
+# verdict（ok / ng / error）と mode（dry-run / on）は、ランナーが通知を決めるのに読む
+MARKER = "<!-- auto-merge-check sha={sha} result={result} verdict={verdict} mode={mode} -->"
+MARKER_RE = re.compile(
+    r"<!-- auto-merge-check sha=(\w+) result=(\w+)(?: verdict=([\w-]+) mode=([\w-]+))? -->"
+)
 # 変えていたら人が見る（ルール、設定、CI、依存）
 CAREFUL_PREFIXES = (".github/", ".claude/", ".env")
 CAREFUL_NAMES = {"pyproject.toml", "uv.lock", "CLAUDE.md", "AGENTS.md"}
@@ -182,14 +186,23 @@ def result_digest(verdict: str, reasons: list[str]) -> str:
     return hashlib.sha256("\n".join([verdict, *reasons]).encode()).hexdigest()[:12]
 
 
-def comment_body(verdict: str, reasons: list[str], sha: str) -> str:
-    if verdict == "ok":
-        text = "🤖 自動マージの判定（試運転）: 条件を満たしています。本番ならマージします。"
+def comment_body(verdict: str, reasons: list[str], sha: str, mode: str = "dry-run") -> str:
+    """verdict は ok / ng / error（条件は満たしたが、承認かマージに失敗した）。"""
+    listed = "\n\n" + "\n".join(f"- {r}" for r in reasons) if reasons else ""
+    if mode != "on":
+        if verdict == "ok":
+            text = "🤖 自動マージの判定（試運転）: 条件を満たしています。本番ならマージします。"
+        else:
+            text = "🤖 自動マージの判定（試運転）: 条件を満たしていません。" + listed
+    elif verdict == "ok":
+        text = "🤖 自動マージ: 条件を満たしたので、承認してマージしました。"
+    elif verdict == "error":
+        text = "🤖 自動マージ: 条件は満たしましたが、マージできませんでした。" + listed
     else:
-        text = "🤖 自動マージの判定（試運転）: 条件を満たしていません。\n\n" + "\n".join(
-            f"- {r}" for r in reasons
-        )
-    marker = MARKER.format(sha=sha, result=result_digest(verdict, reasons))
+        text = "🤖 自動マージ: 条件を満たしていないので、マージしません。" + listed
+    marker = MARKER.format(
+        sha=sha, result=result_digest(verdict, reasons), verdict=verdict, mode=mode
+    )
     return f"{text}\n\n対象のコミット: `{sha[:7]}`\n{marker}"
 
 
@@ -238,18 +251,74 @@ def collect(repo: str, owner: str, pr: dict) -> tuple[int | None, dict | None]:
     return number, facts
 
 
-def already_commented(comments: list, sha: str, verdict: str, reasons: list[str]) -> bool:
-    """このコミットへの最後の判定のコメントが、同じ結果と理由か。
-
-    同じコミットでも、テストの再実行や所有者のコメントで結果が変わることがあるので、
-    結果か理由が変わったらコメントし直す。
-    """
+def last_marker(comments: list, sha: str) -> re.Match | None:
+    """このコミットへの最後の判定のコメントの印。"""
     last = None
     for c in comments:
         for m in MARKER_RE.finditer(c.get("body") or ""):
             if m.group(1) == sha:
-                last = m.group(2)
-    return last == result_digest(verdict, reasons)
+                last = m
+    return last
+
+
+def already_commented(
+    comments: list, sha: str, verdict: str, reasons: list[str], mode: str = "dry-run"
+) -> bool:
+    """このコミットへの最後の判定のコメントが、同じ結果と理由と動きか。
+
+    同じコミットでも、テストの再実行や所有者のコメントで結果が変わることがあるので、
+    結果か理由が変わったらコメントし直す。試運転から本番に切り替えたときも、本番の処理をする。
+    """
+    last = last_marker(comments, sha)
+    if not last or last.group(2) != result_digest(verdict, reasons):
+        return False
+    return (last.group(4) or "dry-run") == mode
+
+
+def merge_failed(comments: list, sha: str) -> bool:
+    """このコミットで、前にマージに失敗したか。失敗は人が見るので、同じコミットでは繰り返さない。
+
+    最後の判定だけでなく、そのコミットへのすべての判定を見る（失敗の後に別の判定が出ることがあるため）。
+    """
+    for c in comments:
+        for m in MARKER_RE.finditer(c.get("body") or ""):
+            if m.group(1) == sha and m.group(3) == "error":
+                return True
+    return False
+
+
+def gh(*args: str) -> None:
+    subprocess.run(["gh", *args], capture_output=True, text=True, check=True)
+
+
+def approve_and_merge(repo: str, pr: int, sha: str) -> None:
+    """承認してマージする。判定したコミットのままのときだけマージする。
+
+    直前に push されていたら、マージは失敗する。
+    """
+    gh(
+        "pr",
+        "review",
+        str(pr),
+        "-R",
+        repo,
+        "--approve",
+        "--body",
+        "自動マージの条件を満たしたため、承認します。",
+    )
+    gh("pr", "merge", str(pr), "-R", repo, "--merge", "--match-head-commit", sha)
+
+
+def remove_agent_labels(repo: str, issue: int) -> None:
+    """Issue の agent:* のラベルを外す。
+
+    Actions のトークンでマージすると、GitHub の決まりで Issue が閉じたことが別の Actions に届かず、
+    いつもラベルを外す「エージェントのラベルを外す」が動かないため、ここで行う。
+    """
+    data = gh_api(f"repos/{repo}/issues/{issue}")
+    for label in data.get("labels", []):
+        if label["name"].startswith("agent:"):
+            gh("issue", "edit", str(issue), "-R", repo, "--remove-label", label["name"])
 
 
 def main() -> int:
@@ -257,6 +326,8 @@ def main() -> int:
     if mode == "off":
         print("AUTO_MERGE=off のため、何もしません")
         return 0
+    if mode != "on":
+        mode = "dry-run"
     repo = os.environ["REPO"]
     owner = repo.split("/", 1)[0]
     agent = os.environ["AGENT_ACCOUNT"]
@@ -268,14 +339,29 @@ def main() -> int:
             continue
         verdict, reasons = judge(facts)
         sha = pr["head"]["sha"]
+        comments = facts["pr_comments"]
         print(f"PR #{pr['number']}（Issue #{number}）: {verdict} {reasons}")
-        if verdict == "wait" or already_commented(facts["pr_comments"], sha, verdict, reasons):
+        if verdict == "wait" or already_commented(comments, sha, verdict, reasons, mode):
             continue
-        body = comment_body(verdict, reasons, sha)
-        subprocess.run(
-            ["gh", "pr", "comment", str(pr["number"]), "-R", repo, "--body", body], check=True
-        )
+        if mode == "on" and verdict == "ok":
+            if merge_failed(comments, sha):
+                continue
+            try:
+                approve_and_merge(repo, pr["number"], sha)
+            except subprocess.CalledProcessError as e:
+                error = (e.stderr or "").strip() or f"終了コード {e.returncode}"
+                print(f"PR #{pr['number']}: マージに失敗しました: {error}")
+                comment(repo, pr["number"], comment_body("error", [error], sha, mode))
+                continue
+            comment(repo, pr["number"], comment_body("ok", [], sha, mode))
+            remove_agent_labels(repo, number)
+            continue
+        comment(repo, pr["number"], comment_body(verdict, reasons, sha, mode))
     return 0
+
+
+def comment(repo: str, pr: int, body: str) -> None:
+    gh("pr", "comment", str(pr), "-R", repo, "--body", body)
 
 
 if __name__ == "__main__":
