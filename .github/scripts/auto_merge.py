@@ -261,20 +261,30 @@ def last_marker(comments: list, sha: str) -> re.Match | None:
     return last
 
 
-def already_commented(comments: list, sha: str, verdict: str, reasons: list[str]) -> bool:
-    """このコミットへの最後の判定のコメントが、同じ結果と理由か。
+def already_commented(
+    comments: list, sha: str, verdict: str, reasons: list[str], mode: str = "dry-run"
+) -> bool:
+    """このコミットへの最後の判定のコメントが、同じ結果と理由と動きか。
 
     同じコミットでも、テストの再実行や所有者のコメントで結果が変わることがあるので、
-    結果か理由が変わったらコメントし直す。
+    結果か理由が変わったらコメントし直す。試運転から本番に切り替えたときも、本番の処理をする。
     """
     last = last_marker(comments, sha)
-    return bool(last) and last.group(2) == result_digest(verdict, reasons)
+    if not last or last.group(2) != result_digest(verdict, reasons):
+        return False
+    return (last.group(4) or "dry-run") == mode
 
 
 def merge_failed(comments: list, sha: str) -> bool:
-    """このコミットで、前にマージに失敗したか。失敗は人が見るので、同じコミットでは繰り返さない。"""
-    last = last_marker(comments, sha)
-    return bool(last) and last.group(3) == "error"
+    """このコミットで、前にマージに失敗したか。失敗は人が見るので、同じコミットでは繰り返さない。
+
+    最後の判定だけでなく、そのコミットへのすべての判定を見る（失敗の後に別の判定が出ることがあるため）。
+    """
+    for c in comments:
+        for m in MARKER_RE.finditer(c.get("body") or ""):
+            if m.group(1) == sha and m.group(3) == "error":
+                return True
+    return False
 
 
 def gh(*args: str) -> None:
@@ -331,7 +341,7 @@ def main() -> int:
         sha = pr["head"]["sha"]
         comments = facts["pr_comments"]
         print(f"PR #{pr['number']}（Issue #{number}）: {verdict} {reasons}")
-        if verdict == "wait" or already_commented(comments, sha, verdict, reasons):
+        if verdict == "wait" or already_commented(comments, sha, verdict, reasons, mode):
             continue
         if mode == "on" and verdict == "ok":
             if merge_failed(comments, sha):
