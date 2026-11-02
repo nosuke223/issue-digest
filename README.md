@@ -65,6 +65,7 @@ uv run issue-digest --repo owner/repo
 | `--until <日付>` | 最終更新が指定日（`YYYY-MM-DD`）の UTC の終わりまで（翌日0時より前）の Issue だけを出力する（`--since` と一緒に使うと期間で絞れる） | `uv run issue-digest --since 2026-10-01 --until 2026-10-31 issues.json` |
 | `--sort updated` | 各分類の中を最終更新の古い順に並べる | `uv run issue-digest --sort updated issues.json` |
 | `--sort created` | 各分類の中を作成日時の古い順に並べる | `uv run issue-digest --sort created issues.json` |
+| `--sort number` | 各分類の中を Issue の番号の小さい順に並べる | `uv run issue-digest --sort number issues.json` |
 | `--reverse` | 各分類の中の並びを逆にする（`--sort` がなければリポジトリ名と番号の逆順、あれば新しい順） | `uv run issue-digest --reverse issues.json` |
 | `--limit <件数>` | 各分類で、先頭から指定件数だけ Issue を出力する | `uv run issue-digest --limit 5 issues.json` |
 | `--max-chars <文字数>` | Markdown の出力全体を指定文字数以内に収める（収まらない分の Issue の行を `- ほか N 件` にする） | `uv run issue-digest --max-chars 2000 issues.json` |
@@ -325,7 +326,7 @@ uv run issue-digest --summary issues.json
 
 `--sort updated` を付けると、各分類の中の Issue を `updatedAt`（最終更新）の古い順に並べます。止まっている Issue を見つけやすくするために使います。
 `updatedAt` が同じ Issue は既定の並び（リポジトリ名の順、同じリポジトリの中は番号の小さい順。「リポジトリ名の表示」を参照）、`updatedAt` がない Issue は分類の末尾に既定の並びで並べます。分類の順番は変わりません。
-`--sort` に指定できる値は `updated` と `created` です。それ以外の値や値がない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
+`--sort` に指定できる値は `updated`、`created`、`number` の3つです。それ以外の値や値がない場合は、エラーを標準エラーに出して終了コード 2 で終わります。
 `--sort` を付けない場合の並び順（既定の並び）は変わりません。
 
 ```
@@ -343,12 +344,24 @@ gh issue list -L 1000 --json number,title,labels,url,updatedAt | uv run issue-di
 gh issue list -L 1000 --json number,title,labels,url,createdAt | uv run issue-digest --sort created -
 ```
 
+### `--sort number`
+
+`--sort number` を付けると、各分類の中の Issue を番号の小さい順に並べます。複数のリポジトリの Issue をまとめたとき（既定はリポジトリ名の順）に、番号の順で見たいときに使います。
+番号が同じ Issue（別のリポジトリの同じ番号）は既定の並び（リポジトリ名の順）で並べます。分類の順番は変わりません。日時は使わないので、入力に `updatedAt` や `createdAt` がなくても同じように並びます。
+`--reverse` と一緒なら番号の大きい順になります（番号が同じ Issue は既定の並びの逆）。`--limit`、`--max-chars`、`--json`、`--csv`、`--group-by assignee` との関係は、`--sort updated` / `--sort created` と同じです。
+`--sort` は1つの値しか使えず、複数回指定したときは最後の指定だけを使います。設定ファイルの `sort = "number"` でも指定でき、`--sort` を指定したら設定の値は使いません。
+
+```
+uv run issue-digest --sort number alpha.json beta.json
+```
+
 ### `--reverse`
 
 `--reverse` を付けると、各分類の中の Issue の並びを逆にします。新しい Issue から順に見たいときに使います。`--group-by assignee` のときは、各担当者の中の並びを逆にします。分類や担当者の順番は変わりません。
 
 - `--sort` がなければ、既定の並び（リポジトリ名の順、同じリポジトリの中は番号の小さい順）を逆にします。入力が1つのリポジトリだけなら、番号の大きい順になります。
 - `--sort updated` / `--sort created` と一緒なら、`--sort` で並べた結果をそのまま逆にするので、新しい順になります（同じ日時の Issue は既定の並びの逆。`updatedAt`・`createdAt` がない Issue は、逆にするので分類の先頭に既定の並びの逆で並びます）。
+- `--sort number` と一緒なら、番号の大きい順になります（番号が同じ Issue は既定の並びの逆）。
 - `--limit` は逆にした後の先頭から数えます（`--reverse --limit 5` で、新しい5件）。
 - `--max-chars` で削るのは、逆にした後の末尾の行です。
 - `--json`、`--csv` でも同じように並びが変わります。
@@ -570,7 +583,7 @@ gh issue list -L 1000 --json number,title,labels,url | uv run issue-digest --jso
 | `exclude` | 文字列の配列（`--exclude` と同じ6つのラベル） | `--exclude` |
 | `stale` | 0以上の整数 | `--stale` |
 | `since` | `"7d"` のような `<整数>d` の形の文字列（日付の形は書けない） | `--since 7d` |
-| `sort` | `"updated"` か `"created"` | `--sort updated` / `--sort created` |
+| `sort` | `"updated"`、`"created"`、`"number"` のどれか | `--sort updated` / `--sort created` / `--sort number` |
 | `reverse` | 真偽値 | `--reverse` |
 | `show_assignees` | 真偽値 | `--show-assignees` |
 | `show_author` | 真偽値 | `--show-author` |
@@ -767,7 +780,7 @@ if [ "$status" -eq 3 ]; then notify "判断待ちか中断の Issue がありま
 - `--json` と同時に指定した場合
   - `--hide-empty`、`--only`、`--exclude` は Markdown と同じように効き、出力する分類が変わります。
   - `--stale` を同時に指定すると、印が付く Issue にだけ `stale_days`（経過日数）を加えます。
-  - `--sort updated` または `--sort created` を同時に指定すると、各分類の `issues` の順が変わります。`--reverse` を同時に指定すると、`issues` の順が逆になります。
+  - `--sort updated`、`--sort created`、`--sort number` のどれかを同時に指定すると、各分類の `issues` の順が変わります。`--reverse` を同時に指定すると、`issues` の順が逆になります。
   - `--summary` は無視します（JSON には分類ごとの `count` があるため）。
   - `--show-assignees` を同時に指定すると、各 Issue に `"assignees": ["alice", "bob"]`（login の配列。担当者がいなければ空の配列）を加えます。`--show-assignees` を付けない JSON には `assignees` を出しません。
   - `--show-author` を同時に指定すると、各 Issue に `"author": "bob"`（作成者の `login` の文字列。なければ `null`）を加えます。`--show-author` を付けない JSON には `author` を出しません。
