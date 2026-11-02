@@ -841,6 +841,68 @@ def test_main_non_object_author_or_milestone_on_stdin(capsys, monkeypatch, key):
     assert captured.out == ""
 
 
+WRONG_TYPE_FIELDS = [
+    {"title": 5},
+    {"number": "1"},
+    {"number": True},
+    {"url": 1},
+    {"labels": [{"name": 1}]},
+    {"labels": [{"name": None}]},
+    {"milestone": {"title": 1}},
+    {"author": {"login": 1}},
+    {"assignees": [{"login": 1}]},
+    {"assignees": [{"login": None}]},
+]
+
+
+@pytest.mark.parametrize("fields", WRONG_TYPE_FIELDS)
+@pytest.mark.parametrize(
+    "extra",
+    [
+        [],
+        ["--show-labels", "--show-milestone", "--show-author", "--show-assignees"],
+        ["--json"],
+        ["--json", "--show-milestone", "--show-author", "--show-assignees"],
+        ["--csv"],
+    ],
+)
+def test_main_wrong_type_field_in_file(capsys, tmp_path, fields, extra):
+    item = {"number": 1, "title": "t", "labels": [], "url": "https://github.com/o/r/issues/1"}
+    path = tmp_path / "bad.json"
+    path.write_text(json.dumps([{**item, **fields}]), encoding="utf-8")
+    assert main([*extra, str(path)]) == 1
+    captured = capsys.readouterr()
+    assert captured.err == f"エラー: ファイルを読み込めません: {path} (TypeError)\n"
+    assert captured.out == ""
+
+
+@pytest.mark.parametrize("fields", WRONG_TYPE_FIELDS)
+def test_main_wrong_type_field_on_stdin(capsys, monkeypatch, fields):
+    item = {"number": 1, "title": "t", "labels": [], "url": "https://github.com/o/r/issues/1"}
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps([{**item, **fields}])))
+    assert main(["-"]) == 1
+    captured = capsys.readouterr()
+    assert captured.err == "エラー: 標準入力を読み込めません (TypeError)\n"
+    assert captured.out == ""
+
+
+def test_main_null_milestone_title_and_author_login_are_ignored(capsys, tmp_path):
+    item = {
+        "number": 1,
+        "title": "t",
+        "labels": [],
+        "url": "https://github.com/o/r/issues/1",
+        "milestone": {"title": None},
+        "author": {},
+    }
+    path = tmp_path / "issues.json"
+    path.write_text(json.dumps([item]), encoding="utf-8")
+    assert main(["--show-milestone", "--show-author", str(path)]) == 0
+    captured = capsys.readouterr()
+    assert "（マイルストーン:" not in captured.out
+    assert "（作成者:" not in captured.out
+
+
 def test_main_null_author_and_milestone_are_ignored(capsys, tmp_path):
     item = {"number": 1, "title": "t", "labels": [], "url": "https://github.com/o/r/issues/1"}
     path = tmp_path / "null.json"

@@ -76,16 +76,19 @@ def parse_issues(text: str) -> list[Issue]:
     `milestone`（`{"title": "v1.0"}` の形）も任意。ないとき、null のときはマイルストーンなし。
     `author`（`{"login": "alice"}` の形）も任意。ないとき、null のときは作成者なし。
     `milestone` と `author` がオブジェクトでないときは TypeError になる。
+    項目の型が `gh` の出力と違うとき（`number` が整数でない、`title`、`url`、
+    `labels` の各 `name`、`assignees` の各 `login` が文字列でない、
+    `milestone` の `title`、`author` の `login` が文字列でも null でもない）も TypeError になる。
     """
     data = json.loads(text)
     return [
         Issue(
-            number=item["number"],
-            title=item["title"],
-            labels=[label["name"] for label in item["labels"]],
-            url=item["url"],
+            number=_int(item["number"]),
+            title=_str(item["title"]),
+            labels=[_str(label["name"]) for label in item["labels"]],
+            url=_str(item["url"]),
             updated_at=_parse_datetime(item["number"], item.get("updatedAt"), "updatedAt"),
-            assignees=[a["login"] for a in item.get("assignees") or []],
+            assignees=[_str(a["login"]) for a in item.get("assignees") or []],
             created_at=_parse_datetime(item["number"], item.get("createdAt"), "createdAt"),
             milestone=_object_field(item.get("milestone"), "title"),
             author=_object_field(item.get("author"), "login"),
@@ -94,13 +97,29 @@ def parse_issues(text: str) -> list[Issue]:
     ]
 
 
+def _int(value: object) -> int:
+    """整数であることを確かめる。整数でなければ（真偽値も）TypeError。"""
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise TypeError(f"整数ではありません: {value!r}")
+    return value
+
+
+def _str(value: object) -> str:
+    """文字列であることを確かめる。文字列でなければ TypeError。"""
+    if not isinstance(value, str):
+        raise TypeError(f"文字列ではありません: {value!r}")
+    return value
+
+
 def _object_field(value: object, key: str) -> str | None:
-    """`{"<key>": ...}` の形の項目から値を読む。null は None、オブジェクト以外は TypeError。"""
+    """`{"<key>": ...}` の形の項目から値を読む。null は None、オブジェクト以外は TypeError。
+    値は文字列か null（または無い）で、それ以外は TypeError。"""
     if value is None:
         return None
     if not isinstance(value, dict):
         raise TypeError(f"オブジェクトではありません: {value!r}")
-    return value.get(key)
+    field_value = value.get(key)
+    return None if field_value is None else _str(field_value)
 
 
 def merge_issues(groups: list[list[Issue]]) -> list[Issue]:
