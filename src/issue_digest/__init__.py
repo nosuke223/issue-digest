@@ -54,6 +54,7 @@ USAGE = (
     "  --until で最終更新（updatedAt）が指定日（YYYY-MM-DD）の UTC の終わりまで（翌日0時より前）の"
     "Issue だけを出す（指定日に更新された Issue も出る。--since と一緒に指定すると期間で絞れる。"
     "--since の日付（7d なら基準時刻から直した日付）が --until より後ならエラー。"
+    "--since がないときは設定ファイルの since の日付も同じように比べる。"
     "updatedAt がない Issue、件数、--diff の扱いは --since と同じ。設定ファイルには書けない）\n"
     "  --sort updated で各分類の中を最終更新の古い順に並べる"
     "（--sort created なら作成日時の古い順、--sort number なら番号の小さい順。"
@@ -359,13 +360,17 @@ def main(argv: list[str] | None = None, now: datetime | None = None, run: Runner
                 file=sys.stderr,
             )
             return 2
-        # --since の日付（7d の形なら基準時刻から直した UTC の日付）と日付どうしで比べる
-        if (
-            opts.since is not None
-            and since is not None
-            and since.astimezone(UTC).date() > until_day.date()
-        ):
-            print("エラー: --since は --until より前の日付にしてください", file=sys.stderr)
+        # --since の日付（7d の形なら基準時刻から直した UTC の日付）と日付どうしで比べる。
+        # 設定の since（--since がないときだけ使う）も同じ決まりで比べる
+        if since is not None and since.astimezone(UTC).date() > until_day.date():
+            if opts.since is not None:
+                print("エラー: --since は --until より前の日付にしてください", file=sys.stderr)
+            else:
+                print(
+                    f"エラー: 設定ファイルの since（{config['since']}）は"
+                    " --until より前の日付にしてください",
+                    file=sys.stderr,
+                )
             return 2
         try:
             # UTC のその日の終わりまで（翌日0時より前）
