@@ -92,18 +92,20 @@ USAGE = (
     "  --config で読む設定ファイルを指定する（省略時はカレントディレクトリの .issue-digest.toml。"
     "なければ使わない）。キーは hide_empty、summary、only、exclude、stale、since、sort、reverse、"
     "show_assignees、show_author、show_labels、show_milestone、age、title、limit、max_chars、group_by、"
-    "json、headings、category_labels で、コマンドラインの指定を優先する"
+    "json、fail_if_any、headings、category_labels で、コマンドラインの指定を優先する"
     '（since は "7d" のような日数の形の文字列だけで、--since を指定したら使わない。'
     "sort は updated か created、limit と max_chars は1以上の整数、"
     'group_by は "assignee"、title は1文字以上の文字列）'
     "（only と exclude は --only か --exclude を指定したら使わず、"
-    "両方を書くとエラー。reverse = true は常に有効。"
+    "両方を書くとエラー。fail_if_any は --fail-if-any を指定したら使わない。"
+    "reverse = true は常に有効。"
     "json = true は --csv、--group-by、--max-chars を指定したら使わない。"
     "group_by と max_chars は --json か --csv を指定したら使わず、"
     "設定の json = true と一緒に書くとエラー）\n"
     '    例: hide_empty = true / stale = 7 / limit = 5 / only = ["agent:review", "agent:blocked"]'
     ' / exclude = ["unclassified"] / reverse = true'
-    ' / age = true / show_milestone = true / max_chars = 2000 / group_by = "assignee"\n'
+    ' / age = true / show_milestone = true / max_chars = 2000 / group_by = "assignee"'
+    ' / fail_if_any = ["agent:blocked"]\n'
     "    [headings] テーブルで分類の見出しを変えられる"
     '（例: [headings] の下に "agent:review" = "確認待ち"）\n'
     "    [category_labels] テーブルで各分類に割り当てる GitHub ラベルを変えられる"
@@ -389,7 +391,8 @@ def main(argv: list[str] | None = None, now: datetime | None = None, run: Runner
     if only and exclude:
         print("エラー: --only と --exclude は同時に指定できません", file=sys.stderr)
         return 2
-    fail_if_any: list[str] = opts.fail_if_any
+    # コマンドラインで --fail-if-any を指定しないときだけ、設定の fail_if_any を使う
+    fail_if_any: list[str] = opts.fail_if_any or config.get("fail_if_any", [])
     for option, labels in (
         ("--only", only),
         ("--exclude", exclude),
