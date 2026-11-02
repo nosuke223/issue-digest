@@ -252,6 +252,13 @@ def test_main_gh_output_with_non_object_field(capsys, key):
         {"milestone": {"title": 1}},
         {"author": {"login": 1}},
         {"assignees": [{"login": 1}]},
+        {"labels": {}},
+        {"labels": ""},
+        {"labels": None},
+        {"labels": ["bug"]},
+        {"assignees": False},
+        {"assignees": {}},
+        {"assignees": ["alice"]},
     ],
 )
 def test_main_gh_output_with_wrong_type_field(capsys, fields):

@@ -852,6 +852,18 @@ WRONG_TYPE_FIELDS = [
     {"author": {"login": 1}},
     {"assignees": [{"login": 1}]},
     {"assignees": [{"login": None}]},
+    {"labels": {}},
+    {"labels": ""},
+    {"labels": None},
+    {"labels": {"agent:ready": 1}},
+    {"labels": "bug"},
+    {"labels": ["bug"]},
+    {"assignees": False},
+    {"assignees": 0},
+    {"assignees": ""},
+    {"assignees": {}},
+    {"assignees": "alice"},
+    {"assignees": ["alice"]},
 ]
 
 

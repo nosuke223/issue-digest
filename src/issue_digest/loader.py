@@ -72,7 +72,9 @@ def parse_issues(text: str) -> list[Issue]:
 
     各 Issue の `updatedAt` と `createdAt`（ISO 8601 形式）は任意。
     ないときや null のときは None になる。
-    `assignees`（`[{"login": "alice"}]` の形）も任意。ないとき、null、空のときは担当者なし。
+    `assignees`（`[{"login": "alice"}]` の形）も任意。ないとき、null、空の配列のときは担当者なし。
+    `labels` と `assignees` が配列でない（空のオブジェクトや false なども）とき、
+    配列の要素がオブジェクトでないときは TypeError になる。
     `milestone`（`{"title": "v1.0"}` の形）も任意。ないとき、null のときはマイルストーンなし。
     `author`（`{"login": "alice"}` の形）も任意。ないとき、null のときは作成者なし。
     `milestone` と `author` がオブジェクトでないときは TypeError になる。
@@ -85,10 +87,10 @@ def parse_issues(text: str) -> list[Issue]:
         Issue(
             number=_int(item["number"]),
             title=_str(item["title"]),
-            labels=[_str(label["name"]) for label in item["labels"]],
+            labels=[_str(label["name"]) for label in _objects(item["labels"])],
             url=_str(item["url"]),
             updated_at=_parse_datetime(item["number"], item.get("updatedAt"), "updatedAt"),
-            assignees=[_str(a["login"]) for a in item.get("assignees") or []],
+            assignees=[_str(a["login"]) for a in _objects(item.get("assignees"), allow_null=True)],
             created_at=_parse_datetime(item["number"], item.get("createdAt"), "createdAt"),
             milestone=_object_field(item.get("milestone"), "title"),
             author=_object_field(item.get("author"), "login"),
@@ -108,6 +110,19 @@ def _str(value: object) -> str:
     """文字列であることを確かめる。文字列でなければ TypeError。"""
     if not isinstance(value, str):
         raise TypeError(f"文字列ではありません: {value!r}")
+    return value
+
+
+def _objects(value: object, allow_null: bool = False) -> list[dict]:
+    """オブジェクトの配列であることを確かめる。配列でない、または要素がオブジェクトでなければ
+    TypeError。`allow_null` のときだけ null を空の配列として扱う。"""
+    if value is None and allow_null:
+        return []
+    if not isinstance(value, list):
+        raise TypeError(f"配列ではありません: {value!r}")
+    for element in value:
+        if not isinstance(element, dict):
+            raise TypeError(f"オブジェクトではありません: {element!r}")
     return value
 
 
