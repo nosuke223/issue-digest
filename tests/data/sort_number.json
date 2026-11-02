@@ -1,0 +1,38 @@
+[
+  {
+    "number": 5,
+    "title": "alpha の5番",
+    "labels": [{"name": "agent:ready"}],
+    "url": "https://github.com/alpha/tools/issues/5"
+  },
+  {
+    "number": 2,
+    "title": "beta の2番",
+    "labels": [{"name": "agent:ready"}],
+    "url": "https://github.com/beta/app/issues/2"
+  },
+  {
+    "number": 2,
+    "title": "alpha の2番",
+    "labels": [{"name": "agent:ready"}],
+    "url": "https://github.com/alpha/tools/issues/2"
+  },
+  {
+    "number": 1,
+    "title": "beta の1番",
+    "labels": [{"name": "agent:ready"}],
+    "url": "https://github.com/beta/app/issues/1"
+  },
+  {
+    "number": 4,
+    "title": "beta の4番（レビュー待ち）",
+    "labels": [{"name": "agent:review"}],
+    "url": "https://github.com/beta/app/issues/4"
+  },
+  {
+    "number": 3,
+    "title": "alpha の3番（レビュー待ち）",
+    "labels": [{"name": "agent:review"}],
+    "url": "https://github.com/alpha/tools/issues/3"
+  }
+]

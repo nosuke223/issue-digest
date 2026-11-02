@@ -100,9 +100,10 @@ def _validate(data: dict[str, Any]) -> dict[str, Any]:
             if not isinstance(value, str) or value == "":
                 raise ConfigError("設定ファイルの title には1文字以上の文字列を指定してください")
         elif key == "sort":
-            if value not in ("updated", "created"):
+            if value not in ("updated", "created", "number"):
                 raise ConfigError(
-                    f'設定ファイルの sort には "updated" か "created" を指定してください: {value}'
+                    "設定ファイルの sort には "
+                    f'"updated"、"created"、"number" のどれかを指定してください: {value}'
                 )
         elif key in ("only", "exclude", "fail_if_any"):
             if not isinstance(value, list) or not all(isinstance(v, str) for v in value):

@@ -280,14 +280,22 @@ def _selected_categories(
             continue
         if hide_empty and not issues:
             continue
-        if sort == "updated":
-            issues = _sort_by_date(issues, "updated_at")
-        elif sort == "created":
-            issues = _sort_by_date(issues, "created_at")
+        issues = _apply_sort(issues, sort)
         if reverse:
             issues = issues[::-1]
         selected.append((category, issues))
     return selected
+
+
+def _apply_sort(issues: list[Issue], sort: str | None) -> list[Issue]:
+    """sort（updated / created / number）に応じて並べる。None なら入力の並びのまま。"""
+    if sort == "updated":
+        return _sort_by_date(issues, "updated_at")
+    if sort == "created":
+        return _sort_by_date(issues, "created_at")
+    if sort == "number":
+        return sorted(issues, key=lambda i: (i.number, i.order))
+    return issues
 
 
 def _sort_by_date(issues: list[Issue], attr: str) -> list[Issue]:
@@ -535,10 +543,7 @@ def format_digest_by_assignee(
     sections: list[_Section] = []
     for login, issues in groups:
         heading = f"## {_assignee_heading(login)} - {len(issues)}件"
-        if sort == "updated":
-            issues = _sort_by_date(issues, "updated_at")
-        elif sort == "created":
-            issues = _sort_by_date(issues, "created_at")
+        issues = _apply_sort(issues, sort)
         if reverse:
             issues = issues[::-1]
         shown = issues if limit is None else issues[:limit]
