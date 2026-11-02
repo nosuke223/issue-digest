@@ -309,12 +309,14 @@ def approve_and_merge(repo: str, pr: int, sha: str) -> None:
     gh("pr", "merge", str(pr), "-R", repo, "--merge", "--match-head-commit", sha)
 
 
-def remove_agent_labels(repo: str, issue: int) -> None:
-    """Issue の agent:* のラベルを外す。
+def close_issue(repo: str, issue: int) -> None:
+    """Issue を「完了」で閉じ、agent:* のラベルを外す。
 
-    Actions のトークンでマージすると、GitHub の決まりで Issue が閉じたことが別の Actions に届かず、
-    いつもラベルを外す「エージェントのラベルを外す」が動かないため、ここで行う。
+    Actions のトークンでマージすると、PR の `Closes` があっても Issue は閉じない。
+    閉じたことも別の Actions に届かず、いつもラベルを外す「エージェントのラベルを外す」も動かない。
+    そのため、ここで両方を行う。「完了」で閉じるのは、ランナーが着手の条件を「済み」と読むため。
     """
+    gh("issue", "close", str(issue), "-R", repo, "--reason", "completed")
     data = gh_api(f"repos/{repo}/issues/{issue}")
     for label in data.get("labels", []):
         if label["name"].startswith("agent:"):
@@ -354,7 +356,7 @@ def main() -> int:
                 comment(repo, pr["number"], comment_body("error", [error], sha, mode))
                 continue
             comment(repo, pr["number"], comment_body("ok", [], sha, mode))
-            remove_agent_labels(repo, number)
+            close_issue(repo, number)
             continue
         comment(repo, pr["number"], comment_body(verdict, reasons, sha, mode))
     return 0
