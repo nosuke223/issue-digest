@@ -62,6 +62,7 @@ uv run issue-digest --repo owner/repo
 | `--exclude <ラベル>` | 指定したラベルの分類を出力しない（複数回指定できる。`--only` とは同時に使えない） | `uv run issue-digest --exclude unclassified issues.json` |
 | `--stale <日数>` | 最終更新から指定日数以上たった Issue に `（N日更新なし）` を付ける | `uv run issue-digest --stale 7 issues.json` |
 | `--since <日付>` | 最終更新が指定日（`YYYY-MM-DD`、UTC の0時）以降、または `7d` のように基準時刻の N 日前以降の Issue だけを出力する | `uv run issue-digest --since 2026-10-01 issues.json` / `uv run issue-digest --since 7d issues.json` |
+| `--until <日付>` | 最終更新が指定日（`YYYY-MM-DD`）の UTC の終わりまで（翌日0時より前）の Issue だけを出力する（`--since` と一緒に使うと期間で絞れる） | `uv run issue-digest --since 2026-10-01 --until 2026-10-31 issues.json` |
 | `--sort updated` | 各分類の中を最終更新の古い順に並べる | `uv run issue-digest --sort updated issues.json` |
 | `--sort created` | 各分類の中を作成日時の古い順に並べる | `uv run issue-digest --sort created issues.json` |
 | `--reverse` | 各分類の中の並びを逆にする（`--sort` がなければリポジトリ名と番号の逆順、あれば新しい順） | `uv run issue-digest --reverse issues.json` |
@@ -228,6 +229,28 @@ gh issue list -L 1000 --json number,title,labels,url,updatedAt | uv run issue-di
 ```
 gh issue list -L 1000 --json number,title,labels,url,updatedAt | uv run issue-digest --since 2026-10-01 -
 gh issue list -L 1000 --json number,title,labels,url,updatedAt | uv run issue-digest --since 7d -
+```
+
+### `--until <日付>`
+
+`--until <日付>` を付けると、最終更新（`updatedAt`）が指定日の終わりまでの Issue だけを出力します。`--since` と一緒に使うと、「先月に動いた Issue」のように期間を区切って見られます。
+
+- 日付は `YYYY-MM-DD` の形で、UTC のその日の終わりまで（翌日の `T00:00:00Z` より前）を対象にします。指定した日に更新された Issue も出ます。時刻やタイムゾーンは指定できません。`7d` のような日数の形は使えません。
+- `--until` だけでも使えます。このときは指定日の終わりまでに更新された Issue をすべて出します。
+- `--since` と一緒に指定すると、両方の条件に合う Issue だけを出します。`--since 2026-10-01 --until 2026-10-31` なら、10月1日0時から10月31日の終わりまで（10月31日に更新された Issue も含む）に更新された Issue です。同じ日を指定すると、その日1日分です。
+- `--since` の日付が `--until` の日付より後のときは、`エラー: --since は --until より前の日付にしてください` を標準エラーに出して終了コード 2 で終わります。`--since` が `7d` の形のときは、基準時刻の N 日前を UTC の日付に直して比べます（例: 基準時刻が 2026-11-02 12時なら、`--since 1d` は11月1日なので `--until 2026-10-31` とはエラー、`--since 2d` は10月31日なのでエラーにならない）。この検査はコマンドラインの `--since` だけが対象で、設定ファイルの `since` とは比べません（両方の条件で絞るので、合う Issue がなければ0件になります）。
+- `updatedAt` がない Issue は出ません（`--since` と同じ）。
+- 日付として読めない値（`2026-02-30` のようなない日付を含む）のときは、`エラー: --until には YYYY-MM-DD の形の日付を指定してください: <値>` を標準エラーに出して終了コード 2 で終わります。日付の順の検査より先に行います。
+- `--until` は1つの値しか使えません。複数回指定しても、エラーにはならず、最後の指定だけを使います（`--since` と同じ）。
+- 絞った後の Issue が、見出しの総件数、分類ごとの件数、`--summary`、`--fail-if-any` の判定の対象になります。`--diff` の比較は、絞り込みに関係なく全件で行います。
+- Markdown、`--json`、`--csv`、`--group-by assignee` のどれでも効きます。
+- 設定ファイルには書けません（日付が固定されて古くなるため。設定の `since` が日付の形を受け付けないのと同じ理由です）。`until` を書くと、`エラー: 設定ファイルに知らないキーがあります: until` を標準エラーに出して終了コード 2 で終わります。
+
+`--until` を付けない場合の出力は変わりません。
+
+```
+gh issue list -L 1000 --json number,title,labels,url,updatedAt | uv run issue-digest --since 2026-10-01 --until 2026-10-31 -
+gh issue list -L 1000 --json number,title,labels,url,updatedAt | uv run issue-digest --until 2026-10-31 -
 ```
 
 ### `--show-assignees`
@@ -474,8 +497,8 @@ uv run issue-digest --output digest.md issues.json
 どれかに変化があるときは3つの小見出し（`### 新しい Issue - 1件` など）をすべて出し、0件の小見出しには「なし」を出します。各小見出しの中は、リポジトリ名の順、同じリポジトリの中は Issue 番号の小さい順です（リポジトリ名がない Issue は最後に番号の小さい順）。
 どれも変化がなければ、節の中に「変化なし」だけを出します。
 
-前回の JSON は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since` を付けず、設定ファイル（`.issue-digest.toml` や `--config`）の `hide_empty`、`only`、`exclude`、`limit`、`since` も使わずに出力したものを前提とします。付けて出力した JSON を使うと、その JSON に入っていなかった Issue は「新しい Issue」として出ます。複数の分類に入る Issue で、前回は一部の分類にしか出ていなかったものは「分類が変わった Issue」として出ます。
-今回の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since`（設定ファイルの `only`、`exclude`、`hide_empty`、`limit`、`since` も）に関係なく、全分類の全件で行います。
+前回の JSON は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since`、`--until` を付けず、設定ファイル（`.issue-digest.toml` や `--config`）の `hide_empty`、`only`、`exclude`、`limit`、`since` も使わずに出力したものを前提とします。付けて出力した JSON を使うと、その JSON に入っていなかった Issue は「新しい Issue」として出ます。複数の分類に入る Issue で、前回は一部の分類にしか出ていなかったものは「分類が変わった Issue」として出ます。
+今回の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since`、`--until`（設定ファイルの `only`、`exclude`、`hide_empty`、`limit`、`since` も）に関係なく、全分類の全件で行います。
 `--title`、`--stale`、`--show-assignees`、`--show-author`、`--show-labels`、`--age`、`--show-milestone`、`--summary`、`--sort`、`--reverse`、`--diff` を付けて出力した JSON も、前回の JSON として使えます（増えた項目は読みません。`--sort` と `--reverse` は並びだけが変わります）。
 
 前回の JSON が見つからない、JSON として読めない、または `--json` の出力の形でない（`total` と `categories` がない、分類の `label` が見出しのラベルでない、Issue に `number`、`title`、`url` がないなど）ときは、エラーを標準エラーに出して終了コード 1 で終わります。
@@ -563,7 +586,7 @@ gh issue list -L 1000 --json number,title,labels,url | uv run issue-digest --jso
 | `headings` | テーブル（`[headings]`）。キーは `--only` と同じ6つのラベル、値は1文字以上の文字列 | なし（下の「分類の見出しを変える」を参照） |
 | `category_labels` | テーブル（`[category_labels]`）。キーは `unclassified` 以外の5つの分類の名前、値は1文字以上の文字列を1つ以上入れた配列 | なし（下の「分類に使うラベルを変える」を参照） |
 
-`--output`、`--version` など、上に挙げていないオプションは設定できません。
+`--output`、`--until`、`--version` など、上に挙げていないオプションは設定できません。
 
 - コマンドラインの指定が設定ファイルより優先されます。`--stale 3` は設定の `stale` を上書きします。
 - 設定の `only` と `exclude` は、コマンドラインで `--only` か `--exclude` を1つでも指定したら、どちらも使いません。指定しないときだけ使います。
@@ -689,7 +712,7 @@ gh issue list -L 1000 --json number,title,labels,url,assignees | uv run issue-di
 複数回指定でき、どれか1つの分類に1件以上あれば終了コード 3 です。どの分類にもなければ、終了コード 0 で終わります。
 
 - ダイジェストはいつもどおり出力します。`--output` があるときは、ファイルに書き出してから終了コード 3 で終わります。
-- 判定に使う件数は、`--since` で絞った後の件数です。`--only`、`--exclude`、`--hide-empty`、`--limit`、`--max-chars` には左右されないので、出力に出ていない分類でも判定します。
+- 判定に使う件数は、`--since`、`--until` で絞った後の件数です。`--only`、`--exclude`、`--hide-empty`、`--limit`、`--max-chars` には左右されないので、出力に出ていない分類でも判定します。
 - 指定できるラベルは `--only` と同じ6つ（`agent:ready`、`agent:working`、`agent:review`、`agent:needs-decision`、`agent:blocked`、`unclassified`）です。これは分類の名前で、設定ファイルの `[category_labels]` で分類に使うラベルを変えても変わりません。それ以外を指定すると、エラーを標準エラーに出して終了コード 2 で終わります。`--fail-if-any` の後に値がない場合も終了コード 2 です。
 - エラー（終了コード 1、2）になるときは、今までと同じ終了コードで終わります（3 にはなりません）。ファイルに書き出せないときも終了コード 1 です。
 - Markdown、`--json`、`--csv`、`--group-by` のどれでも効きます。
@@ -733,12 +756,12 @@ if [ "$status" -eq 3 ]; then notify "判断待ちか中断の Issue がありま
 
 ### 組み合わせ
 
-- 入力を複数指定したときも、すべてのオプションは入力が1つのときと同じように効きます。まとめた後の Issue（URL が同じものは最初の1件だけ）が、件数、`--since`、`--only`、`--exclude`、`--sort`、`--reverse`、`--limit`、`--max-chars`、`--summary`、`--group-by`、`--diff`、`--fail-if-any` の対象です。設定ファイルに入力を書くキーはありません。
-- `--repo` は、ほかのオプションすべてと同時に使えます。取得した Issue は、ファイルから読んだ Issue と同じように、件数、`--since`、`--only`、`--exclude`、`--sort`、`--reverse`、`--limit`、`--max-chars`、`--summary`、`--group-by`、`--diff`、`--fail-if-any`、`--json`、`--csv` の対象です。`--repo` での取得に失敗したとき（終了コード 1）は、`--output` のファイルを書き出さず、`--fail-if-any` の判定もしません。
-- `--hide-empty`、`--only`、`--stale`、`--since`、`--sort`、`--reverse`、`--limit`、`--title`、`--output`、`--diff` は、どれも同時に使えます（`--csv` との併用は下の項目を参照）。
+- 入力を複数指定したときも、すべてのオプションは入力が1つのときと同じように効きます。まとめた後の Issue（URL が同じものは最初の1件だけ）が、件数、`--since`、`--until`、`--only`、`--exclude`、`--sort`、`--reverse`、`--limit`、`--max-chars`、`--summary`、`--group-by`、`--diff`、`--fail-if-any` の対象です。設定ファイルに入力を書くキーはありません。
+- `--repo` は、ほかのオプションすべてと同時に使えます。取得した Issue は、ファイルから読んだ Issue と同じように、件数、`--since`、`--until`、`--only`、`--exclude`、`--sort`、`--reverse`、`--limit`、`--max-chars`、`--summary`、`--group-by`、`--diff`、`--fail-if-any`、`--json`、`--csv` の対象です。`--repo` での取得に失敗したとき（終了コード 1）は、`--output` のファイルを書き出さず、`--fail-if-any` の判定もしません。
+- `--hide-empty`、`--only`、`--stale`、`--since`、`--until`、`--sort`、`--reverse`、`--limit`、`--title`、`--output`、`--diff` は、どれも同時に使えます（`--csv` との併用は下の項目を参照）。
 - `--reverse` は `--sort` の後に並びを逆にし、そのあとで `--limit` と `--max-chars` が効きます（`--limit` は逆にした後の先頭から、`--max-chars` は逆にした後の末尾の行から）。
-- `--since` で絞るのは出力する Issue です。件数（総件数、分類ごとの件数、`--summary`）は絞った後の Issue で数えます。`--json`、`--csv` でも同じです。
-- `--diff` の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since` に関係なく全分類の全件で行います。`## 前回からの変化` の節の行には、`--stale`、`--show-assignees`、`--show-author`、`--show-labels`、`--age`、`--show-milestone` の印を付けません。
+- `--since`、`--until` で絞るのは出力する Issue です。件数（総件数、分類ごとの件数、`--summary`）は絞った後の Issue で数えます。`--json`、`--csv` でも同じです。両方を指定すると、両方の条件に合う Issue だけを出します。`--since` の日付が `--until` の日付より後ならエラー（終了コード 2）です。
+- `--diff` の比較は、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--since`、`--until` に関係なく全分類の全件で行います。`## 前回からの変化` の節の行には、`--stale`、`--show-assignees`、`--show-author`、`--show-labels`、`--age`、`--show-milestone` の印を付けません。
 - `--max-chars` は、Markdown を出すほかのオプションと同時に使えます。`--limit` と同時に指定すると、`--limit` で省いた後の出力をさらに削り、`- ほか N 件` の件数は両方で省いた件数の合計になります。`--output` と同時に指定すると、削った後の出力をファイルに書き出します（`--json`、`--csv`、`--group-by` との併用は下の項目を参照）。
 - `--exclude` は `--only` 以外と同時に使えます。`--only` と同時に指定するとエラーです。
 - `--json` と同時に指定した場合
@@ -754,24 +777,24 @@ if [ "$status" -eq 3 ]; then notify "判断待ちか中断の Issue がありま
   - `--diff` を同時に指定すると、末尾に `diff`（`added`、`removed`、`moved`）を加えます。`--diff` を付けない JSON には `diff` を出しません。
 - `--json` と `--output <パス>` を同時に指定すると、JSON をファイルに書き出します。
 - `--csv` と同時に指定した場合
-  - `--hide-empty`、`--only`、`--exclude`、`--since`、`--sort`、`--reverse`、`--limit`、`--output` は Markdown と同じように効きます（`--limit` は各分類の先頭から指定件数の行にします）。
+  - `--hide-empty`、`--only`、`--exclude`、`--since`、`--until`、`--sort`、`--reverse`、`--limit`、`--output` は Markdown と同じように効きます（`--limit` は各分類の先頭から指定件数の行にします）。
   - `--stale`、`--age`、`--show-assignees`、`--show-author`、`--show-labels`、`--show-milestone`、`--summary`、`--title`、`--diff` は、CSV に対応する列や行がないので無視します（エラーにしません。`--diff` の前回の JSON も読みません）。
   - `--json` と同時に指定すると、`エラー: --json と --csv は同時に指定できません` を標準エラーに出して終了コード 2 で終わります。
 - コマンドラインの `--json` または `--csv` と `--max-chars` を同時に指定すると、`エラー: --max-chars は --json、--csv と同時に指定できません（Markdown だけで使えます）` を標準エラーに出して終了コード 2 で終わります。設定ファイルの `json = true` は `--max-chars` を指定したら使わないので、`--max-chars` と設定の `json = true` だけなら Markdown を出します（`--csv` を指定したときは、`--csv` との同時指定のエラーです）。
 - `--stale`、`--show-assignees`、`--show-author`、`--show-labels`、`--age`、`--show-milestone` の印が付くときは、`（N日更新なし）（担当: @alice）（作成者: @bob）（ラベル: bug）（作成から12日）（マイルストーン: v1.0）` の順です。
 - `--summary` の件数の行は、`--only` や `--hide-empty` に関係なく、常に6つの分類すべての件数を出します。
 - `--group-by assignee` と同時に指定した場合
-  - `--only`、`--exclude`、`--since` は、出す Issue を絞ります。`--only`、`--exclude` では、選んだ分類のどれかに入る Issue だけを出し、行末の分類の名前も選んだ分類だけにします。
-  - 見出しの総件数は、分類ごとのときと同じです（`--since` で絞った後の全件。`--only`、`--exclude` に関係なし）。
+  - `--only`、`--exclude`、`--since`、`--until` は、出す Issue を絞ります。`--only`、`--exclude` では、選んだ分類のどれかに入る Issue だけを出し、行末の分類の名前も選んだ分類だけにします。
+  - 見出しの総件数は、分類ごとのときと同じです（`--since`、`--until` で絞った後の全件。`--only`、`--exclude` に関係なし）。
   - `--sort`、`--reverse`、`--limit` は各担当者の中で効きます（`--limit` で出さなかった Issue があれば、その担当者の最後に `- ほか N 件`。見出しの件数は全件のまま）。
   - `--stale`、`--show-assignees`、`--show-author`、`--show-labels`、`--age`、`--show-milestone` の印は、分類の名前の後ろに付きます（例: `（作業中, 着手可能）（13日更新なし）（担当: @alice）（作成者: @bob）（ラベル: bug）（作成から12日）（マイルストーン: v1.0）`）。
-  - `--summary` は、総件数の次に担当者ごとの件数を1行で出します（例: `@alice 2 / @bob 1 / 担当者なし 1`。順は見出しと同じ）。この行は `--only`、`--exclude` に関係なく、`--since` で絞った後の全件で数えます。出す Issue がなければ「なし」です。
+  - `--summary` は、総件数の次に担当者ごとの件数を1行で出します（例: `@alice 2 / @bob 1 / 担当者なし 1`。順は見出しと同じ）。この行は `--only`、`--exclude` に関係なく、`--since`、`--until` で絞った後の全件で数えます。出す Issue がなければ「なし」です。
   - `--hide-empty` は効果がありません（0件の担当者は出さないため）。
   - `--diff` の `## 前回からの変化` の節は、分類ごとのときと同じです。
   - `--title`、`--output`、`--config` は分類ごとのときと同じように効きます。
   - `--json`、`--csv` と同時に指定するとエラーです。
   - `--max-chars` は、最後の担当者の見出し（`## 担当者なし` があればそれ）から順に、各担当者の末尾の Issue の行を1行ずつ削ります。最後の担当者の Issue の行がなくなったら、1つ前の担当者を削ります。削った担当者の最後に `- ほか N 件` を出し、`--limit` で省いた件数とまとめて1行にします。見出し、件数、`--summary` の行、`--diff` の節は削りません。行末の分類の名前と印を含めた行で数えます。すべて削っても収まらないときの警告は、分類ごとのときと同じです。
-- `--fail-if-any` は、ほかのオプションすべてと同時に使えます。終了コードの判定は `--since` で絞った後の件数で行い、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--max-chars` には左右されません。`--json`、`--csv`、`--group-by`、`--output` のどれと同時でも、出力してから終了コード 3 で終わります。設定ファイルの `fail_if_any` も同じで、コマンドラインで `--fail-if-any` を指定したときは使いません。
+- `--fail-if-any` は、ほかのオプションすべてと同時に使えます。終了コードの判定は `--since`、`--until` で絞った後の件数で行い、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--max-chars` には左右されません。`--json`、`--csv`、`--group-by`、`--output` のどれと同時でも、出力してから終了コード 3 で終わります。設定ファイルの `fail_if_any` も同じで、コマンドラインで `--fail-if-any` を指定したときは使いません。
 - 終了コードは「終了コード」の節を見てください。
 - 設定ファイルの `group_by`、`max_chars` と `json = true` を一緒に書くと、コマンドラインで `--group-by`、`--max-chars` と `--json` を同時に指定したときと同じエラーで終了コード 2 です。コマンドラインで `--json` か `--csv` を指定したときは、設定の `group_by` と `max_chars` は使いません。
 - `--config` は、ほかのオプションすべてと同時に使えます。設定ファイルの値は、コマンドラインで同じオプションを指定したときは使いません（詳しくは「設定ファイルと `--config <パス>`」）。

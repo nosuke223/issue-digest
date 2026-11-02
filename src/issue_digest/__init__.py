@@ -24,7 +24,7 @@ from issue_digest.loader import (
 
 USAGE = (
     "使い方: issue-digest [--hide-empty] [--summary] [--only <ラベル>]... [--exclude <ラベル>]..."
-    " [--stale <日数>] [--age] [--since <YYYY-MM-DD | Nd>]"
+    " [--stale <日数>] [--age] [--since <YYYY-MM-DD | Nd>] [--until <YYYY-MM-DD>]"
     " [--json | --csv] [--sort updated|created] [--reverse] [--limit <件数>]"
     " [--max-chars <文字数>]"
     " [--show-assignees] [--show-author]"
@@ -51,6 +51,10 @@ USAGE = (
     "  --since で最終更新（updatedAt）が指定日（YYYY-MM-DD、UTC の0時）以降の Issue だけを出す"
     "（7d のように日数を指定すると、基準時刻の7日前以降。基準時刻は --stale、--age と同じ。"
     "updatedAt がない Issue は出さない。件数も絞った後の数。--diff の比較は全件で行う）\n"
+    "  --until で最終更新（updatedAt）が指定日（YYYY-MM-DD）の UTC の終わりまで（翌日0時より前）の"
+    "Issue だけを出す（指定日に更新された Issue も出る。--since と一緒に指定すると期間で絞れる。"
+    "--since の日付（7d なら基準時刻から直した日付）が --until より後ならエラー。"
+    "updatedAt がない Issue、件数、--diff の扱いは --since と同じ。設定ファイルには書けない）\n"
     "  --sort updated で各分類の中を最終更新の古い順に並べる"
     "（--sort created なら作成日時の古い順）\n"
     "  --reverse で各分類（--group-by assignee のときは各担当者）の中の並びを逆にする"
@@ -83,7 +87,7 @@ USAGE = (
     "  --diff で前回の --json の出力と比べ、新しい Issue、なくなった Issue、分類が変わった Issue を"
     "出す（Issue は URL で照合する。"
     "Markdown は末尾に「## 前回からの変化」、JSON は diff を加える。--csv では無視する。"
-    "前回の JSON は --only、--exclude、--hide-empty、--limit、--since を付けず、"
+    "前回の JSON は --only、--exclude、--hide-empty、--limit、--since、--until を付けず、"
     "設定ファイルの hide_empty、only、exclude、limit、since も使わずに出力したもの。"
     "付けて出力した JSON だと、入っていなかった Issue は"
     "新しい Issue や分類が変わった Issue として出る）\n"
@@ -122,7 +126,7 @@ USAGE = (
     "--hide-empty は効果がない）\n"
     "  --fail-if-any で指定した分類に Issue が1件以上あるとき、ダイジェストをいつもどおり出力"
     "（--output ならファイルに書き出して）してから終了コード 3 で終わる"
-    "（複数回指定でき、どれか1つにあれば 3。判定は --since で絞った後の件数で、"
+    "（複数回指定でき、どれか1つにあれば 3。判定は --since、--until で絞った後の件数で、"
     "--only、--exclude、--hide-empty、--limit、--max-chars には左右されない。"
     "エラー（終了コード 1、2）のときはそちらを優先する）\n"
     "  --version でバージョンだけを出力する（ほかの指定は無視する）\n"
@@ -161,6 +165,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--limit")
     parser.add_argument("--max-chars")
     parser.add_argument("--since")
+    parser.add_argument("--until")
     parser.add_argument("--output")
     parser.add_argument("--title")
     parser.add_argument("--diff")
@@ -193,14 +198,15 @@ def _parse_since_days(value: str) -> int | None:
 
 
 def _join_dash_value(args: list[str]) -> list[str]:
-    """`--since -1d` を `--since=-1d` に、`--repo -x/y` を `--repo=-x/y` にする。argparse が
-    -1d をオプションと見なして使い方を出さずに、値の検査のエラーを出すため。
+    """`--since -1d` を `--since=-1d` に、`--repo -x/y` を `--repo=-x/y` にする
+    （`--until` も同じ）。argparse が -1d をオプションと見なして使い方を出さずに、
+    値の検査のエラーを出すため。
     `--` で始まる値（別のオプション）は変えない。"""
     joined: list[str] = []
     i = 0
     while i < len(args):
         if (
-            args[i] in ("--since", "--repo")
+            args[i] in ("--since", "--until", "--repo")
             and i + 1 < len(args)
             and re.fullmatch(r"-[^-].*", args[i + 1])
         ):
@@ -342,6 +348,30 @@ def main(argv: list[str] | None = None, now: datetime | None = None, run: Runner
                 file=sys.stderr,
             )
             return 2
+    # --until は設定ファイルに書けない（日付が固定されて古くなるため）
+    until: datetime | None = None
+    if opts.until is not None:
+        until_day = _parse_since(opts.until)
+        if until_day is None:
+            print(
+                f"エラー: --until には YYYY-MM-DD の形の日付を指定してください: {opts.until}",
+                file=sys.stderr,
+            )
+            return 2
+        # --since の日付（7d の形なら基準時刻から直した UTC の日付）と日付どうしで比べる
+        if (
+            opts.since is not None
+            and since is not None
+            and since.astimezone(UTC).date() > until_day.date()
+        ):
+            print("エラー: --since は --until より前の日付にしてください", file=sys.stderr)
+            return 2
+        try:
+            # UTC のその日の終わりまで（翌日0時より前）
+            until = until_day + timedelta(days=1)
+        except OverflowError:
+            # 9999-12-31 は翌日を表せないが、それより後に更新された Issue はないので絞らない
+            until = None
     if group_by is not None and group_by != "assignee":
         print(
             f"エラー: --group-by に指定できる値は assignee です: {group_by}",
@@ -469,15 +499,22 @@ def main(argv: list[str] | None = None, now: datetime | None = None, run: Runner
     )
     all_classified = classify_issues(issues, category_labels)
     classified = all_classified
-    if since is not None:
+    if since is not None or opts.until is not None:
+        # updatedAt がない Issue は、--since でも --until でも出さない
         classified = classify_issues(
-            [i for i in issues if i.updated_at is not None and i.updated_at >= since],
+            [
+                i
+                for i in issues
+                if i.updated_at is not None
+                and (since is None or i.updated_at >= since)
+                and (until is None or i.updated_at < until)
+            ],
             category_labels,
         )
     diff: Diff | None = None
     if opts.diff is not None and not as_csv:
         try:
-            # 今回の --only や --since などに関係なく、全分類の全件で比べる
+            # 今回の --only や --since、--until などに関係なく、全分類の全件で比べる
             diff = compute_diff(load_previous(opts.diff), all_classified)
         except FileNotFoundError:
             print(f"エラー: 前回の JSON が見つかりません: {opts.diff}", file=sys.stderr)
@@ -574,7 +611,7 @@ def main(argv: list[str] | None = None, now: datetime | None = None, run: Runner
             f"（{len(digest)} 文字）",
             file=sys.stderr,
         )
-    # 判定は --since で絞った後の件数で行い、--only などの出力の絞り込みには左右されない
+    # 判定は --since、--until で絞った後の件数で行い、--only などの出力の絞り込みには左右されない
     exit_code = 3 if any(classified[label] for label in fail_if_any) else 0
     if output is None:
         print(digest, end="")
