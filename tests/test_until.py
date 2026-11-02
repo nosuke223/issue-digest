@@ -174,12 +174,60 @@ def test_main_config_until_is_unknown_key(capsys, tmp_path):
     assert capsys.readouterr().err == "エラー: 設定ファイルに知らないキーがあります: until\n"
 
 
-def test_main_config_since_with_until_not_compared(capsys, tmp_path):
-    # 順の検査はコマンドラインの --since だけ。設定の since とは比べず、両方で絞る
+def _config_since(tmp_path, value):
     config = tmp_path / "config.toml"
-    config.write_text('since = "1d"\n', encoding="utf-8")
-    assert main(["--config", str(config), "--until", "2026-10-31", UNTIL], now=NOW) == 0
+    config.write_text(f'since = "{value}"\n', encoding="utf-8")
+    return str(config)
+
+
+def test_main_config_since_after_until(capsys, tmp_path):
+    # 設定の since も --since と同じ決まりで比べる。1d は11月1日で、10月31日より後
+    config = _config_since(tmp_path, "1d")
+    assert main(["--config", config, "--until", "2026-10-31", UNTIL], now=NOW) == 2
+    captured = capsys.readouterr()
+    assert captured.err == (
+        "エラー: 設定ファイルの since（1d）は --until より前の日付にしてください\n"
+    )
+    assert captured.out == ""
+
+
+def test_main_config_since_after_until_with_fail_if_any(capsys, tmp_path):
+    # 0件で終了コード 0 にならず、--fail-if-any の判定の前にエラーになる
+    config = _config_since(tmp_path, "1d")
+    args = ["--config", config, "--until", "2026-10-31", "--fail-if-any", "agent:review"]
+    assert main([*args, UNTIL], now=NOW) == 2
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("until", ["2026-11-01", "2026-11-02", "2026-12-31"])
+def test_main_config_since_not_after_until_filters_both(capsys, tmp_path, until):
+    # 1d は 2026-11-01 12時。--until が11月1日以降ならエラーにせず、両方の条件で絞る。
+    # 11月1日0時の #4 も設定の since より前なので出ない
+    config = _config_since(tmp_path, "1d")
+    assert main(["--config", config, "--until", until, UNTIL], now=NOW) == 0
     assert issue_numbers_in_output(capsys.readouterr().out) == []
+
+
+def test_main_config_since_same_day_as_until_filters_both(capsys, tmp_path):
+    # 2d は 2026-10-31 12時。同じ日なのでエラーにせず、両方の条件で絞る
+    config = _config_since(tmp_path, "2d")
+    assert main(["--config", config, "--until", "2026-10-31", UNTIL], now=NOW) == 0
+    assert sorted(issue_numbers_in_output(capsys.readouterr().out)) == [3, 5]
+
+
+def test_main_config_since_with_wide_range_and_until(capsys, tmp_path):
+    # 32d は 2026-10-01 12時。--until と組み合わせて期間で絞れる
+    # （#1、#2 は設定の since で、#4 は --until で除かれる）
+    config = _config_since(tmp_path, "32d")
+    assert main(["--config", config, "--until", "2026-10-31", UNTIL], now=NOW) == 0
+    assert sorted(issue_numbers_in_output(capsys.readouterr().out)) == [3, 5]
+
+
+def test_main_command_line_since_ignores_config_since_with_until(capsys, tmp_path):
+    # --since を指定すると設定の since は使わないので、設定の 1d とは比べない
+    config = _config_since(tmp_path, "1d")
+    assert main(["--config", config, *OCTOBER, UNTIL], now=NOW) == 0
+    assert sorted(issue_numbers_in_output(capsys.readouterr().out)) == [2, 3, 5]
 
 
 def test_main_usage_mentions_until(capsys):
