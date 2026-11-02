@@ -21,6 +21,7 @@ _KEYS = (
     *_BOOL_KEYS,
     "only",
     "exclude",
+    "fail_if_any",
     "stale",
     "since",
     "sort",
@@ -103,7 +104,7 @@ def _validate(data: dict[str, Any]) -> dict[str, Any]:
                 raise ConfigError(
                     f'設定ファイルの sort には "updated" か "created" を指定してください: {value}'
                 )
-        elif key in ("only", "exclude"):
+        elif key in ("only", "exclude", "fail_if_any"):
             if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
                 raise ConfigError(f"設定ファイルの {key} には文字列の配列を指定してください")
             for label in value:

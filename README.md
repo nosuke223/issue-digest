@@ -537,7 +537,7 @@ gh issue list -L 1000 --json number,title,labels,url | uv run issue-digest --jso
 `--config <パス>` で読むファイルを指定できます（このとき `.issue-digest.toml` は読みません）。指定したファイルがなければ、`エラー: 設定ファイルが見つかりません: <パス>` を標準エラーに出して終了コード 1 で終わります。
 ホームディレクトリなど、ほかの場所の設定ファイルは探しません。
 
-書けるキーは次の20個です。
+書けるキーは次の21個です。
 
 | キー | 型 | 対応するオプション |
 | --- | --- | --- |
@@ -559,6 +559,7 @@ gh issue list -L 1000 --json number,title,labels,url | uv run issue-digest --jso
 | `max_chars` | 1以上の整数 | `--max-chars` |
 | `group_by` | `"assignee"` だけ | `--group-by assignee` |
 | `json` | 真偽値 | `--json` |
+| `fail_if_any` | 文字列の配列（`--fail-if-any` と同じ6つのラベル） | `--fail-if-any` |
 | `headings` | テーブル（`[headings]`）。キーは `--only` と同じ6つのラベル、値は1文字以上の文字列 | なし（下の「分類の見出しを変える」を参照） |
 | `category_labels` | テーブル（`[category_labels]`）。キーは `unclassified` 以外の5つの分類の名前、値は1文字以上の文字列を1つ以上入れた配列 | なし（下の「分類に使うラベルを変える」を参照） |
 
@@ -568,6 +569,7 @@ gh issue list -L 1000 --json number,title,labels,url | uv run issue-digest --jso
 - 設定の `only` と `exclude` は、コマンドラインで `--only` か `--exclude` を1つでも指定したら、どちらも使いません。指定しないときだけ使います。
 - 設定に `only` と `exclude` を両方書く（どちらも空の配列でない）と、`エラー: --only と --exclude は同時に指定できません` を標準エラーに出して終了コード 2 で終わります。空の配列は、書かないのと同じです。コマンドラインで `--only` か `--exclude` を指定したときは、設定の `only` と `exclude` を使わないので、このエラーになりません。
 - 設定の `since` は `"7d"` の形だけ書けます。日付の形（`"2026-10-01"`）は、書くと日付が固定になって古くなるので書けません。日付の形、`"7"`、`"7D"`、数値などは、`エラー: 設定ファイルの since には ...` を標準エラーに出して終了コード 2 で終わります。コマンドラインで `--since` を指定したら（日付の形でも日数の形でも）、設定の `since` は使いません。
+- 設定の `fail_if_any` は、コマンドラインで `--fail-if-any` を1つでも指定したら使いません。空の配列は、書かないのと同じです。
 - 設定の `title`、`limit`、`max_chars`、`group_by` も、コマンドラインで `--title`、`--limit`、`--max-chars`、`--group-by` を指定したら使いません。
 - 設定の `group_by` と `max_chars` は、コマンドラインで `--json` または `--csv` を指定したら使いません（コマンドラインの出力形式が優先です）。
 - 設定どうしが矛盾するとき（設定の `json = true` と `group_by` または `max_chars` を一緒に書いたときなど）は、コマンドラインで同じ指定をしたときと同じエラーを標準エラーに出して終了コード 2 で終わります。
@@ -590,6 +592,7 @@ max_chars = 2000
 group_by = "assignee"
 exclude = ["unclassified"]
 reverse = true
+fail_if_any = ["agent:needs-decision", "agent:blocked"]
 ```
 
 ```
@@ -689,7 +692,8 @@ gh issue list -L 1000 --json number,title,labels,url,assignees | uv run issue-di
 - 判定に使う件数は、`--since` で絞った後の件数です。`--only`、`--exclude`、`--hide-empty`、`--limit`、`--max-chars` には左右されないので、出力に出ていない分類でも判定します。
 - 指定できるラベルは `--only` と同じ6つ（`agent:ready`、`agent:working`、`agent:review`、`agent:needs-decision`、`agent:blocked`、`unclassified`）です。これは分類の名前で、設定ファイルの `[category_labels]` で分類に使うラベルを変えても変わりません。それ以外を指定すると、エラーを標準エラーに出して終了コード 2 で終わります。`--fail-if-any` の後に値がない場合も終了コード 2 です。
 - エラー（終了コード 1、2）になるときは、今までと同じ終了コードで終わります（3 にはなりません）。ファイルに書き出せないときも終了コード 1 です。
-- Markdown、`--json`、`--csv`、`--group-by` のどれでも効きます。設定ファイルにキーはありません。
+- Markdown、`--json`、`--csv`、`--group-by` のどれでも効きます。
+- 設定ファイルの `fail_if_any`（例: `fail_if_any = ["agent:blocked"]`）にも書けます。意味は `--fail-if-any` と同じで、コマンドラインで `--fail-if-any` を1つでも指定したら設定の値は使いません。空の配列は、書かないのと同じです。知らないラベル、配列でない値、文字列でない要素は、`エラー: 設定ファイルの fail_if_any ...` を標準エラーに出して終了コード 2 で終わります。
 
 ```
 uv run issue-digest --fail-if-any agent:needs-decision --fail-if-any agent:blocked --output digest.md issues.json
@@ -767,7 +771,7 @@ if [ "$status" -eq 3 ]; then notify "判断待ちか中断の Issue がありま
   - `--title`、`--output`、`--config` は分類ごとのときと同じように効きます。
   - `--json`、`--csv` と同時に指定するとエラーです。
   - `--max-chars` は、最後の担当者の見出し（`## 担当者なし` があればそれ）から順に、各担当者の末尾の Issue の行を1行ずつ削ります。最後の担当者の Issue の行がなくなったら、1つ前の担当者を削ります。削った担当者の最後に `- ほか N 件` を出し、`--limit` で省いた件数とまとめて1行にします。見出し、件数、`--summary` の行、`--diff` の節は削りません。行末の分類の名前と印を含めた行で数えます。すべて削っても収まらないときの警告は、分類ごとのときと同じです。
-- `--fail-if-any` は、ほかのオプションすべてと同時に使えます。終了コードの判定は `--since` で絞った後の件数で行い、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--max-chars` には左右されません。`--json`、`--csv`、`--group-by`、`--output` のどれと同時でも、出力してから終了コード 3 で終わります。
+- `--fail-if-any` は、ほかのオプションすべてと同時に使えます。終了コードの判定は `--since` で絞った後の件数で行い、`--only`、`--exclude`、`--hide-empty`、`--limit`、`--max-chars` には左右されません。`--json`、`--csv`、`--group-by`、`--output` のどれと同時でも、出力してから終了コード 3 で終わります。設定ファイルの `fail_if_any` も同じで、コマンドラインで `--fail-if-any` を指定したときは使いません。
 - 終了コードは「終了コード」の節を見てください。
 - 設定ファイルの `group_by`、`max_chars` と `json = true` を一緒に書くと、コマンドラインで `--group-by`、`--max-chars` と `--json` を同時に指定したときと同じエラーで終了コード 2 です。コマンドラインで `--json` か `--csv` を指定したときは、設定の `group_by` と `max_chars` は使いません。
 - `--config` は、ほかのオプションすべてと同時に使えます。設定ファイルの値は、コマンドラインで同じオプションを指定したときは使いません（詳しくは「設定ファイルと `--config <パス>`」）。
