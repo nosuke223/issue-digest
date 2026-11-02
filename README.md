@@ -80,7 +80,7 @@ uv run issue-digest --repo owner/repo
 | `--title <文字列>` | 見出しの `Issue ダイジェスト` を指定した文字列に置き換える | `uv run issue-digest --title issue-digest issues.json` |
 | `--output <パス>` | 標準出力ではなく、指定したファイルに書き出す | `uv run issue-digest --output digest.md issues.json` |
 | `--diff <前回のJSONのパス>` | 前回の `--json` の出力と比べ、変化した Issue を末尾に出す | `uv run issue-digest --diff last.json issues.json` |
-| `--fail-if-any <ラベル>` | 指定したラベルの分類に Issue が1件以上あるとき、終了コード 3 で終わる（複数回指定できる） | `uv run issue-digest --fail-if-any agent:blocked issues.json` |
+| `--fail-if-any <ラベル>` | 指定したラベルの分類に Issue が1件以上あるとき、終了コード 3 で終わる（複数回指定できる。設定ファイルの `fail_if_any` にも書ける） | `uv run issue-digest --fail-if-any agent:blocked issues.json` |
 | `--config <パス>` | 読む設定ファイルを指定する（省略時はカレントディレクトリの `.issue-digest.toml`） | `uv run issue-digest --config my.toml issues.json` |
 | `--group-by assignee` | 分類ごとの代わりに、担当者ごとの見出しで並べる（Markdown だけ） | `uv run issue-digest --group-by assignee issues.json` |
 
@@ -757,10 +757,10 @@ cron や CI で終了コードによって処理を分けたいときの一覧�
 
 | 終了コード | 意味 | 起きる例 |
 | --- | --- | --- |
-| 0 | 正常 | ダイジェストを出力した。`--fail-if-any` を付けたときは、指定した分類のどれにも Issue がなかった |
+| 0 | 正常 | ダイジェストを出力した。`--fail-if-any`（または設定の `fail_if_any`）で分類を指定したときは、指定した分類のどれにも Issue がなかった |
 | 1 | 実行時のエラー | 入力のファイルが読めない（`エラー: ファイルが見つかりません: <パス>`）、設定ファイルが見つからない・読めない（`エラー: 設定ファイルが見つかりません: <パス>`）、`--diff` の前回の JSON が見つからない・形が違う、`--output` のファイルを書き出せない、`gh` が失敗した、`updatedAt` や `createdAt` が日時として読めない |
 | 2 | オプションの指定のエラー | `--fail-if-any` や `--only` に知らない値を指定した、`--only` と `--exclude` のように同時に使えないものを指定した、`--repo` の形の誤り、設定ファイルの中身の誤り（TOML として読めない、知らないキー、値の型や形の誤り） |
-| 3 | `--fail-if-any` で指定した分類に Issue がある | `--fail-if-any agent:ready` を付けて、着手可能の分類に Issue が1件以上あった |
+| 3 | `--fail-if-any`（または設定の `fail_if_any`）で指定した分類に Issue がある | `--fail-if-any agent:ready` を付けて（または設定に `fail_if_any = ["agent:ready"]` と書いて）、着手可能の分類に Issue が1件以上あった |
 
 - エラー（1 か 2）のときは、3 より 1 か 2 を優先します。`--fail-if-any` の分類に Issue があっても、エラーなら 3 にはなりません。
 - 終了コード 3 のときも、ダイジェストはいつもどおり出力します。`--output` があるときは、ファイルに書き出してから終了コード 3 で終わります。
