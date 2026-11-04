@@ -309,6 +309,19 @@ def approve_and_merge(repo: str, pr: int, sha: str) -> None:
     gh("pr", "merge", str(pr), "-R", repo, "--merge", "--match-head-commit", sha)
 
 
+def delete_branch(repo: str, branch: str) -> None:
+    """マージした PR のブランチを消す。
+
+    Actions のトークンでマージすると、リポジトリの「マージ後にブランチを消す」設定が働かないため。
+    消せなくても（人が先に消したなど）、マージは済んでいるので続ける。
+    """
+    subprocess.run(
+        ["gh", "api", "-X", "DELETE", f"repos/{repo}/git/refs/heads/{branch}"],
+        capture_output=True,
+        text=True,
+    )
+
+
 def close_issue(repo: str, issue: int) -> None:
     """Issue を「完了」で閉じ、agent:* のラベルを外す。
 
@@ -357,6 +370,7 @@ def main() -> int:
                 continue
             comment(repo, pr["number"], comment_body("ok", [], sha, mode))
             close_issue(repo, number)
+            delete_branch(repo, pr["head"]["ref"])
             continue
         comment(repo, pr["number"], comment_body(verdict, reasons, sha, mode))
     return 0
