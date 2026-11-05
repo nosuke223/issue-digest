@@ -34,6 +34,11 @@ MARKER = "<!-- auto-merge-check sha={sha} result={result} verdict={verdict} mode
 MARKER_RE = re.compile(
     r"<!-- auto-merge-check sha=(\w+) result=(\w+)(?: verdict=([\w-]+) mode=([\w-]+))? -->"
 )
+# 後片付け（Issue を閉じる、ラベル、ブランチ）が済んだ記録。
+# 済んでから書く「マージしました」のコメントに付ける。
+# 以前の版は後片付けの前に「マージしました」と書いていたので、判定の印とは別にする
+CLEANUP_MARKER = "<!-- auto-merge-cleanup-done sha={sha} -->"
+CLEANUP_RE = re.compile(r"<!-- auto-merge-cleanup-done sha=(\w+) -->")
 # 変えていたら人が見る（ルール、設定、CI、依存）
 # 依存のファイルは、型（python-cli、web）のものをまとめて見る
 CAREFUL_NAMES = {
@@ -77,6 +82,20 @@ def issue_number_of(branch: str, closing: list[int]) -> int | None:
     if not m or closing != [int(m.group(1))]:
         return None
     return int(m.group(1))
+
+
+def closing_numbers(refs: list, repo: str) -> list[int]:
+    """PR が閉じる Issue の番号。別のリポジトリの Issue は -1 にする。
+
+    番号だけで、このリポジトリの Issue と取り違えないようにするため。
+
+    -1 が混ざると issue_number_of が「1件だけ」を満たさないので、その PR は対象外になる。
+    """
+    numbers = []
+    for ref in refs:
+        name = ((ref.get("repository") or {}).get("nameWithOwner") or "").lower()
+        numbers.append(ref["number"] if name == repo.lower() else -1)
+    return numbers
 
 
 def label_added_by(events: list, label: str) -> str | None:
@@ -241,7 +260,7 @@ CLOSING_QUERY = """
 query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
     pullRequest(number: $number) {
-      closingIssuesReferences(first: 10) { nodes { number } }
+      closingIssuesReferences(first: 10) { nodes { number repository { nameWithOwner } } }
     }
   }
 }
@@ -253,8 +272,7 @@ def collect(repo: str, owner: str, pr: dict) -> tuple[int | None, dict | None]:
     name = repo.split("/", 1)[1]
     data = gh_graphql(CLOSING_QUERY, owner=owner, name=name, number=pr["number"])
     refs = data["repository"]["pullRequest"]["closingIssuesReferences"]["nodes"]
-    closing = [n["number"] for n in refs]
-    number = issue_number_of(pr["head"]["ref"], closing)
+    number = issue_number_of(pr["head"]["ref"], closing_numbers(refs, repo))
     if number is None:
         return None, None
     issue = gh_api(f"repos/{repo}/issues/{number}")
@@ -344,28 +362,36 @@ def approve_and_merge(repo: str, pr: int, sha: str) -> None:
     gh("pr", "merge", str(pr), "-R", repo, "--merge", "--match-head-commit", sha)
 
 
-def delete_branch(repo: str, branch: str) -> None:
-    """マージした PR のブランチを消す。
+def delete_branch(repo: str, branch: str, sha: str, head_repo: str | None) -> bool:
+    """マージした PR のブランチを消す。消すべきものが残っていなければ True。
 
     Actions のトークンでマージすると、リポジトリの「マージ後にブランチを消す」設定が働かないため。
-    消せなくても（人が先に消したなど）、マージは済んでいるので続ける。
+    消すのは、ブランチがこのリポジトリのもので（fork ではない）、
+    先頭がマージしたコミットのままのときだけ。
+    同じ名前で作り直されたブランチや、新しいコミットが足されたブランチは、未マージの作業なので残す。
     """
-    subprocess.run(
-        ["gh", "api", "-X", "DELETE", f"repos/{repo}/git/refs/heads/{branch}"],
-        capture_output=True,
-        text=True,
-    )
+    if (head_repo or "").lower() != repo.lower():
+        return True  # fork の PR。マージ先の同じ名前のブランチは別物
+    ref = f"repos/{repo}/git/refs/heads/{branch}"
+    current = subprocess.run(["gh", "api", ref], capture_output=True, text=True)
+    if current.returncode != 0:
+        return "Not Found" in (current.stderr or "")  # すでに消えている
+    if json.loads(current.stdout).get("object", {}).get("sha") != sha:
+        return True
+    result = subprocess.run(["gh", "api", "-X", "DELETE", ref], capture_output=True, text=True)
+    return result.returncode == 0 or "Reference does not exist" in (result.stderr or "")
 
 
 def close_issue(repo: str, issue: int) -> None:
-    """Issue を「完了」で閉じ、agent:* のラベルを外す。
+    """Issue を「完了」で閉じ、agent:* のラベルを外す。閉じていれば、ラベルだけ外す。
 
     Actions のトークンでマージすると、PR の `Closes` があっても Issue は閉じない。
     閉じたことも別の Actions に届かず、いつもラベルを外す「エージェントのラベルを外す」も動かない。
     そのため、ここで両方を行う。「完了」で閉じるのは、ランナーが着手の条件を「済み」と読むため。
     """
-    gh("issue", "close", str(issue), "-R", repo, "--reason", "completed")
     data = gh_api(f"repos/{repo}/issues/{issue}")
+    if data.get("state") == "open":
+        gh("issue", "close", str(issue), "-R", repo, "--reason", "completed")
     for label in data.get("labels", []):
         if label["name"].startswith("agent:"):
             gh("issue", "edit", str(issue), "-R", repo, "--remove-label", label["name"])
@@ -408,12 +434,88 @@ def main() -> int:
                 print(f"PR #{pr['number']}: マージに失敗しました: {error}")
                 comment(repo, pr["number"], comment_body("error", [error], sha, mode))
                 continue
-            comment(repo, pr["number"], comment_body("ok", [], sha, mode))
-            close_issue(repo, number)
-            delete_branch(repo, pr["head"]["ref"])
+            head_repo = (pr["head"].get("repo") or {}).get("full_name")
+            finish_merged(repo, pr["number"], number, pr["head"]["ref"], sha, mode, head_repo)
             continue
         comment(repo, pr["number"], comment_body(verdict, reasons, sha, mode))
+    if mode == "on":
+        retry_unfinished(repo, agent, default_branch)
     return 0
+
+
+def finish_merged(
+    repo: str, pr: int, issue: int, branch: str, sha: str, mode: str, head_repo: str | None
+) -> bool:
+    """マージの後片付け。Issue を閉じてラベルを外し、ブランチを消し、済んだらコメントを書く。
+
+    そのコメント（判定の印 verdict=ok mode=on）が、後片付けが済んだ記録になる。
+    どれかが失敗したら書かず、次の回の retry_unfinished がやり直す。済んだら True。
+    """
+    try:
+        close_issue(repo, issue)
+    except subprocess.CalledProcessError as e:
+        print(f"PR #{pr}: Issue を閉じられませんでした（次の回にやり直す）: {e.stderr}")
+        return False
+    if not delete_branch(repo, branch, sha, head_repo):
+        print(f"PR #{pr}: ブランチを消せませんでした（次の回にやり直す）")
+        return False
+    comment(repo, pr, comment_body("ok", [], sha, mode) + "\n" + CLEANUP_MARKER.format(sha=sha))
+    return True
+
+
+def cleanup_done(comments: list, sha: str) -> bool:
+    """この PR の後片付けが済んだ記録（GitHub Actions のコメントの CLEANUP_MARKER）があるか。"""
+    for c in comments:
+        if (c.get("user") or {}).get("login") != ACTIONS_BOT:
+            continue
+        if any(m.group(1) == sha for m in CLEANUP_RE.finditer(c.get("body") or "")):
+            return True
+    return False
+
+
+def reopened_after(events: list, when: str) -> bool:
+    """when（マージした時刻）より後に、Issue が開き直されたか。
+
+    人の判断なので、後片付けで閉じ直さない。
+    """
+    return any(e.get("event") == "reopened" and (e.get("created_at") or "") > when for e in events)
+
+
+def retry_unfinished(repo: str, agent: str, default_branch: str) -> None:
+    """GitHub Actions がマージしたのに、後片付けが済んだ記録のない PR の後片付けをやり直す。
+
+    マージした回の後片付けが一時的なエラーで失敗すると、PR はもう開いていないので、
+    判定の流れでは二度と見ない。最近閉じた PR から探す。マージの後に Issue が開き直されていたら、
+    所有者の判断なので触らない。
+    """
+    recent = gh_api(f"repos/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page=20")
+    for pr in recent:
+        if not pr.get("merged_at") or pr["user"]["login"] != agent:
+            continue
+        if (pr.get("base") or {}).get("ref") != default_branch:
+            continue
+        if not re.match(r"issue-\d+-", pr["head"]["ref"]):
+            continue
+        sha = pr["head"]["sha"]
+        comments = gh_api(f"repos/{repo}/issues/{pr['number']}/comments", paginate=True)
+        if cleanup_done(comments, sha):
+            continue
+        detail = gh_api(f"repos/{repo}/pulls/{pr['number']}")
+        if (detail.get("merged_by") or {}).get("login") != ACTIONS_BOT:
+            continue  # 人がマージしたものは、人が判断する
+        owner, name = repo.split("/", 1)
+        data = gh_graphql(CLOSING_QUERY, owner=owner, name=name, number=pr["number"])
+        refs = data["repository"]["pullRequest"]["closingIssuesReferences"]["nodes"]
+        number = issue_number_of(pr["head"]["ref"], closing_numbers(refs, repo))
+        if number is None:
+            continue
+        events = gh_api(f"repos/{repo}/issues/{number}/events", paginate=True)
+        if reopened_after(events, pr["merged_at"]):
+            print(f"PR #{pr['number']}: マージの後に Issue #{number} が開き直されたので、触らない")
+            continue
+        print(f"PR #{pr['number']}: 後片付けが済んでいないので、やり直す")
+        head_repo = (pr["head"].get("repo") or {}).get("full_name")
+        finish_merged(repo, pr["number"], number, pr["head"]["ref"], sha, "on", head_repo)
 
 
 def comment(repo: str, pr: int, body: str) -> None:
