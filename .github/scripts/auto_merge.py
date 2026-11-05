@@ -35,7 +35,20 @@ MARKER_RE = re.compile(
 )
 # 変えていたら人が見る（ルール、設定、CI、依存）
 CAREFUL_PREFIXES = (".github/", ".claude/", ".env")
-CAREFUL_NAMES = {"pyproject.toml", "uv.lock", "CLAUDE.md", "AGENTS.md"}
+# 依存のファイルは、型（python-cli、web）のものをまとめて見る
+CAREFUL_NAMES = {
+    "pyproject.toml",
+    "uv.lock",
+    "package.json",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "bun.lock",
+    "bun.lockb",
+    ".npmrc",
+    "CLAUDE.md",
+    "AGENTS.md",
+}
 
 
 def gh_api(path: str, paginate: bool = False):
